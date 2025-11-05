@@ -43,6 +43,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'corsheaders',
+    'rest_framework',
+    'django_filters',
     # Apps del proyecto
     'apps.users',
     'apps.branches',
@@ -140,3 +142,18 @@ AUTH_USER_MODEL = 'users.User'
 # CORS Configuration
 CORS_ALLOWED_ORIGINS = [origin.strip() for origin in os.getenv('CORS_ALLOWED_ORIGINS', '').split(',') if origin.strip()]
 CORS_ALLOW_CREDENTIALS = True
+
+# Django REST Framework Configuration
+REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ],
+    # Authentication will be configured in Phase 4 with JWT
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny',  # Temporal para testing, cambiar a IsAuthenticated en Fase 4
+    ],
+}

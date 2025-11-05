@@ -1428,6 +1428,498 @@ Branch.objects.count()  # Debe retornar 3
 
 ---
 
-**Ultima actualizacion:** Noviembre 5, 2025 - 11:00 AM
+## 12. Arquitectura de la API REST (Fase 3 - Completada)
+
+### 12.1 Estructura de Serializers
+
+Los serializers actúan como capa de traducción entre los modelos Django y las representaciones JSON de la API.
+
+#### Patrón de Serialización Anidada
+
+**Problema resuelto:** Evitar que el frontend tenga que hacer múltiples requests para obtener datos relacionados.
+
+**Implementación:**
+```python
+# apps/employees/serializers.py
+class EmployeeSerializer(serializers.ModelSerializer):
+    # Campo anidado: En lugar de solo retornar sucursal_id, retorna el objeto completo
+    sucursal_detail = BranchSerializer(source='sucursal', read_only=True)
+    created_by_username = serializers.CharField(source='created_by.username', read_only=True)
+
+    class Meta:
+        fields = [
+            'sucursal',           # ID para escritura (POST/PUT)
+            'sucursal_detail',    # Objeto completo para lectura (GET)
+        ]
+```
+
+**Resultado en JSON:**
+```json
+{
+  "id": 1,
+  "nombre_completo": "Juan Pérez",
+  "sucursal": 1,                    // Para enviar en POST/PUT
+  "sucursal_detail": {              // Para leer en GET
+    "id": 1,
+    "nombre": "Casa Matriz Santiago",
+    "codigo": "SCL-01",
+    "ciudad": "Santiago"
+  }
+}
+```
+
+**Beneficios:**
+- Reducción de requests HTTP (de N+1 a 1)
+- Mejor experiencia de desarrollo en el frontend
+- Datos completos en una sola respuesta
+
+#### Validaciones en Serializers
+
+**apps/devices/serializers.py:**
+```python
+def validate_serie_imei(self, value):
+    """Validar que la serie/IMEI sea única"""
+    if self.instance:
+        # Actualización: excluir el registro actual
+        if Device.objects.exclude(pk=self.instance.pk).filter(serie_imei=value).exists():
+            raise serializers.ValidationError("Ya existe un dispositivo con esta serie/IMEI")
+    else:
+        # Creación: verificar que no exista
+        if Device.objects.filter(serie_imei=value).exists():
+            raise serializers.ValidationError("Ya existe un dispositivo con esta serie/IMEI")
+    return value
+```
+
+**Validaciones implementadas:**
+1. **Campo único:** serie_imei, RUT
+2. **Formato:** RUT chileno (básico, completo en Fase 5)
+3. **Lógica de negocio:** Fechas coherentes, dispositivos disponibles
+4. **Condicionales:** Número de teléfono requerido para tipo TELEFONO/SIM
+
+---
+
+### 12.2 Estructura de ViewSets
+
+Los ViewSets proporcionan las operaciones CRUD automáticas con configuración mínima.
+
+#### Optimización de Queries con select_related()
+
+**Problema:** N+1 queries problem
+- Sin optimización: 1 query + N queries adicionales por cada registro relacionado
+- Con select_related(): 1 query con JOIN
+
+**Implementación:**
+```python
+# apps/employees/views.py
+class EmployeeViewSet(viewsets.ModelViewSet):
+    # select_related() hace JOIN en SQL, evitando queries adicionales
+    queryset = Employee.objects.select_related('sucursal', 'created_by').all()
+```
+
+**SQL generado:**
+```sql
+-- Con select_related() (1 query)
+SELECT employee.*, branch.*, user.*
+FROM employees_employee
+LEFT JOIN branches_branch ON employee.sucursal_id = branch.id
+LEFT JOIN auth_user ON employee.created_by_id = user.id;
+
+-- Sin select_related() (N+1 queries)
+SELECT * FROM employees_employee;           -- 1 query
+SELECT * FROM branches_branch WHERE id=1;   -- N queries
+SELECT * FROM auth_user WHERE id=1;         -- N queries
+```
+
+#### Sistema de Filtros y Búsqueda
+
+**Tres tipos de filtros configurados:**
+
+1. **DjangoFilterBackend:** Filtros exactos por campos
+   ```
+   GET /api/devices/?estado=DISPONIBLE&tipo_equipo=LAPTOP
+   ```
+
+2. **SearchFilter:** Búsqueda de texto en múltiples campos
+   ```
+   GET /api/devices/?search=Samsung
+   ```
+
+3. **OrderingFilter:** Ordenamiento por campos
+   ```
+   GET /api/devices/?ordering=-fecha_ingreso
+   ```
+
+**Ejemplo completo en DeviceViewSet:**
+```python
+class DeviceViewSet(viewsets.ModelViewSet):
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+
+    # Filtros exactos
+    filterset_fields = ['tipo_equipo', 'estado', 'sucursal', 'marca']
+
+    # Búsqueda de texto (busca en cualquiera de estos campos)
+    search_fields = ['serie_imei', 'marca', 'modelo', 'numero_telefono']
+
+    # Campos disponibles para ordenar
+    ordering_fields = ['marca', 'modelo', 'fecha_ingreso', 'created_at']
+
+    # Ordenamiento por defecto
+    ordering = ['-fecha_ingreso']
+```
+
+#### Auto-asignación de created_by
+
+**Problema:** El usuario que crea un registro debe registrarse automáticamente.
+
+**Solución:**
+```python
+def perform_create(self, serializer):
+    """Django Rest Framework hook ejecutado antes de save()"""
+    serializer.save(created_by=self.request.user)
+```
+
+**Flujo:**
+1. Frontend envía POST sin campo `created_by`
+2. ViewSet intercepta con `perform_create()`
+3. Agrega `created_by` del usuario autenticado
+4. Guarda el registro con auditoría completa
+
+---
+
+### 12.3 Sistema de Routing
+
+#### Estructura de URLs en 3 Niveles
+
+**Nivel 1: config/urls.py (URLs principales)**
+```python
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('api/branches/', include('apps.branches.urls')),
+    path('api/employees/', include('apps.employees.urls')),
+    path('api/devices/', include('apps.devices.urls')),
+    path('api/assignments/', include('apps.assignments.urls')),
+]
+```
+
+**Nivel 2: apps/{app}/urls.py (Router de DRF)**
+```python
+# apps/branches/urls.py
+router = DefaultRouter()
+router.register(r'', BranchViewSet, basename='branch')
+
+urlpatterns = [
+    path('', include(router.urls)),
+]
+```
+
+**Nivel 3: DefaultRouter (Endpoints generados automáticamente)**
+
+El DefaultRouter de DRF genera automáticamente estas rutas:
+
+| Método HTTP | URL | Acción | Nombre |
+|-------------|-----|--------|--------|
+| GET | `/api/branches/` | Listar todas | branch-list |
+| POST | `/api/branches/` | Crear nueva | branch-list |
+| GET | `/api/branches/{id}/` | Obtener una | branch-detail |
+| PUT | `/api/branches/{id}/` | Actualizar completa | branch-detail |
+| PATCH | `/api/branches/{id}/` | Actualizar parcial | branch-detail |
+| DELETE | `/api/branches/{id}/` | Eliminar | branch-detail |
+
+#### Endpoints de Assignments (Múltiples ViewSets)
+
+**apps/assignments/urls.py:**
+```python
+router = DefaultRouter()
+router.register(r'requests', RequestViewSet, basename='request')
+router.register(r'assignments', AssignmentViewSet, basename='assignment')
+router.register(r'returns', ReturnViewSet, basename='return')
+```
+
+**Resultado:**
+- `/api/assignments/requests/` → Solicitudes de dispositivos
+- `/api/assignments/assignments/` → Asignaciones de dispositivos
+- `/api/assignments/returns/` → Devoluciones de dispositivos
+
+Cada uno con sus propios endpoints CRUD completos.
+
+---
+
+### 12.4 Paginación y Performance
+
+#### Configuración de Paginación
+
+**config/settings.py:**
+```python
+REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
+}
+```
+
+**Respuesta con paginación:**
+```json
+{
+  "count": 150,           // Total de registros
+  "next": "http://localhost:8000/api/devices/?page=2",
+  "previous": null,
+  "results": [            // 20 registros por página
+    { "id": 1, ... },
+    { "id": 2, ... },
+    // ... 18 más
+  ]
+}
+```
+
+#### Estrategias de Optimización
+
+1. **select_related():** Para ForeignKey (1-to-1, Many-to-1)
+   ```python
+   Employee.objects.select_related('sucursal', 'created_by')
+   ```
+
+2. **prefetch_related():** Para ManyToMany y relaciones inversas (Fase 5)
+   ```python
+   Branch.objects.prefetch_related('employee_set')
+   ```
+
+3. **Índices de base de datos:** Definidos en modelos
+   ```python
+   class Meta:
+       indexes = [
+           models.Index(fields=['serie_imei']),
+           models.Index(fields=['estado']),
+       ]
+   ```
+
+---
+
+### 12.5 Flujo de Request/Response
+
+#### Ejemplo: Crear un Empleado
+
+**1. Frontend envía POST:**
+```http
+POST /api/employees/
+Content-Type: application/json
+Authorization: Bearer {token}
+
+{
+  "rut": "12345678-9",
+  "nombre_completo": "María González",
+  "cargo": "Desarrolladora",
+  "sucursal": 1,
+  "estado": "ACTIVO"
+}
+```
+
+**2. Django procesa:**
+```
+config/urls.py
+  ↓ include('apps.employees.urls')
+apps/employees/urls.py
+  ↓ router → EmployeeViewSet
+apps/employees/views.py
+  ↓ EmployeeViewSet.create()
+    ↓ perform_create(serializer)
+    ↓ serializer.save(created_by=request.user)
+apps/employees/serializers.py
+  ↓ EmployeeSerializer.validate_rut()
+  ↓ EmployeeSerializer.save()
+apps/employees/models.py
+  ↓ Employee.objects.create(...)
+  ↓ Database INSERT
+```
+
+**3. Respuesta al frontend:**
+```http
+HTTP 201 CREATED
+Content-Type: application/json
+
+{
+  "id": 15,
+  "rut": "12345678-9",
+  "nombre_completo": "María González",
+  "cargo": "Desarrolladora",
+  "sucursal": 1,
+  "sucursal_detail": {
+    "id": 1,
+    "nombre": "Casa Matriz Santiago",
+    "codigo": "SCL-01"
+  },
+  "estado": "ACTIVO",
+  "created_by": 1,
+  "created_by_username": "admin",
+  "created_at": "2025-11-05T14:30:00Z",
+  "updated_at": "2025-11-05T14:30:00Z"
+}
+```
+
+---
+
+### 12.6 Decisiones Arquitectónicas de la API
+
+#### Por qué DefaultRouter
+
+**Ventajas:**
+- Genera automáticamente todas las rutas CRUD
+- Incluye browsable API de DRF
+- Nombres consistentes para reverse URLs
+- Menos código, menos errores
+
+**Alternativa rechazada:** SimpleRouter
+- No incluye la vista raíz de la API
+- Menos conveniente para desarrollo
+
+#### Por qué Serialización Anidada
+
+**Ventaja:** Reducir requests del frontend
+```python
+# Sin anidación: Frontend necesita 2 requests
+GET /api/employees/1/      → { "sucursal": 1 }
+GET /api/branches/1/       → { "nombre": "Santiago" }
+
+# Con anidación: Frontend necesita 1 request
+GET /api/employees/1/      → { "sucursal": 1, "sucursal_detail": {...} }
+```
+
+**Trade-off aceptado:**
+- Respuestas JSON más grandes
+- Pero menos latencia total (menos round-trips)
+
+#### Por qué AllowAny Temporal
+
+**Configuración actual:**
+```python
+'DEFAULT_PERMISSION_CLASSES': [
+    'rest_framework.permissions.AllowAny',
+]
+```
+
+**Razón:** Facilitar testing de endpoints en Fase 3
+**Cambio en Fase 4:** Reemplazar con `IsAuthenticated` + JWT
+
+---
+
+### 12.7 Archivos de la API y sus Responsabilidades
+
+#### apps/branches/
+
+**serializers.py:**
+- `BranchSerializer`: Serializa el modelo Branch
+- Campos: Todos los del modelo
+- Validaciones: Ninguna especial (campos estándar)
+
+**views.py:**
+- `BranchViewSet`: CRUD de sucursales
+- Filtros: `is_active`, `ciudad`
+- Búsqueda: `nombre`, `codigo`, `ciudad`, `direccion`
+- Sin `perform_create` (no tiene campo created_by)
+
+**urls.py:**
+- DefaultRouter registrando BranchViewSet
+- Base path: `/api/branches/`
+
+---
+
+#### apps/employees/
+
+**serializers.py:**
+- `EmployeeSerializer`: Serializa Employee con datos anidados
+- Campos anidados: `sucursal_detail`, `created_by_username`
+- Validaciones: `validate_rut()` - formato básico de RUT
+
+**views.py:**
+- `EmployeeViewSet`: CRUD de empleados
+- Optimización: `select_related('sucursal', 'created_by')`
+- Filtros: `estado`, `sucursal`, `unidad_negocio`
+- Búsqueda: `nombre_completo`, `rut`, `cargo`, `correo_corporativo`
+- `perform_create()`: Asigna `created_by`
+
+**urls.py:**
+- DefaultRouter registrando EmployeeViewSet
+- Base path: `/api/employees/`
+
+---
+
+#### apps/devices/
+
+**serializers.py:**
+- `DeviceSerializer`: Serializa Device con validaciones complejas
+- Campos anidados: `sucursal_detail`, `created_by_username`, displays
+- Validaciones:
+  - `validate_serie_imei()`: Unicidad (considera update vs create)
+  - `validate()`: Número de teléfono requerido para TELEFONO/SIM
+
+**views.py:**
+- `DeviceViewSet`: CRUD de dispositivos
+- Optimización: `select_related('sucursal', 'created_by')`
+- Filtros: `tipo_equipo`, `estado`, `sucursal`, `marca`
+- Búsqueda: `serie_imei`, `marca`, `modelo`, `numero_telefono`, `numero_factura`
+- `perform_create()`: Asigna `created_by`
+
+**urls.py:**
+- DefaultRouter registrando DeviceViewSet
+- Base path: `/api/devices/`
+
+---
+
+#### apps/assignments/
+
+**serializers.py:**
+- `RequestSerializer`: Solicitudes de dispositivos
+  - Anidado: `empleado_detail`
+  - Validaciones: Ninguna especial
+
+- `AssignmentSerializer`: Asignaciones de dispositivos
+  - Anidado: `empleado_detail`, `dispositivo_detail`, `solicitud_detail`
+  - Validaciones:
+    - `validate_dispositivo()`: Verifica que esté DISPONIBLE
+    - `validate()`: Fecha devolución > fecha entrega
+
+- `ReturnSerializer`: Devoluciones de dispositivos
+  - Anidado: `asignacion_detail`
+  - Validaciones:
+    - `validate_asignacion()`: Verifica que esté ACTIVA y sin devolución previa
+    - `validate()`: Fecha devolución >= fecha entrega de la asignación
+
+**views.py:**
+- `RequestViewSet`: CRUD de solicitudes
+  - Optimización: `select_related('empleado', 'created_by')`
+  - Filtros: `estado`, `empleado`, `tipo_dispositivo`
+
+- `AssignmentViewSet`: CRUD de asignaciones
+  - Optimización: `select_related('empleado', 'dispositivo', 'solicitud', 'created_by')`
+  - Filtros: `estado_asignacion`, `empleado`, `dispositivo`, `tipo_entrega`
+
+- `ReturnViewSet`: CRUD de devoluciones
+  - Optimización: `select_related('asignacion', 'created_by')`
+  - Filtros: `estado_dispositivo`, `asignacion`
+
+**urls.py:**
+- DefaultRouter registrando 3 ViewSets
+- Base paths:
+  - `/api/assignments/requests/`
+  - `/api/assignments/assignments/`
+  - `/api/assignments/returns/`
+
+---
+
+### 12.8 Próximas Mejoras (Fase 4 y 5)
+
+**Fase 4 - Autenticación JWT:**
+- Cambiar `AllowAny` a `IsAuthenticated`
+- Agregar permisos personalizados: `IsAdmin`, `IsAdminOrReadOnly`
+- Endpoints: `/api/auth/login/`, `/api/auth/refresh/`
+
+**Fase 5 - Lógica de Negocio:**
+- Signals para cambios automáticos de estado:
+  - Crear Assignment → Device.estado = ASIGNADO
+  - Crear Return → Assignment.estado = FINALIZADA, Device.estado según condición
+- Registro en AuditLog automático
+- Validación completa de RUT chileno
+
+---
+
+**Última actualización:** Noviembre 5, 2025 - Fase 3 Completada
 **Documentado por:** Claude (Asistente IA)
-**Proxima actualizacion:** Al completar Fase 3
+**Próxima actualización:** Al completar Fase 4

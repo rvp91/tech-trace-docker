@@ -117,24 +117,69 @@ backend/apps/
 
 | Paso | Descripcion | Estado | Notas |
 |------|-------------|--------|-------|
-| 3.1 | Instalar Django REST Framework | [ ] | djangorestframework |
-| 3.2 | Agregar DRF a INSTALLED_APPS | [ ] | |
-| 3.3 | Configurar DRF en settings | [ ] | Paginacion, auth, permisos |
-| 3.4 | Crear serializer para Branch | [ ] | |
-| 3.5 | Crear ViewSet para Branch | [ ] | |
-| 3.6 | Configurar rutas para Branch API | [ ] | |
-| 3.7 | Incluir rutas de branches en config/urls.py | [ ] | /api/branches/ |
-| 3.8 | Crear serializer para Employee | [ ] | |
-| 3.9 | Crear ViewSet para Employee con filtros | [ ] | |
-| 3.10 | Configurar rutas para Employee API | [ ] | /api/employees/ |
-| 3.11 | Crear serializer para Device | [ ] | |
-| 3.12 | Crear ViewSet para Device con filtros | [ ] | |
-| 3.13 | Configurar rutas para Device API | [ ] | /api/devices/ |
-| 3.14 | Crear serializers para Request, Assignment y Return | [ ] | |
-| 3.15 | Crear ViewSets para Request, Assignment y Return | [ ] | |
-| 3.16 | Configurar rutas para Assignments API | [ ] | /api/assignments/ |
+| 3.1 | Instalar Django REST Framework | [x] | djangorestframework 3.15.2 + django-filter 25.2 |
+| 3.2 | Agregar DRF a INSTALLED_APPS | [x] | rest_framework y django_filters agregados |
+| 3.3 | Configurar DRF en settings | [x] | Paginacion (20 items), filtros, AllowAny temporal |
+| 3.4 | Crear serializer para Branch | [x] | BranchSerializer con todos los campos |
+| 3.5 | Crear ViewSet para Branch | [x] | BranchViewSet con filtros y busqueda |
+| 3.6 | Configurar rutas para Branch API | [x] | apps/branches/urls.py con DefaultRouter |
+| 3.7 | Incluir rutas de branches en config/urls.py | [x] | /api/branches/ funcionando |
+| 3.8 | Crear serializer para Employee | [x] | EmployeeSerializer con datos anidados |
+| 3.9 | Crear ViewSet para Employee con filtros | [x] | EmployeeViewSet con select_related |
+| 3.10 | Configurar rutas para Employee API | [x] | /api/employees/ funcionando |
+| 3.11 | Crear serializer para Device | [x] | DeviceSerializer con validaciones |
+| 3.12 | Crear ViewSet para Device con filtros | [x] | DeviceViewSet con busqueda avanzada |
+| 3.13 | Configurar rutas para Device API | [x] | /api/devices/ funcionando |
+| 3.14 | Crear serializers para Request, Assignment y Return | [x] | 3 serializers con validaciones |
+| 3.15 | Crear ViewSets para Request, Assignment y Return | [x] | 3 ViewSets con filtros |
+| 3.16 | Configurar rutas para Assignments API | [x] | /api/assignments/requests/, /assignments/, /returns/ |
 
-**Estado de la Fase 3:** [ ] **PENDIENTE** (0% - 0/16 completados)
+**Estado de la Fase 3:** [x] **COMPLETADA** (100% - 16/16 completados)
+
+**Detalles de implementacion:**
+- djangorestframework 3.15.2 y django-filter 25.2 instalados
+- Paginacion automatica de 20 items por pagina
+- Filtros configurados: DjangoFilterBackend, SearchFilter, OrderingFilter
+- Serializers con campos anidados para mostrar datos relacionados
+- Validaciones en serializers: RUT, serie_imei unica, fechas coherentes
+- ViewSets con select_related() para optimizar queries
+- perform_create() en ViewSets para asignar created_by automaticamente
+- Todos los endpoints probados y funcionando correctamente
+
+**Archivos creados:**
+```
+backend/apps/
+├── branches/
+│   ├── serializers.py (BranchSerializer)
+│   ├── urls.py (DefaultRouter con BranchViewSet)
+│   └── views.py (BranchViewSet actualizado)
+├── employees/
+│   ├── serializers.py (EmployeeSerializer con validacion RUT)
+│   ├── urls.py (DefaultRouter con EmployeeViewSet)
+│   └── views.py (EmployeeViewSet con filtros)
+├── devices/
+│   ├── serializers.py (DeviceSerializer con validaciones)
+│   ├── urls.py (DefaultRouter con DeviceViewSet)
+│   └── views.py (DeviceViewSet con filtros)
+└── assignments/
+    ├── serializers.py (3 serializers: Request, Assignment, Return)
+    ├── urls.py (DefaultRouter con 3 ViewSets)
+    └── views.py (3 ViewSets con filtros y busqueda)
+```
+
+**Configuracion aplicada:**
+- config/settings.py: REST_FRAMEWORK con paginacion y filtros
+- config/urls.py: Rutas /api/branches/, /api/employees/, /api/devices/, /api/assignments/
+- Permisos temporales: AllowAny (cambiar a IsAuthenticated en Fase 4)
+
+**Endpoints API funcionando:**
+- GET /api/branches/ - Listar sucursales (con filtros: is_active, ciudad; busqueda: nombre, codigo, ciudad)
+- GET /api/employees/ - Listar empleados (con filtros: estado, sucursal; busqueda: nombre, rut, cargo)
+- GET /api/devices/ - Listar dispositivos (con filtros: tipo_equipo, estado, sucursal; busqueda: serie_imei, marca)
+- GET /api/assignments/requests/ - Listar solicitudes (con filtros: estado, empleado)
+- GET /api/assignments/assignments/ - Listar asignaciones (con filtros: estado_asignacion, empleado, dispositivo)
+- GET /api/assignments/returns/ - Listar devoluciones (con filtros: estado_dispositivo)
+- POST, PUT, PATCH, DELETE disponibles en todos los endpoints
 
 ---
 
@@ -252,7 +297,7 @@ backend/apps/
 | 0 | Preparacion del Entorno | 100% (3/3) | [x] Completada |
 | 1 | Configuracion del Backend | 100% (7/7) | [x] Completada |
 | 2 | Modelos de Base de Datos | 100% (18/18) | [x] Completada |
-| 3 | API REST con DRF | 0% (0/16) | [ ] Pendiente |
+| 3 | API REST con DRF | 100% (16/16) | [x] Completada |
 | 4 | Autenticacion JWT | 0% (0/8) | [ ] Pendiente |
 | 5 | Logica de Negocio Backend | 0% (0/10) | [ ] Pendiente |
 | 6 | Configuracion del Frontend | 100% (7/7) | [x] Completada |
@@ -261,10 +306,10 @@ backend/apps/
 
 ### Total del Proyecto
 
-**Pasos completados:** 35 / 150+ pasos
-**Progreso general:** ~23%
+**Pasos completados:** 51 / 150+ pasos
+**Progreso general:** ~34%
 
-**Fases completadas:** 4 / 19 (Fases 0, 1, 2, 6)
+**Fases completadas:** 5 / 19 (Fases 0, 1, 2, 3, 6)
 **Fases en progreso:** 0
 
 ---
@@ -296,15 +341,23 @@ backend/apps/
 
 ## Proximos Pasos Inmediatos
 
-1. **Iniciar Fase 3: API REST con Django REST Framework**
-   - [ ] Instalar djangorestframework
-   - [ ] Crear serializers para todos los modelos
-   - [ ] Crear ViewSets con filtros
-   - [ ] Configurar rutas de API
+1. **✅ Fase 3: API REST con Django REST Framework - COMPLETADA**
+   - [x] Instalar djangorestframework y django-filter
+   - [x] Crear serializers para todos los modelos
+   - [x] Crear ViewSets con filtros y busqueda
+   - [x] Configurar rutas de API
+   - [x] Probar todos los endpoints
 
-2. **Despues de Fase 3:**
-   - [ ] Fase 4: Implementar JWT authentication
+2. **Siguiente: Fase 4 - Autenticacion JWT**
+   - [ ] Instalar djangorestframework-simplejwt
+   - [ ] Configurar JWT authentication
+   - [ ] Crear endpoints de login/logout/refresh
+   - [ ] Crear permisos personalizados (IsAdmin, IsAdminOrReadOnly)
+   - [ ] Actualizar permisos de ViewSets (cambiar de AllowAny a IsAuthenticated)
+
+3. **Despues de Fase 4:**
    - [ ] Fase 5: Logica de negocio (senales, validaciones)
+   - [ ] Fase 7: Autenticacion frontend
 
 ---
 
