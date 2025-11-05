@@ -1,0 +1,83 @@
+"use client"
+
+import { cn } from "@/lib/utils"
+import { LayoutDashboard, Users, Package, Zap, Building2, BarChart3, Settings, LogOut } from "lucide-react"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { Button } from "@/components/ui/button"
+import { NAVIGATION } from "@/lib/mock-data"
+
+interface SidebarProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}
+
+const ICON_MAP = {
+  LayoutDashboard,
+  Users,
+  Package,
+  Zap,
+  Building2,
+  BarChart3,
+  Settings,
+}
+
+export function Sidebar({ open, onOpenChange }: SidebarProps) {
+  const pathname = usePathname()
+
+  return (
+    <>
+      {/* Mobile Overlay */}
+      {open && <div className="fixed inset-0 z-20 bg-black/50 lg:hidden" onClick={() => onOpenChange(false)} />}
+
+      {/* Sidebar */}
+      <div
+        className={cn(
+          "fixed left-0 top-0 z-30 h-screen w-64 bg-sidebar border-r border-sidebar-border transform transition-transform duration-300 lg:relative lg:translate-x-0",
+          open ? "translate-x-0" : "-translate-x-full",
+        )}
+      >
+        <div className="flex flex-col h-full">
+          <div className="p-6 border-b border-sidebar-border">
+            <h1 className="text-xl font-bold text-sidebar-foreground">TechTrace</h1>
+            <p className="text-xs text-sidebar-foreground/60 mt-1">Gestión de Inventario</p>
+          </div>
+
+          <nav className="flex-1 overflow-auto p-4 space-y-1">
+            {NAVIGATION.map((item) => {
+              const Icon = ICON_MAP[item.icon as keyof typeof ICON_MAP]
+              const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-sm font-medium",
+                    isActive
+                      ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                  )}
+                >
+                  <Icon className="h-5 w-5" />
+                  <span>{item.name}</span>
+                </Link>
+              )
+            })}
+          </nav>
+
+          <div className="p-4 border-t border-sidebar-border space-y-2">
+            <Button variant="outline" className="w-full justify-start bg-transparent" size="sm">
+              <Settings className="h-4 w-4 mr-2" />
+              Configuración
+            </Button>
+            <Button variant="ghost" className="w-full justify-start text-destructive hover:text-destructive" size="sm">
+              <LogOut className="h-4 w-4 mr-2" />
+              Cerrar Sesión
+            </Button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
