@@ -1,4 +1,6 @@
 from rest_framework import viewsets, filters
+from rest_framework.decorators import action
+from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import Employee
 from .serializers import EmployeeSerializer
@@ -22,3 +24,37 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         Asignar automáticamente el usuario actual como created_by al crear un empleado.
         """
         serializer.save(created_by=self.request.user)
+
+    @action(detail=True, methods=['get'], url_path='history')
+    def history(self, request, pk=None):
+        """
+        Endpoint personalizado para obtener el historial de asignaciones de un empleado.
+
+        URL: /api/employees/{id}/history/
+
+        Retorna todas las asignaciones (activas e históricas) del empleado,
+        ordenadas de más reciente a más antigua.
+        """
+        from apps.assignments.serializers import AssignmentSerializer
+
+        employee = self.get_object()
+        assignments = employee.assignment_set.select_related(
+            'dispositivo',
+            'dispositivo__sucursal',
+            'solicitud',
+            'created_by'
+        ).order_by('-fecha_entrega')
+
+        serializer = AssignmentSerializer(assignments, many=True)
+
+        return Response({
+            'employee': {
+                'id': employee.id,
+                'rut': employee.rut,
+                'nombre_completo': employee.nombre_completo,
+                'cargo': employee.cargo,
+            },
+            'total_assignments': assignments.count(),
+            'active_assignments': assignments.filter(estado_asignacion='ACTIVA').count(),
+            'assignments': serializer.data
+        })

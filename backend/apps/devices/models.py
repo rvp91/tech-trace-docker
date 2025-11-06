@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+import json
 
 
 class Device(models.Model):
@@ -45,10 +46,31 @@ class Device(models.Model):
 
     def change_status(self, new_status, user=None):
         """Cambia el estado del dispositivo y registra en auditoría"""
+        from apps.users.audit import AuditLog
+
         old_status = self.estado
+
+        if old_status == new_status:
+            return False  # No hay cambio
+
         self.estado = new_status
         self.save()
-        # TODO: Registrar en auditoría cuando se implemente
+
+        # Registrar en auditoría si se proporciona un usuario
+        if user:
+            AuditLog.objects.create(
+                user=user,
+                action='UPDATE',
+                entity_type='Device',
+                entity_id=self.id,
+                changes={
+                    'field': 'estado',
+                    'old_value': old_status,
+                    'new_value': new_status,
+                    'device': str(self)
+                }
+            )
+
         return True
 
     def has_active_assignment(self):

@@ -2574,6 +2574,939 @@ curl -H "Authorization: Bearer eyJhbGc..." \
 
 ---
 
-**Última actualización:** Noviembre 5, 2025 - Fase 4 Completada
+## 14. Arquitectura de Lógica de Negocio (Fase 5 - Completada)
+
+### 14.1 Visión General
+
+La Fase 5 implementa toda la lógica de negocio del backend, incluyendo:
+- Cambios automáticos de estado de dispositivos
+- Validaciones avanzadas (RUT chileno)
+- Sistema de auditoría completo
+- Endpoints de historial y estadísticas
+- Protección de datos contra eliminación accidental
+
+### 14.2 Sistema de Señales (Signals)
+
+Django Signals permite desacoplar la lógica de negocio ejecutando código automáticamente en respuesta a eventos del modelo.
+
+#### apps/assignments/signals.py
+
+**Propósito:** Gestionar cambios automáticos de estado cuando se crean o modifican asignaciones.
+
+**Señales implementadas:**
+
+1. **assignment_post_save**
+```python
+@receiver(post_save, sender=Assignment)
+def assignment_post_save(sender, instance, created, **kwargs):
+    """
+    Ejecuta después de guardar una Assignment.
+
+    Flujo:
+    1. Verifica si la asignación está ACTIVA
+    2. Si el dispositivo no está ASIGNADO, lo cambia automáticamente
+    3. Registra el cambio en auditoría usando change_status()
+    """
+```
+
+**Ejemplo de flujo:**
+```
+Usuario crea Assignment → Django guarda → Señal se activa →
+Dispositivo cambia a ASIGNADO → AuditLog registra cambio
+```
+
+2. **return_post_save**
+```python
+@receiver(post_save, sender=Return)
+def return_post_save(sender, instance, created, **kwargs):
+    """
+    Ejecuta después de registrar una Return (devolución).
+
+    Flujo:
+    1. Marca Assignment como FINALIZADA
+    2. Decide nuevo estado del dispositivo:
+       - OPTIMO → DISPONIBLE (listo para reasignar)
+       - CON_DANOS → MANTENIMIENTO (requiere reparación)
+       - NO_FUNCIONAL → MANTENIMIENTO (fuera de servicio)
+    3. Registra cambios en auditoría
+    """
+```
+
+**Diagrama de flujo de devolución:**
+```
+Return creada (OPTIMO)
+    ↓
+Assignment.estado_asignacion = FINALIZADA
+    ↓
+Device.estado = DISPONIBLE
+    ↓
+AuditLog registra: Device #123 ASIGNADO → DISPONIBLE
+```
+
+**Registro en apps.py:**
+```python
+# apps/assignments/apps.py
+class AssignmentsConfig(AppConfig):
+    def ready(self):
+        import apps.assignments.signals  # Carga señales al iniciar Django
+```
+
+---
+
+#### apps/users/signals.py
+
+**Propósito:** Sistema de auditoría automático para todos los modelos principales.
+
+**Arquitectura del sistema de auditoría:**
+
+```
+Modelo (Employee/Device/Assignment)
+    ↓
+Django ORM (save/delete)
+    ↓
+Signal activado (post_save/post_delete)
+    ↓
+create_audit_log()
+    ↓
+AuditLog.objects.create()
+    ↓
+Registro inmutable en BD
+```
+
+**Señales implementadas:**
+
+1. **employee_post_save / employee_post_delete**
+   - Registra creación, actualización y eliminación de empleados
+   - Captura: RUT, nombre completo, estado
+
+2. **device_post_save / device_post_delete**
+   - Registra operaciones sobre dispositivos
+   - Captura: serie_imei, tipo_equipo, marca, modelo, estado
+
+3. **assignment_post_save / assignment_post_delete**
+   - Registra asignaciones creadas/modificadas/eliminadas
+   - Captura: empleado, dispositivo, estado_asignacion, fecha_entrega
+
+4. **return_post_save**
+   - Registra devoluciones (solo CREATE, no UPDATE)
+   - Captura: asignacion, estado_dispositivo, fecha_devolucion
+
+**Función auxiliar: create_audit_log()**
+```python
+def create_audit_log(user, action, entity_type, entity_id, changes=None):
+    """
+    Centraliza la creación de registros de auditoría.
+
+    Args:
+        user: Usuario autenticado (de request.user o instance.created_by)
+        action: 'CREATE', 'UPDATE', 'DELETE'
+        entity_type: 'Employee', 'Device', 'Assignment', 'Return'
+        entity_id: ID del registro afectado
+        changes: dict con campos modificados
+
+    Prevención de errores:
+    - Solo crea log si user existe y está autenticado
+    - Evita recursión infinita con flag _skip_audit
+    """
+```
+
+**Ejemplo de registro en AuditLog:**
+```json
+{
+  "user_id": 1,
+  "action": "UPDATE",
+  "entity_type": "Device",
+  "entity_id": 42,
+  "changes": {
+    "action_type": "UPDATE",
+    "model": "Device",
+    "str_representation": "Laptop - Apple MacBook Pro (ABC123)",
+    "estado": "ASIGNADO",
+    "serie_imei": "ABC123"
+  },
+  "timestamp": "2025-11-05T16:30:00Z"
+}
+```
+
+**Prevención de problemas:**
+
+1. **Recursión infinita:**
+   - Flag `_skip_audit` evita que señales se activen en cascada
+   - Importante porque guardar un AuditLog también dispara post_save
+
+2. **Usuario no disponible en DELETE:**
+   - Intenta obtener de `instance._deleting_user`
+   - Fallback a `instance.created_by`
+   - Si no hay usuario, no crea log (mejor que fallar)
+
+**Registro en apps.py:**
+```python
+# apps/users/apps.py
+class UsersConfig(AppConfig):
+    def ready(self):
+        import apps.users.signals
+```
+
+---
+
+### 14.3 Validación de RUT Chileno
+
+#### apps/employees/validators.py
+
+**Propósito:** Validar que los RUTs chilenos sean correctos antes de guardar empleados.
+
+**Función: validate_rut()**
+
+**Algoritmo del dígito verificador:**
+```python
+Ejemplo: RUT 12.345.678-5
+
+Paso 1: Tomar solo números → 12345678
+Paso 2: Invertir dígitos → 87654321
+Paso 3: Multiplicar por serie 2,3,4,5,6,7 (cíclica):
+    8×2 + 7×3 + 6×4 + 5×5 + 4×6 + 3×7 + 2×2 + 1×3 = 139
+Paso 4: Calcular 11 - (139 % 11) = 11 - 7 = 4
+Paso 5: Ajustar casos especiales:
+    - Si resultado = 11 → DV = 0
+    - Si resultado = 10 → DV = K
+    - Caso contrario → DV = resultado
+Paso 6: Comparar con DV proporcionado
+```
+
+**Flujo de validación:**
+```
+Usuario ingresa RUT → Django valida formato básico →
+validate_rut() llamado → Calcula DV →
+¿Coincide? → SÍ: Guarda | NO: ValidationError
+```
+
+**Formatos aceptados:**
+- `12345678-9` (sin puntos)
+- `12.345.678-9` (con puntos)
+- Normaliza automáticamente antes de validar
+
+**Integración con modelo:**
+```python
+# apps/employees/models.py
+class Employee(models.Model):
+    rut = models.CharField(
+        max_length=12,
+        unique=True,
+        validators=[validate_rut],  # ← Validación automática
+        help_text='Formato: XX.XXX.XXX-X o XXXXXXXX-X'
+    )
+```
+
+**Función auxiliar: format_rut()**
+- Convierte RUT a formato estándar: `12.345.678-9`
+- Útil para normalizar datos antes de guardar o mostrar
+
+---
+
+### 14.4 Método change_status() Mejorado
+
+#### apps/devices/models.py
+
+**Método: Device.change_status()**
+
+**Propósito:** Cambiar el estado de un dispositivo con registro automático en auditoría.
+
+**Implementación:**
+```python
+def change_status(self, new_status, user=None):
+    """
+    Cambia el estado del dispositivo y registra en auditoría.
+
+    Args:
+        new_status: Nuevo estado ('DISPONIBLE', 'ASIGNADO', etc.)
+        user: Usuario que realiza el cambio (para auditoría)
+
+    Returns:
+        bool: True si hubo cambio, False si era el mismo estado
+
+    Side effects:
+        - Actualiza self.estado
+        - Guarda en BD (self.save())
+        - Crea registro en AuditLog si user != None
+    """
+```
+
+**Flujo:**
+```
+change_status('ASIGNADO', user=request.user)
+    ↓
+¿estado actual == nuevo estado? → SÍ: return False (sin cambios)
+    ↓ NO
+self.estado = new_status
+    ↓
+self.save()
+    ↓
+¿user proporcionado? → SÍ: Crear AuditLog
+    ↓
+return True
+```
+
+**Uso desde señales:**
+```python
+# En assignment_post_save
+dispositivo.change_status('ASIGNADO', user=instance.created_by)
+```
+
+**Registro en AuditLog:**
+```json
+{
+  "user": 1,
+  "action": "UPDATE",
+  "entity_type": "Device",
+  "entity_id": 42,
+  "changes": {
+    "field": "estado",
+    "old_value": "DISPONIBLE",
+    "new_value": "ASIGNADO",
+    "device": "Laptop - Apple MacBook Pro (ABC123)"
+  }
+}
+```
+
+---
+
+### 14.5 Endpoints de Historial
+
+Estos endpoints proporcionan vistas completas del historial de asignaciones.
+
+#### GET /api/employees/{id}/history/
+
+**Archivo:** apps/employees/views.py (líneas 26-58)
+
+**Propósito:** Consultar todas las asignaciones (activas e históricas) de un empleado.
+
+**ViewSet action:**
+```python
+@action(detail=True, methods=['get'], url_path='history')
+def history(self, request, pk=None):
+    """
+    Custom action en EmployeeViewSet.
+
+    URL generada automáticamente por @action decorator:
+    /api/employees/{id}/history/
+
+    detail=True → Requiere PK (empleado específico)
+    methods=['get'] → Solo GET permitido
+    url_path='history' → Parte final de la URL
+    """
+```
+
+**Optimización de queries:**
+```python
+assignments = employee.assignment_set.select_related(
+    'dispositivo',              # JOIN con tabla devices
+    'dispositivo__sucursal',    # JOIN con tabla branches
+    'solicitud',                # JOIN con tabla requests
+    'created_by'                # JOIN con tabla users
+).order_by('-fecha_entrega')
+```
+
+**Sin select_related (problema N+1):**
+```sql
+-- 1 query principal
+SELECT * FROM assignments WHERE empleado_id = 5;
+
+-- N queries adicionales (una por cada assignment)
+SELECT * FROM devices WHERE id = 10;
+SELECT * FROM branches WHERE id = 1;
+SELECT * FROM requests WHERE id = 3;
+SELECT * FROM users WHERE id = 1;
+-- ... repetido N veces
+```
+
+**Con select_related (optimizado):**
+```sql
+-- 1 sola query con JOINs
+SELECT
+    assignments.*,
+    devices.*,
+    branches.*,
+    requests.*,
+    users.*
+FROM assignments
+LEFT JOIN devices ON assignments.dispositivo_id = devices.id
+LEFT JOIN branches ON devices.sucursal_id = branches.id
+LEFT JOIN requests ON assignments.solicitud_id = requests.id
+LEFT JOIN users ON assignments.created_by_id = users.id
+WHERE assignments.empleado_id = 5
+ORDER BY assignments.fecha_entrega DESC;
+```
+
+**Respuesta JSON:**
+```json
+{
+  "employee": {
+    "id": 5,
+    "rut": "12.345.678-9",
+    "nombre_completo": "Juan Pérez",
+    "cargo": "Desarrollador"
+  },
+  "total_assignments": 12,
+  "active_assignments": 2,
+  "assignments": [
+    {
+      "id": 45,
+      "empleado": 5,
+      "dispositivo_detail": {
+        "id": 10,
+        "tipo_equipo": "LAPTOP",
+        "marca": "Apple",
+        "modelo": "MacBook Pro",
+        "serie_imei": "ABC123"
+      },
+      "fecha_entrega": "2025-01-15",
+      "estado_asignacion": "ACTIVA"
+    },
+    // ... más asignaciones
+  ]
+}
+```
+
+---
+
+#### GET /api/devices/{id}/history/
+
+**Archivo:** apps/devices/views.py (líneas 26-60)
+
+**Propósito:** Consultar todas las asignaciones de un dispositivo.
+
+**Diferencia con employee history:**
+```python
+# Employee history
+assignments = employee.assignment_set.select_related(
+    'dispositivo',  # ← Necesario (datos del dispositivo asignado)
+    ...
+)
+
+# Device history
+assignments = device.assignment_set.select_related(
+    'empleado',     # ← Necesario (datos del empleado asignado)
+    ...
+).prefetch_related('return')  # ← También carga devoluciones
+```
+
+**¿Por qué prefetch_related para return?**
+- `Return` tiene relación OneToOne con `Assignment`
+- `select_related` solo funciona con ForeignKey y OneToOne "hacia adelante"
+- `prefetch_related` hace query separada y une en Python (más eficiente que N+1)
+
+**Respuesta JSON:**
+```json
+{
+  "device": {
+    "id": 10,
+    "tipo_equipo": "LAPTOP",
+    "marca": "Apple",
+    "modelo": "MacBook Pro",
+    "serie_imei": "ABC123",
+    "estado": "ASIGNADO"
+  },
+  "total_assignments": 8,
+  "active_assignment": true,
+  "assignments": [
+    {
+      "id": 45,
+      "empleado_detail": {
+        "id": 5,
+        "rut": "12.345.678-9",
+        "nombre_completo": "Juan Pérez",
+        "cargo": "Desarrollador"
+      },
+      "fecha_entrega": "2025-01-15",
+      "estado_asignacion": "ACTIVA"
+    },
+    // ... más asignaciones
+  ]
+}
+```
+
+---
+
+### 14.6 Endpoint de Estadísticas
+
+#### GET /api/stats/dashboard/
+
+**Archivo:** apps/devices/views.py (líneas 66-146)
+
+**Arquitectura:**
+
+**StatsViewSet (viewsets.ViewSet)**
+- No hereda de ModelViewSet (no tiene modelo asociado)
+- Solo proporciona custom actions
+- Más ligero que ModelViewSet cuando no se necesita CRUD
+
+**Queries de agregación:**
+
+1. **Dispositivos por estado:**
+```python
+devices_by_status = Device.objects.values('estado').annotate(
+    total=Count('id')
+).order_by('estado')
+
+# SQL generado:
+# SELECT estado, COUNT(id) as total
+# FROM devices
+# GROUP BY estado
+# ORDER BY estado;
+
+# Resultado:
+# [
+#   {'estado': 'ASIGNADO', 'total': 45},
+#   {'estado': 'DISPONIBLE', 'total': 23},
+#   {'estado': 'MANTENIMIENTO', 'total': 5}
+# ]
+```
+
+2. **Dispositivos por tipo:**
+```python
+devices_by_type = Device.objects.values('tipo_equipo').annotate(
+    total=Count('id')
+)
+
+# Resultado:
+# [
+#   {'tipo_equipo': 'LAPTOP', 'total': 50},
+#   {'tipo_equipo': 'TELEFONO', 'total': 120},
+#   {'tipo_equipo': 'TABLET', 'total': 15}
+# ]
+```
+
+3. **Dispositivos por sucursal:**
+```python
+devices_by_branch = Device.objects.values(
+    'sucursal__nombre',    # JOIN con Branch
+    'sucursal__codigo'
+).annotate(total=Count('id')).order_by('-total')
+
+# SQL con JOIN:
+# SELECT
+#   branches.nombre,
+#   branches.codigo,
+#   COUNT(devices.id) as total
+# FROM devices
+# JOIN branches ON devices.sucursal_id = branches.id
+# GROUP BY branches.nombre, branches.codigo
+# ORDER BY total DESC;
+```
+
+**Conversión a diccionario:**
+```python
+# Lista de dicts → Dict simple (mejor para frontend)
+devices_by_status_dict = {
+    item['estado']: item['total']
+    for item in devices_by_status
+}
+
+# Resultado:
+# {
+#   'ASIGNADO': 45,
+#   'DISPONIBLE': 23,
+#   'MANTENIMIENTO': 5
+# }
+```
+
+**Últimas 5 asignaciones:**
+```python
+recent_assignments = Assignment.objects.select_related(
+    'empleado',
+    'dispositivo',
+    'created_by'
+).order_by('-created_at')[:5]  # LIMIT 5 en SQL
+```
+
+**Respuesta completa:**
+```json
+{
+  "summary": {
+    "total_devices": 150,
+    "available_devices": 45,
+    "active_employees": 78,
+    "active_assignments": 105
+  },
+  "devices_by_status": {
+    "DISPONIBLE": 45,
+    "ASIGNADO": 90,
+    "MANTENIMIENTO": 10,
+    "BAJA": 5
+  },
+  "devices_by_type": {
+    "LAPTOP": 60,
+    "TELEFONO": 70,
+    "TABLET": 15,
+    "SIM": 5
+  },
+  "devices_by_branch": [
+    {"sucursal__nombre": "Casa Matriz Santiago", "sucursal__codigo": "SCL-01", "total": 80},
+    {"sucursal__nombre": "Valparaíso Centro", "sucursal__codigo": "VAL-01", "total": 50},
+    {"sucursal__nombre": "Concepción Plaza", "sucursal__codigo": "CON-01", "total": 20}
+  ],
+  "recent_assignments": [
+    // ... últimas 5 asignaciones con datos completos
+  ]
+}
+```
+
+**Routing:**
+```python
+# apps/devices/urls_stats.py
+router = DefaultRouter()
+router.register(r'', StatsViewSet, basename='stats')
+
+# config/urls.py
+path('api/stats/', include('apps.devices.urls_stats')),
+
+# URL final:
+# GET /api/stats/dashboard/
+#     └── StatsViewSet.dashboard() action
+```
+
+---
+
+### 14.7 Prevención de Eliminación
+
+Ya implementado en Fase 2, pero crítico para la lógica de negocio.
+
+**Implementación en Employee y Device:**
+```python
+def delete(self, *args, **kwargs):
+    """
+    Sobrescribe el método delete() de Django.
+
+    Flujo:
+    1. Verifica si hay asignaciones activas
+    2. Si las hay, lanza ProtectedError
+    3. Si no, permite eliminación normal
+    """
+    if self.has_active_assignments():
+        raise models.ProtectedError(
+            "No se puede eliminar porque tiene asignaciones activas",
+            self
+        )
+    super().delete(*args, **kwargs)
+```
+
+**Ventaja sobre on_delete=PROTECT:**
+- `on_delete=PROTECT` previene eliminación si hay FK apuntando
+- Este método personalizado permite lógica condicional
+- Solo protege si asignaciones están ACTIVAS (no todas las asignaciones)
+
+**Ejemplo de flujo:**
+```
+Admin intenta eliminar Device #42
+    ↓
+Django llama device.delete()
+    ↓
+has_active_assignments() → Consulta Assignment.objects.filter(
+    dispositivo=42,
+    estado_asignacion='ACTIVA'
+)
+    ↓
+¿Existen asignaciones activas?
+    ↓ SÍ
+ProtectedError lanzado
+    ↓
+HTTP 400 Bad Request
+    ↓
+Mensaje al usuario: "No se puede eliminar el dispositivo porque tiene una asignación activa"
+```
+
+---
+
+### 14.8 Resumen de Archivos Creados/Modificados
+
+#### Archivos Nuevos
+
+1. **apps/assignments/signals.py**
+   - Señales para cambio automático de estado de dispositivos
+   - Lógica de devolución automática
+   - 60 líneas de código
+
+2. **apps/employees/validators.py**
+   - Validación completa de RUT chileno
+   - Función format_rut() auxiliar
+   - Algoritmo de dígito verificador
+   - 90 líneas de código
+
+3. **apps/users/signals.py**
+   - Sistema de auditoría automático
+   - Señales para Employee, Device, Assignment, Return
+   - Funciones auxiliares: create_audit_log(), get_model_changes()
+   - 200 líneas de código
+
+4. **apps/devices/urls_stats.py**
+   - Router para StatsViewSet
+   - 15 líneas de código
+
+#### Archivos Modificados
+
+1. **apps/devices/models.py**
+   - Mejorado change_status() con auditoría
+   - Import de json (línea 3)
+   - Líneas 47-74 modificadas
+
+2. **apps/employees/models.py**
+   - Import de validate_rut (línea 3)
+   - Campo rut con validador (líneas 15-21)
+
+3. **apps/employees/views.py**
+   - Imports: action, Response (líneas 2-3)
+   - Endpoint history() (líneas 26-58)
+   - 35 líneas agregadas
+
+4. **apps/devices/views.py**
+   - Imports: action, Response, Count, Q (líneas 2-5)
+   - Endpoint history() (líneas 26-60)
+   - StatsViewSet completo (líneas 66-146)
+   - 85 líneas agregadas
+
+5. **apps/assignments/apps.py**
+   - Método ready() para registrar señales (líneas 9-13)
+
+6. **apps/users/apps.py**
+   - Método ready() para registrar señales (líneas 9-13)
+
+7. **config/urls.py**
+   - Ruta /api/stats/ (línea 28)
+
+---
+
+### 14.9 Flujos de Negocio Completos
+
+#### Flujo: Crear Asignación
+
+```
+1. POST /api/assignments/assignments/
+   Body: {
+     "empleado": 5,
+     "dispositivo": 10,
+     "tipo_entrega": "PERMANENTE",
+     "fecha_entrega": "2025-01-15",
+     "estado_asignacion": "ACTIVA"
+   }
+   ↓
+2. AssignmentSerializer.validate_dispositivo()
+   - Verifica que dispositivo.estado == 'DISPONIBLE'
+   - Si no, lanza ValidationError
+   ↓
+3. AssignmentViewSet.perform_create()
+   - Agrega created_by = request.user
+   ↓
+4. Django guarda Assignment en BD
+   ↓
+5. Signal: assignment_post_save() activado
+   - Detecta estado_asignacion == 'ACTIVA'
+   - Llama dispositivo.change_status('ASIGNADO', user)
+   ↓
+6. Device.change_status()
+   - Actualiza device.estado = 'ASIGNADO'
+   - Guarda en BD
+   - Crea AuditLog del cambio
+   ↓
+7. Signal: device_post_save() activado
+   - Crea otro AuditLog para el UPDATE general
+   ↓
+8. Signal: assignment_post_save() activado (del paso 4)
+   - Crea AuditLog de creación de Assignment
+   ↓
+9. Respuesta HTTP 201 Created
+   - Retorna Assignment serializada con datos anidados
+```
+
+**Resultado final:**
+- 1 Assignment creada (estado: ACTIVA)
+- 1 Device actualizado (estado: DISPONIBLE → ASIGNADO)
+- 3 registros en AuditLog:
+  1. CREATE Assignment
+  2. UPDATE Device (change_status específico)
+  3. UPDATE Device (post_save general)
+
+---
+
+#### Flujo: Registrar Devolución
+
+```
+1. POST /api/assignments/returns/
+   Body: {
+     "asignacion": 45,
+     "fecha_devolucion": "2025-02-01",
+     "estado_dispositivo": "OPTIMO",
+     "observaciones": "Sin daños"
+   }
+   ↓
+2. ReturnSerializer.validate_asignacion()
+   - Verifica que asignacion.estado_asignacion == 'ACTIVA'
+   - Verifica que no tenga ya una devolución
+   ↓
+3. ReturnSerializer.validate()
+   - Verifica fecha_devolucion >= fecha_entrega
+   ↓
+4. ReturnViewSet.perform_create()
+   - Agrega created_by = request.user
+   ↓
+5. Django guarda Return en BD
+   ↓
+6. Signal: return_post_save() activado
+   - Obtiene asignacion y dispositivo
+   - Marca asignacion.estado_asignacion = 'FINALIZADA'
+   - Guarda asignacion
+   ↓
+7. Signal: assignment_post_save() activado
+   - Crea AuditLog del UPDATE de Assignment
+   ↓
+8. return_post_save() continúa:
+   - Como estado_dispositivo == 'OPTIMO'
+   - Llama dispositivo.change_status('DISPONIBLE', user)
+   ↓
+9. Device.change_status()
+   - Actualiza device.estado = 'DISPONIBLE'
+   - Guarda en BD
+   - Crea AuditLog del cambio
+   ↓
+10. Signal: device_post_save() activado
+    - Crea otro AuditLog para el UPDATE general
+    ↓
+11. Respuesta HTTP 201 Created
+    - Retorna Return serializada
+```
+
+**Resultado final:**
+- 1 Return creada
+- 1 Assignment actualizada (estado: ACTIVA → FINALIZADA)
+- 1 Device actualizado (estado: ASIGNADO → DISPONIBLE)
+- 4 registros en AuditLog:
+  1. CREATE Return
+  2. UPDATE Assignment
+  3. UPDATE Device (change_status)
+  4. UPDATE Device (post_save general)
+
+---
+
+### 14.10 Consideraciones de Performance
+
+#### Señales
+
+**Ventajas:**
+- Desacoplamiento: Lógica de negocio separada de ViewSets
+- Reutilizable: Funciona desde Admin, API, shell, fixtures
+- Mantenible: Cambios centralizados
+
+**Desventajas:**
+- Overhead: Cada save() ejecuta múltiples señales
+- Debugging: Flujo menos obvio (código se ejecuta "mágicamente")
+- Recursión: Riesgo de loops infinitos si no se controla
+
+**Mitigación:**
+```python
+# Evitar señales en bulk operations
+Device.objects.bulk_update(devices, ['estado'])  # NO activa signals
+
+# Evitar recursión
+if hasattr(instance, '_skip_audit'):
+    return  # No ejecutar señal
+```
+
+#### Queries de Agregación
+
+**Estadísticas:**
+- Todas las queries usan índices (estado, tipo_equipo, etc.)
+- Agregaciones en BD (COUNT) son más rápidas que len() en Python
+- values() + annotate() genera queries optimizadas
+
+**Cacheo futuro:**
+```python
+# Usar cache de Django para estadísticas
+from django.core.cache import cache
+
+def dashboard(self, request):
+    stats = cache.get('dashboard_stats')
+    if not stats:
+        stats = calculate_stats()  # Queries pesadas
+        cache.set('dashboard_stats', stats, 60*5)  # 5 minutos
+    return Response(stats)
+```
+
+#### Historial
+
+**select_related vs prefetch_related:**
+- `select_related`: ForeignKey, OneToOne → SQL JOIN (1 query)
+- `prefetch_related`: ManyToMany, reverse FK → 2+ queries, join en Python
+
+**Paginación recomendada:**
+```python
+# Para empleados con muchas asignaciones
+from rest_framework.pagination import PageNumberPagination
+
+class HistoryPagination(PageNumberPagination):
+    page_size = 20
+
+# En el ViewSet
+assignments = employee.assignment_set.all()
+paginator = HistoryPagination()
+page = paginator.paginate_queryset(assignments, request)
+```
+
+---
+
+### 14.11 Testing y Validación
+
+#### Tests Manuales Realizados
+
+1. **Cambio de estado:**
+```bash
+# Shell de Django
+python manage.py shell
+
+from apps.devices.models import Device
+from apps.users.models import User
+
+device = Device.objects.first()
+user = User.objects.first()
+device.change_status('ASIGNADO', user=user)
+
+# Verificar AuditLog
+from apps.users.audit import AuditLog
+AuditLog.objects.filter(entity_type='Device', entity_id=device.id).last()
+```
+
+2. **Validación de RUT:**
+```bash
+# Desde API
+curl -X POST http://localhost:8000/api/employees/ \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "rut": "12345678-0",  # DV incorrecto
+    "nombre_completo": "Test",
+    "cargo": "Test",
+    "sucursal": 1
+  }'
+
+# Esperado: HTTP 400 con mensaje de error del DV
+```
+
+3. **Historial:**
+```bash
+curl http://localhost:8000/api/employees/1/history/ \
+  -H "Authorization: Bearer {token}"
+
+# Verifica que retorne JSON con assignments
+```
+
+4. **Estadísticas:**
+```bash
+curl http://localhost:8000/api/stats/dashboard/ \
+  -H "Authorization: Bearer {token}"
+
+# Verifica que summary contenga números correctos
+```
+
+---
+
+**Última actualización:** Noviembre 5, 2025 - Fase 5 Completada
 **Documentado por:** Claude (Asistente IA)
-**Próxima actualización:** Al completar Fase 5 (Lógica de Negocio Backend)
+**Próxima actualización:** Al completar Fase 7 (Autenticación Frontend)

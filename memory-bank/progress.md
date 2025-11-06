@@ -241,22 +241,53 @@ backend/apps/users/
 
 | Paso | Descripcion | Estado | Notas |
 |------|-------------|--------|-------|
-| 5.1 | Crear metodo para cambiar estado de dispositivo | [ ] | |
-| 5.2 | Validar asignacion de dispositivo disponible | [ ] | |
-| 5.3 | Implementar senal post_save en Assignment | [ ] | Cambio automatico de estado |
-| 5.4 | Implementar logica de devolucion | [ ] | |
-| 5.5 | Implementar validacion de RUT chileno | [ ] | Solo formato |
-| 5.6 | Implementar prevencion de eliminacion con asignaciones activas | [ ] | |
-| 5.7 | Crear endpoint de historial de empleado | [ ] | |
-| 5.8 | Crear endpoint de historial de dispositivo | [ ] | |
-| 5.9 | Implementar sistema de auditoria automatico | [ ] | Senales post_save/post_delete |
-| 5.10 | Crear endpoint de estadisticas generales | [ ] | /api/stats/dashboard/ |
+| 5.1 | Crear metodo para cambiar estado de dispositivo | [x] | Mejorado change_status() con auditoria |
+| 5.2 | Validar asignacion de dispositivo disponible | [x] | Ya implementado en Fase 3 |
+| 5.3 | Implementar senal post_save en Assignment | [x] | Cambio automatico de estado |
+| 5.4 | Implementar logica de devolucion | [x] | Señales para Return implementadas |
+| 5.5 | Implementar validacion de RUT chileno | [x] | Validacion completa con digito verificador |
+| 5.6 | Implementar prevencion de eliminacion con asignaciones activas | [x] | Ya implementado en Fase 2 |
+| 5.7 | Crear endpoint de historial de empleado | [x] | /api/employees/{id}/history/ |
+| 5.8 | Crear endpoint de historial de dispositivo | [x] | /api/devices/{id}/history/ |
+| 5.9 | Implementar sistema de auditoria automatico | [x] | Senales post_save/post_delete para todos los modelos |
+| 5.10 | Crear endpoint de estadisticas generales | [x] | /api/stats/dashboard/ |
 
-**Estado de la Fase 5:** [ ] **PENDIENTE** (0% - 0/10 completados)
+**Estado de la Fase 5:** [x] **COMPLETADA** (100% - 10/10 completados)
 
 **Decision de implementacion:**
 - Senales: Registrar en apps.py con ready()
 - Crear signals.py manualmente en cada app que lo necesite
+
+**Detalles de implementacion:**
+- Metodo Device.change_status() mejorado con registro automatico en AuditLog
+- Validacion de RUT chileno completa en apps/employees/validators.py
+- Señales en apps/assignments/signals.py para cambio automatico de estados
+- Sistema de auditoria global en apps/users/signals.py
+- Endpoints de historial: GET /api/employees/{id}/history/ y /api/devices/{id}/history/
+- Endpoint de estadisticas: GET /api/stats/dashboard/
+- Todos los modelos principales registran automaticamente en AuditLog
+
+**Archivos creados:**
+```
+backend/apps/
+├── assignments/
+│   └── signals.py (señales para Assignment y Return)
+├── employees/
+│   └── validators.py (validate_rut con digito verificador)
+├── users/
+│   └── signals.py (señales de auditoria para todos los modelos)
+└── devices/
+    └── urls_stats.py (rutas para StatsViewSet)
+```
+
+**Archivos modificados:**
+- apps/devices/models.py: Mejorado change_status()
+- apps/employees/models.py: Agregado validador validate_rut
+- apps/employees/views.py: Agregado endpoint history()
+- apps/devices/views.py: Agregado endpoint history() y StatsViewSet
+- apps/assignments/apps.py: Registrar signals
+- apps/users/apps.py: Registrar signals
+- config/urls.py: Agregada ruta /api/stats/
 
 ---
 
@@ -331,17 +362,17 @@ backend/apps/users/
 | 2 | Modelos de Base de Datos | 100% (18/18) | [x] Completada |
 | 3 | API REST con DRF | 100% (16/16) | [x] Completada |
 | 4 | Autenticacion JWT | 100% (8/8) | [x] Completada |
-| 5 | Logica de Negocio Backend | 0% (0/10) | [ ] Pendiente |
+| 5 | Logica de Negocio Backend | 100% (10/10) | [x] Completada |
 | 6 | Configuracion del Frontend | 100% (7/7) | [x] Completada |
 | 7 | Autenticacion Frontend | 0% (0/10) | [ ] Pendiente |
 | 8-18 | Modulos Funcionales | 0% | [ ] Pendiente |
 
 ### Total del Proyecto
 
-**Pasos completados:** 59 / 150+ pasos
-**Progreso general:** ~39%
+**Pasos completados:** 69 / 150+ pasos
+**Progreso general:** ~46%
 
-**Fases completadas:** 6 / 19 (Fases 0, 1, 2, 3, 4, 6)
+**Fases completadas:** 7 / 19 (Fases 0, 1, 2, 3, 4, 5, 6)
 **Fases en progreso:** 0
 
 ---
@@ -388,20 +419,34 @@ backend/apps/users/
    - [x] Actualizar permisos de ViewSets (cambiar de AllowAny a IsAuthenticated)
    - [x] Probar autenticación con curl
 
-3. **Siguiente: Fase 5 - Logica de Negocio Backend**
-   - [ ] Crear metodo para cambiar estado de dispositivo
-   - [ ] Validar asignacion de dispositivo disponible
-   - [ ] Implementar señales post_save en Assignment
-   - [ ] Implementar logica de devolucion
-   - [ ] Implementar validacion de RUT chileno completa
-   - [ ] Implementar prevencion de eliminacion con asignaciones activas
-   - [ ] Crear endpoints de historial (empleado y dispositivo)
-   - [ ] Implementar sistema de auditoria automatico
-   - [ ] Crear endpoint de estadisticas generales
+3. **✅ Fase 5: Logica de Negocio Backend - COMPLETADA**
+   - [x] Crear metodo para cambiar estado de dispositivo
+   - [x] Validar asignacion de dispositivo disponible
+   - [x] Implementar señales post_save en Assignment
+   - [x] Implementar logica de devolucion
+   - [x] Implementar validacion de RUT chileno completa
+   - [x] Implementar prevencion de eliminacion con asignaciones activas
+   - [x] Crear endpoints de historial (empleado y dispositivo)
+   - [x] Implementar sistema de auditoria automatico
+   - [x] Crear endpoint de estadisticas generales
 
-4. **Despues de Fase 5:**
-   - [ ] Fase 7: Autenticacion frontend con JWT
-   - [ ] Fase 8+: Modulos funcionales del frontend
+4. **Siguiente: Fase 7 - Autenticacion Frontend**
+   - [ ] Crear auth-service.ts con funciones de login/logout/refresh
+   - [ ] Implementar almacenamiento de tokens en localStorage
+   - [ ] Crear interceptor en ApiClient para agregar Bearer token
+   - [ ] Implementar middleware de Next.js para proteger rutas
+   - [ ] Crear componente LoginPage
+   - [ ] Implementar auto-refresh de tokens
+   - [ ] Crear context provider para estado de autenticacion
+   - [ ] Implementar manejo de logout
+   - [ ] Crear componente ProtectedRoute
+   - [ ] Probar flujo completo de autenticacion
+
+5. **Despues de Fase 7:**
+   - [ ] Fase 8: Modulo de Sucursales
+   - [ ] Fase 9: Modulo de Empleados
+   - [ ] Fase 10: Modulo de Dispositivos
+   - [ ] Fase 11+: Otros modulos funcionales del frontend
 
 ---
 
@@ -458,6 +503,6 @@ pnpm build
 
 ---
 
-**Ultima actualizacion:** Noviembre 5, 2025 - 14:30
+**Ultima actualizacion:** Noviembre 5, 2025 - 16:45
 **Actualizado por:** Claude (Asistente IA)
-**Proxima actualizacion:** Al completar Fase 5 (Logica de Negocio Backend)
+**Proxima actualizacion:** Al completar Fase 7 (Autenticacion Frontend)

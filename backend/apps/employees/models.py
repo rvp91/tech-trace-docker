@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from .validators import validate_rut
 
 
 class Employee(models.Model):
@@ -11,7 +12,13 @@ class Employee(models.Model):
         ('INACTIVO', 'Inactivo'),
     ]
 
-    rut = models.CharField(max_length=12, unique=True, verbose_name='RUT')
+    rut = models.CharField(
+        max_length=12,
+        unique=True,
+        verbose_name='RUT',
+        validators=[validate_rut],
+        help_text='Formato: XX.XXX.XXX-X o XXXXXXXX-X'
+    )
     nombre_completo = models.CharField(max_length=200, verbose_name='Nombre completo')
     cargo = models.CharField(max_length=100, verbose_name='Cargo')
     correo_corporativo = models.EmailField(blank=True, null=True, verbose_name='Correo corporativo')
