@@ -667,10 +667,134 @@ frontend/
 
 ---
 
-## FASES 11-18: PENDIENTES
+## FASE 11: MODULO DE ASIGNACIONES
 
-### FASE 11: MODULO DE ASIGNACIONES
-**Estado:** [ ] **PENDIENTE** (0% - 0/10 completados)
+| Paso | Descripcion | Estado | Notas |
+|------|-------------|--------|-------|
+| 11.1 | Actualizar tipos TypeScript para Request, Assignment y Return | [x] | Interfaces completas con todos los campos |
+| 11.2 | Crear servicios de asignaciones | [x] | request-service.ts y assignment-service.ts creados |
+| 11.3 | Crear página de solicitudes | [x] | /dashboard/assignments/requests con filtros |
+| 11.4 | Crear modal de nueva solicitud | [x] | RequestModal con validaciones |
+| 11.5 | Crear página de listado de asignaciones | [x] | /dashboard/assignments con filtros |
+| 11.6 | Crear modal de nueva asignación | [x] | AssignmentModal con selección de dispositivos disponibles |
+| 11.7 | Implementar asignación desde solicitud | [x] | Botón "Asignar" en solicitudes pendientes/aprobadas |
+| 11.8 | Crear página de detalle de asignación | [x] | /assignments/[id] con toda la información |
+| 11.9 | Crear modal de devolución | [x] | ReturnModal con validaciones de fechas |
+| 11.10 | Implementar validación de fechas | [x] | Fecha devolución no puede ser anterior a entrega |
+
+**Estado de la Fase 11:** [x] **COMPLETADA** (100% - 10/10 completados)
+
+**Detalles de implementación:**
+
+**Backend:**
+- API ya estaba implementada en Fase 3
+- Endpoints funcionando: requests/, assignments/, returns/
+- Señales automáticas para cambio de estados
+- Validaciones de negocio en serializers
+
+**Frontend:**
+- Tipos TypeScript actualizados con Request, Assignment y Return
+- ApiClient extendido con soporte para query params
+- request-service.ts con funciones CRUD y helpers de UI
+- assignment-service.ts con manejo de asignaciones y devoluciones
+- Funciones helper para colores y labels
+
+**Página de Solicitudes (/dashboard/assignments/requests):**
+- Tabla con filtros por estado
+- Búsqueda en tiempo real
+- Botones para Aprobar/Rechazar solicitudes pendientes
+- Botón "Asignar" para solicitudes pendientes/aprobadas
+- Modal de creación de solicitudes
+- Integración con empleados activos
+
+**Página de Asignaciones (/dashboard/assignments):**
+- Tabla con todas las asignaciones
+- Filtros: estado (ACTIVA/FINALIZADA), búsqueda
+- Vista de empleado y dispositivo con detalles
+- Enlace a página de detalle
+- Botón para crear nueva asignación
+- Link a página de solicitudes
+
+**Modal de Asignación:**
+- Selección de empleado (puede venir preseleccionado desde solicitud)
+- Selección de dispositivo (solo DISPONIBLES)
+- Tipo de entrega (PERMANENTE/TEMPORAL)
+- Estado de carta (FIRMADA/PENDIENTE/NO_APLICA)
+- Fecha de entrega
+- Observaciones
+- Validación: advertencia si no hay dispositivos disponibles
+- Vinculación automática con solicitud si aplica
+
+**Página de Detalle (/assignments/[id]):**
+- Información completa del empleado con link
+- Información completa del dispositivo con link
+- Detalles de la asignación (tipo, fechas, estado carta)
+- Información de creación (usuario, fecha)
+- Botón "Registrar Devolución" (solo si está ACTIVA)
+- Card de información de devolución (si está FINALIZADA)
+- Navegación con breadcrumb
+
+**Modal de Devolución:**
+- Fecha de devolución (con validaciones)
+- Estado del dispositivo (OPTIMO/CON_DANOS/NO_FUNCIONAL)
+- Observaciones detalladas
+- Validaciones:
+  - Fecha no anterior a fecha de entrega
+  - Fecha no futura
+- Información visual sobre cambios automáticos:
+  - Asignación → FINALIZADA
+  - Dispositivo → DISPONIBLE (si OPTIMO) o MANTENIMIENTO
+
+**Flujo completo implementado:**
+1. Crear solicitud → Pendiente
+2. Aprobar/Rechazar solicitud
+3. Asignar dispositivo desde solicitud → Solicitud: COMPLETADA, Dispositivo: ASIGNADO
+4. Ver detalle de asignación activa
+5. Registrar devolución → Asignación: FINALIZADA, Dispositivo según estado
+
+**Archivos creados:**
+```
+frontend/
+├── lib/services/
+│   ├── request-service.ts (servicio completo de solicitudes)
+│   └── assignment-service.ts (servicio actualizado con returns)
+├── app/dashboard/assignments/
+│   ├── page.tsx (lista de asignaciones reescrita)
+│   ├── requests/page.tsx (página de solicitudes)
+│   └── [id]/page.tsx (detalle de asignación)
+└── components/modals/
+    ├── request-modal.tsx (crear/ver solicitudes)
+    ├── assignment-modal.tsx (crear asignaciones)
+    └── return-modal.tsx (registrar devoluciones)
+```
+
+**Archivos modificados:**
+```
+frontend/
+├── lib/
+│   ├── types.ts (agregados Request y Return interfaces)
+│   └── api-client.ts (agregado soporte para query params)
+```
+
+**Características implementadas:**
+- ✅ CRUD completo de solicitudes
+- ✅ Aprobación/rechazo de solicitudes
+- ✅ CRUD completo de asignaciones
+- ✅ Asignación desde solicitud con vinculación automática
+- ✅ Solo dispositivos DISPONIBLES en selector
+- ✅ Página de detalle con toda la información
+- ✅ Registro de devoluciones con validaciones
+- ✅ Cambios automáticos de estado (backend con señales)
+- ✅ Validaciones de fechas
+- ✅ Skeleton loaders en todas las páginas
+- ✅ Toast notifications para feedback
+- ✅ Filtros y búsqueda en tiempo real
+- ✅ Responsive design
+- ✅ Build exitoso sin errores
+
+---
+
+## FASES 12-18: PENDIENTES
 
 ### FASE 12: MODULO DE REPORTES E INVENTARIO
 **Estado:** [ ] **PENDIENTE** (0% - 0/5 completados)
@@ -712,14 +836,15 @@ frontend/
 | 8 | Modulo de Sucursales | 100% (6/6) | [x] Completada |
 | 9 | Modulo de Empleados | 100% (8/8) | [x] Completada |
 | 10 | Modulo de Dispositivos | 100% (8/8) | [x] Completada |
-| 11-18 | Otros Modulos Funcionales | 0% | [ ] Pendiente |
+| 11 | Modulo de Asignaciones | 100% (10/10) | [x] Completada |
+| 12-18 | Otros Modulos Funcionales | 0% | [ ] Pendiente |
 
 ### Total del Proyecto
 
-**Pasos completados:** 101 / 150+ pasos
-**Progreso general:** ~67%
+**Pasos completados:** 111 / 160+ pasos
+**Progreso general:** ~69%
 
-**Fases completadas:** 11 / 19 (Fases 0-10)
+**Fases completadas:** 12 / 19 (Fases 0-11)
 **Fases en progreso:** 0
 
 ---
@@ -821,19 +946,26 @@ frontend/
    - [x] Mostrar historial de asignaciones del dispositivo
    - [x] Implementar cambio manual de estado
 
-8. **Siguiente: Fase 11 - Modulo de Asignaciones**
-   - [ ] Actualizar tipos TypeScript para Request y Assignment
-   - [ ] Crear servicios de asignaciones
-   - [ ] Crear página de solicitudes de dispositivos
-   - [ ] Crear flujo de aprobación/rechazo de solicitudes
-   - [ ] Crear página de asignaciones activas
-   - [ ] Implementar proceso de asignación de dispositivo a empleado
-   - [ ] Crear página de devoluciones
-   - [ ] Implementar proceso de devolución de dispositivo
-   - [ ] Agregar validaciones de negocio (dispositivo disponible, etc.)
-   - [ ] Crear página de detalle de asignación
+8. **✅ Fase 11: Modulo de Asignaciones - COMPLETADA**
+   - [x] Actualizar tipos TypeScript para Request, Assignment y Return
+   - [x] Crear servicios de asignaciones (request-service y assignment-service)
+   - [x] Crear página de solicitudes de dispositivos
+   - [x] Crear flujo de aprobación/rechazo de solicitudes
+   - [x] Crear página de asignaciones activas
+   - [x] Implementar proceso de asignación de dispositivo a empleado
+   - [x] Implementar asignación desde solicitud
+   - [x] Implementar proceso de devolución de dispositivo
+   - [x] Agregar validaciones de negocio (dispositivo disponible, fechas)
+   - [x] Crear página de detalle de asignación con información de devolución
 
-9. **Después de Fase 11:**
+9. **Siguiente: Fase 12 - Modulo de Reportes e Inventario**
+   - [ ] Crear página de reportes
+   - [ ] Implementar inventario general
+   - [ ] Implementar inventario por sucursal
+   - [ ] Implementar inventario por empleado
+   - [ ] Implementar exportación a CSV
+
+10. **Después de Fase 12:**
    - [ ] Fase 12: Modulo de Reportes e Inventario
    - [ ] Fase 13: Dashboard y Estadísticas
    - [ ] Fase 14+: Gestión de usuarios, validaciones, optimizaciones
@@ -899,4 +1031,4 @@ pnpm build
 
 **Ultima actualizacion:** Noviembre 6, 2025 - 08:15
 **Actualizado por:** Claude (Asistente IA)
-**Proxima actualizacion:** Al completar Fase 11 (Modulo de Asignaciones)
+**Proxima actualizacion:** Al completar Fase 12 (Módulo de Reportes e Inventario)

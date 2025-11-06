@@ -87,6 +87,25 @@ export interface DeviceHistory {
   assignments: Assignment[]
 }
 
+// Request (Solicitud) types
+export type EstadoSolicitud = "PENDIENTE" | "APROBADA" | "RECHAZADA" | "COMPLETADA"
+
+export interface Request {
+  id: number
+  empleado: number
+  empleado_detail?: Employee
+  jefatura_solicitante: string
+  tipo_dispositivo: string
+  justificacion?: string
+  fecha_solicitud: string
+  estado: EstadoSolicitud
+  created_by: number
+  created_by_username?: string
+  created_at: string
+  updated_at: string
+}
+
+// Assignment (Asignación) types
 export type TipoEntrega = "PERMANENTE" | "TEMPORAL"
 export type EstadoCarta = "FIRMADA" | "PENDIENTE" | "NO_APLICA"
 export type EstadoAsignacion = "ACTIVA" | "FINALIZADA"
@@ -94,6 +113,7 @@ export type EstadoAsignacion = "ACTIVA" | "FINALIZADA"
 export interface Assignment {
   id: number
   solicitud?: number
+  solicitud_detail?: Request
   empleado: number
   dispositivo: number
   empleado_detail?: Employee
@@ -108,6 +128,21 @@ export interface Assignment {
   updated_at: string
   created_by?: number
   created_by_username?: string
+}
+
+// Return (Devolución) types
+export type EstadoDevolucion = "OPTIMO" | "CON_DANOS" | "NO_FUNCIONAL"
+
+export interface Return {
+  id: number
+  asignacion: number
+  asignacion_detail?: Assignment
+  fecha_devolucion: string
+  estado_dispositivo: EstadoDevolucion
+  observaciones?: string
+  created_by: number
+  created_by_username?: string
+  created_at: string
 }
 
 export interface Branch {

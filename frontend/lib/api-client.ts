@@ -29,7 +29,22 @@ export class ApiClient {
     return this.token
   }
 
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  private buildUrl(endpoint: string, params?: Record<string, any>): string {
+    const url = `${this.baseUrl}${endpoint}`
+    if (!params) return url
+
+    const searchParams = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        searchParams.append(key, String(value))
+      }
+    })
+
+    const queryString = searchParams.toString()
+    return queryString ? `${url}?${queryString}` : url
+  }
+
+  private async request<T>(endpoint: string, options: RequestInit = {}, params?: Record<string, any>): Promise<T> {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       ...(options.headers as Record<string, string>),
@@ -39,7 +54,9 @@ export class ApiClient {
       headers["Authorization"] = `Bearer ${this.token}`
     }
 
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+    const url = this.buildUrl(endpoint, params)
+
+    const response = await fetch(url, {
       ...options,
       headers,
     })
@@ -54,8 +71,8 @@ export class ApiClient {
     return response.json()
   }
 
-  async get<T>(endpoint: string): Promise<T> {
-    return this.request<T>(endpoint, { method: "GET" })
+  async get<T>(endpoint: string, params?: Record<string, any>): Promise<T> {
+    return this.request<T>(endpoint, { method: "GET" }, params)
   }
 
   async post<T>(endpoint: string, data?: unknown): Promise<T> {

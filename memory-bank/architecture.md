@@ -4838,6 +4838,654 @@ Uso de `|| 0` para evitar NaN en operaciones aritméticas con valores potencialm
 
 ---
 
-**Última actualización:** Noviembre 6, 2025 - Fase 10 Completada
+## 11. Módulo de Asignaciones (Frontend + Backend)
+
+### Descripción General
+
+El módulo de asignaciones maneja el ciclo de vida completo de la gestión de dispositivos:
+1. **Solicitudes:** Empleados/jefaturas solicitan dispositivos
+2. **Aprobación:** Las solicitudes son aprobadas/rechazadas
+3. **Asignación:** Dispositivos son asignados a empleados
+4. **Devolución:** Registro del retorno de dispositivos
+
+Este módulo es el **core del negocio** ya que conecta Empleados, Dispositivos y gestiona el flujo operativo completo.
+
+### Arquitectura del Módulo
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    FLUJO DE ASIGNACIONES                     │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  1. SOLICITUD (Request)                                      │
+│     ├─ Estado: PENDIENTE                                     │
+│     ├─ Jefatura solicita dispositivo para empleado          │
+│     └─ Tipo de dispositivo requerido                         │
+│                    ↓                                         │
+│  2. APROBACIÓN                                               │
+│     ├─ Revisar solicitud                                     │
+│     ├─ APROBAR → Estado: APROBADA                           │
+│     └─ RECHAZAR → Estado: RECHAZADA (fin)                   │
+│                    ↓                                         │
+│  3. ASIGNACIÓN (Assignment)                                  │
+│     ├─ Seleccionar dispositivo DISPONIBLE                    │
+│     ├─ Crear asignación (vinculada a solicitud)             │
+│     ├─ Solicitud → COMPLETADA                               │
+│     ├─ Dispositivo → ASIGNADO (automático)                  │
+│     └─ Asignación → ACTIVA                                  │
+│                    ↓                                         │
+│  4. DEVOLUCIÓN (Return)                                      │
+│     ├─ Registrar fecha de devolución                        │
+│     ├─ Estado del dispositivo (OPTIMO/CON_DANOS/NO_FUNC)   │
+│     ├─ Asignación → FINALIZADA (automático)                │
+│     └─ Dispositivo → DISPONIBLE o MANTENIMIENTO             │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Estructura de Archivos
+
+```
+frontend/
+├── lib/
+│   ├── types.ts                           # Tipos Request, Assignment, Return
+│   ├── api-client.ts                      # Extendido con query params
+│   └── services/
+│       ├── request-service.ts             # API de solicitudes
+│       └── assignment-service.ts          # API de asignaciones y devoluciones
+│
+├── app/dashboard/assignments/
+│   ├── page.tsx                          # Lista de asignaciones
+│   ├── requests/
+│   │   └── page.tsx                      # Lista de solicitudes
+│   └── [id]/
+│       └── page.tsx                      # Detalle de asignación
+│
+└── components/modals/
+    ├── request-modal.tsx                 # Crear/ver solicitudes
+    ├── assignment-modal.tsx              # Crear asignaciones
+    └── return-modal.tsx                  # Registrar devoluciones
+
+backend/apps/assignments/
+├── models.py                             # Request, Assignment, Return
+├── serializers.py                        # Serializers con validaciones
+├── views.py                              # ViewSets REST
+├── signals.py                            # Cambios automáticos de estado
+└── urls.py                               # Rutas de API
+```
+
+### Modelos de Datos
+
+#### **Request (Solicitud)**
+```python
+- empleado: ForeignKey(Employee)
+- jefatura_solicitante: CharField(max_length=200)
+- tipo_dispositivo: CharField(TIPOS_CHOICES)
+- justificacion: TextField(blank=True)
+- fecha_solicitud: DateTimeField(auto_now_add=True)
+- estado: CharField(PENDIENTE/APROBADA/RECHAZADA/COMPLETADA)
+- created_by: ForeignKey(User)
+```
+
+#### **Assignment (Asignación)**
+```python
+- solicitud: ForeignKey(Request, null=True)  # Opcional
+- empleado: ForeignKey(Employee)
+- dispositivo: ForeignKey(Device)
+- tipo_entrega: CharField(PERMANENTE/TEMPORAL)
+- fecha_entrega: DateField
+- fecha_devolucion: DateField(blank=True)
+- estado_carta: CharField(FIRMADA/PENDIENTE/NO_APLICA)
+- estado_asignacion: CharField(ACTIVA/FINALIZADA)
+- observaciones: TextField(blank=True)
+- created_by: ForeignKey(User)
+```
+
+#### **Return (Devolución)**
+```python
+- asignacion: OneToOneField(Assignment)
+- fecha_devolucion: DateField
+- estado_dispositivo: CharField(OPTIMO/CON_DANOS/NO_FUNCIONAL)
+- observaciones: TextField(blank=True)
+- created_by: ForeignKey(User)
+```
+
+### Servicios Frontend
+
+#### **request-service.ts**
+```typescript
+// Funciones principales
+getRequests(params)         // Lista con filtros
+getRequest(id)             // Detalle
+createRequest(data)        // Crear solicitud
+updateRequest(id, data)    // Actualizar
+deleteRequest(id)          // Eliminar
+approveRequest(id)         // Aprobar (helper)
+rejectRequest(id)          // Rechazar (helper)
+
+// Helpers UI
+getRequestStatusColor(estado)
+getRequestStatusLabel(estado)
+```
+
+#### **assignment-service.ts**
+```typescript
+// Asignaciones
+getAssignments(params)      // Lista con filtros
+getAssignment(id)          // Detalle
+createAssignment(data)     // Crear asignación
+updateAssignment(id, data) // Actualizar
+deleteAssignment(id)       // Eliminar
+
+// Devoluciones
+getReturns(params)         // Lista de devoluciones
+getReturn(id)              // Detalle de devolución
+createReturn(data)         // Registrar devolución
+getReturnByAssignment(id)  // Obtener devolución de una asignación
+
+// Helpers UI
+getAssignmentStatusColor(estado)
+getAssignmentStatusLabel(estado)
+getTipoEntregaLabel(tipo)
+getEstadoCartaLabel(estado)
+getReturnStatusColor(estado)
+getReturnStatusLabel(estado)
+```
+
+### Componentes Principales
+
+#### **1. Página de Solicitudes** (`/dashboard/assignments/requests`)
+
+**Características:**
+- Tabla con todas las solicitudes
+- Filtros: estado (PENDIENTE/APROBADA/RECHAZADA/COMPLETADA)
+- Búsqueda en tiempo real
+- Acciones por estado:
+  - PENDIENTE: Aprobar, Rechazar, Asignar
+  - APROBADA: Asignar
+  - COMPLETADA: Solo ver
+  - RECHAZADA: Solo ver
+
+**Flujo de trabajo:**
+```typescript
+1. Usuario crea solicitud → Estado: PENDIENTE
+2. Admin/Operador aprueba → Estado: APROBADA
+3. Hace clic en "Asignar" → Abre AssignmentModal
+4. Crea asignación → Solicitud: COMPLETADA, Dispositivo: ASIGNADO
+```
+
+#### **2. Modal de Solicitud** (`RequestModal`)
+
+**Props:**
+- `open`: boolean - Control de visibilidad
+- `onClose`: function - Cerrar modal
+- `onSuccess`: function - Callback después de crear/actualizar
+- `request?`: Request | null - Solicitud a editar (opcional)
+
+**Validaciones:**
+- Empleado requerido (solo activos)
+- Jefatura solicitante requerida
+- Tipo de dispositivo requerido
+- Justificación opcional
+
+**Estados:**
+- Modo creación: Sin prop `request`
+- Modo solo lectura: Con prop `request`
+
+#### **3. Página de Asignaciones** (`/dashboard/assignments`)
+
+**Características:**
+- Tabla con todas las asignaciones
+- Filtros: estado (ACTIVA/FINALIZADA)
+- Búsqueda en tiempo real
+- Vista de empleado y dispositivo con detalles completos
+- Link "Ver Detalles" navega a página de detalle
+- Botón "Nueva Asignación" (independiente de solicitudes)
+- Link "Ver Solicitudes"
+
+**Columnas mostradas:**
+- ID de asignación
+- Empleado (nombre completo)
+- Dispositivo (tipo, marca, modelo, serie)
+- Tipo de entrega (Permanente/Temporal)
+- Fecha de entrega
+- Estado (badge con color)
+
+#### **4. Modal de Asignación** (`AssignmentModal`)
+
+**Props:**
+- `open`: boolean
+- `onClose`: function
+- `onSuccess`: function
+- `assignment?`: Assignment | null - Para edición
+- `preSelectedEmployee?`: number - Empleado preseleccionado
+- `preSelectedRequest?`: Request | null - Solicitud origen
+
+**Características especiales:**
+- **Dispositivos disponibles:** Solo muestra dispositivos con estado DISPONIBLE
+- **Empleado preseleccionado:** Viene desde solicitud, campo bloqueado
+- **Vinculación automática:** Si viene de solicitud, se vincula automáticamente
+- **Advertencia:** Muestra mensaje si no hay dispositivos disponibles
+- **Validación:** Botón submit deshabilitado si no hay dispositivos
+
+**Campos:**
+- Empleado (Select, bloqueado si viene de solicitud)
+- Dispositivo (Select, solo DISPONIBLES, bloqueado en edición)
+- Tipo de entrega (PERMANENTE/TEMPORAL)
+- Fecha de entrega
+- Estado de carta (FIRMADA/PENDIENTE/NO_APLICA)
+- Observaciones (opcional)
+
+**Flujo de creación:**
+```typescript
+// Desde solicitud
+1. Solicitud PENDIENTE/APROBADA → Click "Asignar"
+2. Modal se abre con empleado preseleccionado
+3. Seleccionar dispositivo DISPONIBLE
+4. Llenar datos adicionales
+5. Crear asignación:
+   - solicitud.estado → COMPLETADA
+   - dispositivo.estado → ASIGNADO (automático por señal)
+   - asignacion.estado_asignacion → ACTIVA
+
+// Independiente
+1. Click "Nueva Asignación"
+2. Seleccionar empleado
+3. Seleccionar dispositivo DISPONIBLE
+4. Llenar datos
+5. Crear (sin vinculación a solicitud)
+```
+
+#### **5. Página de Detalle de Asignación** (`/assignments/[id]`)
+
+**Secciones:**
+
+**A. Header:**
+- Título con ID de asignación
+- Botón "Registrar Devolución" (solo si ACTIVA)
+- Navegación: Link de regreso
+
+**B. Card de Estado:**
+- Badge con estado actual (ACTIVA/FINALIZADA)
+
+**C. Card de Empleado:**
+- Nombre completo (link a detalle de empleado)
+- RUT
+- Cargo
+- Sucursal
+
+**D. Card de Dispositivo:**
+- Tipo de equipo
+- Marca y modelo (link a detalle de dispositivo)
+- Serie/IMEI
+- Estado actual
+
+**E. Card de Detalles de Asignación:**
+- Tipo de entrega
+- Fecha de entrega
+- Estado de carta
+- Fecha de devolución (si aplica)
+- Creado por (usuario)
+- Fecha de creación
+- Observaciones (si hay)
+
+**F. Card de Información de Devolución** (solo si FINALIZADA):
+- Fecha de devolución
+- Estado del dispositivo (OPTIMO/CON_DANOS/NO_FUNCIONAL)
+- Observaciones de devolución
+
+#### **6. Modal de Devolución** (`ReturnModal`)
+
+**Props:**
+- `open`: boolean
+- `onClose`: function
+- `onSuccess`: function
+- `assignment`: Assignment - Asignación a devolver
+
+**Campos:**
+- Fecha de devolución (pre-llenada con hoy, validada)
+- Estado del dispositivo (Select con descripciones):
+  - OPTIMO: Perfecto estado
+  - CON_DANOS: Daños menores
+  - NO_FUNCIONAL: No funciona
+- Observaciones (opcional pero recomendado)
+
+**Validaciones de fechas:**
+```typescript
+// Fecha de devolución NO puede ser:
+1. Anterior a fecha_entrega
+2. Futura (mayor a hoy)
+
+// Validación en modal
+min={assignment.fecha_entrega}
+max={new Date().toISOString().split("T")[0]}
+```
+
+**Información visual:**
+- Banner informativo sobre cambios automáticos:
+  - Asignación → FINALIZADA
+  - Dispositivo → DISPONIBLE (si OPTIMO) o MANTENIMIENTO (si daños)
+
+**Flujo de devolución:**
+```typescript
+1. Usuario en detalle de asignación ACTIVA
+2. Click "Registrar Devolución"
+3. Modal se abre
+4. Seleccionar fecha (validada)
+5. Seleccionar estado del dispositivo
+6. Agregar observaciones detalladas
+7. Submit:
+   - Crear registro Return
+   - asignacion.estado_asignacion → FINALIZADA (automático)
+   - asignacion.fecha_devolucion → fecha seleccionada
+   - dispositivo.estado → según estado_dispositivo (automático por señal)
+```
+
+### Backend - API de Asignaciones
+
+#### **Endpoints de Solicitudes (Requests):**
+
+```
+GET    /api/assignments/requests/           # Lista paginada
+POST   /api/assignments/requests/           # Crear solicitud
+GET    /api/assignments/requests/{id}/      # Detalle
+PATCH  /api/assignments/requests/{id}/      # Actualizar
+DELETE /api/assignments/requests/{id}/      # Eliminar
+```
+
+**Filtros disponibles:**
+- `search`: Busca en empleado y jefatura
+- `estado`: PENDIENTE, APROBADA, RECHAZADA, COMPLETADA
+- `empleado`: ID del empleado
+- `page`, `page_size`
+
+#### **Endpoints de Asignaciones (Assignments):**
+
+```
+GET    /api/assignments/assignments/        # Lista paginada
+POST   /api/assignments/assignments/        # Crear asignación
+GET    /api/assignments/assignments/{id}/   # Detalle
+PATCH  /api/assignments/assignments/{id}/   # Actualizar
+DELETE /api/assignments/assignments/{id}/   # Eliminar
+```
+
+**Filtros disponibles:**
+- `search`: Busca en empleado y dispositivo
+- `estado_asignacion`: ACTIVA, FINALIZADA
+- `empleado`: ID del empleado
+- `dispositivo`: ID del dispositivo
+- `page`, `page_size`
+
+#### **Endpoints de Devoluciones (Returns):**
+
+```
+GET    /api/assignments/returns/            # Lista paginada
+POST   /api/assignments/returns/            # Registrar devolución
+GET    /api/assignments/returns/{id}/       # Detalle
+```
+
+**Filtros disponibles:**
+- `estado_dispositivo`: OPTIMO, CON_DANOS, NO_FUNCIONAL
+- `page`, `page_size`
+
+### Señales (Signals) - Automatización Backend
+
+#### **Signal: post_save Assignment**
+```python
+@receiver(post_save, sender=Assignment)
+def update_device_status_on_assignment(sender, instance, created, **kwargs):
+    """
+    Cuando se crea una asignación:
+    1. Cambiar dispositivo a ASIGNADO
+    2. Registrar en AuditLog
+    """
+    if created:
+        device = instance.dispositivo
+        device.estado = 'ASIGNADO'
+        device.save()
+```
+
+#### **Signal: post_save Return**
+```python
+@receiver(post_save, sender=Return)
+def update_assignment_and_device_on_return(sender, instance, created, **kwargs):
+    """
+    Cuando se registra una devolución:
+    1. Cambiar asignación a FINALIZADA
+    2. Actualizar fecha_devolucion en asignación
+    3. Cambiar dispositivo según estado:
+       - OPTIMO → DISPONIBLE
+       - CON_DANOS/NO_FUNCIONAL → MANTENIMIENTO
+    4. Registrar en AuditLog
+    """
+    if created:
+        assignment = instance.asignacion
+        assignment.estado_asignacion = 'FINALIZADA'
+        assignment.fecha_devolucion = instance.fecha_devolucion
+        assignment.save()
+
+        device = assignment.dispositivo
+        if instance.estado_dispositivo == 'OPTIMO':
+            device.estado = 'DISPONIBLE'
+        else:
+            device.estado = 'MANTENIMIENTO'
+        device.save()
+```
+
+### Validaciones de Negocio
+
+#### **Backend (Serializers):**
+```python
+# AssignmentSerializer
+def validate_dispositivo(self, value):
+    """
+    Solo se pueden asignar dispositivos DISPONIBLES
+    """
+    if value.estado != 'DISPONIBLE':
+        raise ValidationError("Solo se pueden asignar dispositivos disponibles")
+    return value
+
+def validate(self, data):
+    """
+    Si tipo_entrega es TEMPORAL, fecha_devolucion es requerida
+    """
+    if data.get('tipo_entrega') == 'TEMPORAL':
+        if not data.get('fecha_devolucion'):
+            raise ValidationError("Fecha de devolución requerida para entregas temporales")
+    return data
+
+# ReturnSerializer
+def validate(self, data):
+    """
+    Fecha de devolución debe ser >= fecha de entrega
+    """
+    if data['fecha_devolucion'] < data['asignacion'].fecha_entrega:
+        raise ValidationError("Fecha de devolución no puede ser anterior a fecha de entrega")
+    return data
+```
+
+#### **Frontend (ReturnModal):**
+```typescript
+const validateDates = (): boolean => {
+  const fechaEntrega = new Date(assignment.fecha_entrega)
+  const fechaDevolucion = new Date(formData.fecha_devolucion)
+
+  if (fechaDevolucion < fechaEntrega) {
+    toast({ title: "Error", description: "Fecha no puede ser anterior" })
+    return false
+  }
+
+  const hoy = new Date()
+  if (fechaDevolucion > hoy) {
+    toast({ title: "Error", description: "Fecha no puede ser futura" })
+    return false
+  }
+
+  return true
+}
+```
+
+### Mejora Clave: ApiClient con Query Params
+
+Para este módulo se extendió el `ApiClient` con soporte para query parameters:
+
+```typescript
+// Antes (Fase 0-10)
+apiClient.get<T>(endpoint: string)
+
+// Ahora (Fase 11+)
+apiClient.get<T>(endpoint: string, params?: Record<string, any>)
+
+// Ejemplo de uso
+const response = await apiClient.get("/assignments/requests/", {
+  estado: "PENDIENTE",
+  page: 1,
+  page_size: 20
+})
+// Genera: /assignments/requests/?estado=PENDIENTE&page=1&page_size=20
+```
+
+**Implementación:**
+```typescript
+private buildUrl(endpoint: string, params?: Record<string, any>): string {
+  const url = `${this.baseUrl}${endpoint}`
+  if (!params) return url
+
+  const searchParams = new URLSearchParams()
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      searchParams.append(key, String(value))
+    }
+  })
+
+  const queryString = searchParams.toString()
+  return queryString ? `${url}?${queryString}` : url
+}
+```
+
+### Patrones de Diseño Implementados
+
+#### **1. Wizard/Multi-Step Pattern**
+El flujo Solicitud → Aprobación → Asignación → Devolución implementa un wizard distribuido en múltiples páginas y modales.
+
+#### **2. Preselection Pattern**
+`AssignmentModal` acepta empleado y solicitud preseleccionados, reduciendo pasos para el usuario.
+
+#### **3. State Machine Pattern**
+Los estados de Request y Assignment siguen transiciones específicas:
+```
+Request: PENDIENTE → APROBADA → COMPLETADA
+         PENDIENTE → RECHAZADA (terminal)
+
+Assignment: ACTIVA → FINALIZADA (no reversible)
+```
+
+#### **4. Cascading Updates Pattern**
+Las señales implementan actualizaciones en cascada:
+```
+Return creado → Assignment.FINALIZADA → Device.DISPONIBLE/MANTENIMIENTO
+```
+
+#### **5. Modal Composition with Context Pattern**
+Los modales comparten estructura pero se comportan diferente según contexto (creación vs edición, con/sin preselección).
+
+#### **6. Conditional Form Validation Pattern**
+El modal de asignación valida dinámicamente:
+- Dispositivos solo si hay disponibles
+- Empleado bloqueado si viene de solicitud
+
+#### **7. Safe Array Access Pattern**
+Para evitar errores de `.map()` en arrays undefined:
+```typescript
+{employees && employees.length > 0 ? (
+  employees.map(...)
+) : (
+  <SelectItem value="none" disabled>Cargando...</SelectItem>
+)}
+```
+
+#### **8. Service Response Normalization Pattern**
+Los servicios normalizan respuestas del backend:
+```typescript
+// Backend: { count, results }
+// Servicio retorna: { data, total, page, pageSize, totalPages }
+return {
+  data: response.results,
+  total: response.count,
+  page: params?.page || 1,
+  pageSize: params?.page_size || 20,
+  totalPages: Math.ceil(response.count / (params?.page_size || 20)),
+}
+```
+
+### Consideraciones de Seguridad
+
+1. **Validación de estados:** Backend valida transiciones de estado válidas
+2. **Dispositivos disponibles:** Solo se pueden asignar dispositivos DISPONIBLES
+3. **Unicidad de devolución:** OneToOneField garantiza una sola devolución por asignación
+4. **Fechas lógicas:** Fecha de devolución debe ser >= fecha de entrega
+5. **Auditoría completa:** Todas las operaciones registradas en AuditLog
+6. **Usuario autenticado:** Todos los endpoints requieren JWT válido
+7. **created_by automático:** El backend asigna automáticamente el usuario actual
+8. **Protección CSRF:** DRF protege contra CSRF en operaciones POST/PUT/PATCH/DELETE
+
+### Mejoras Futuras Planificadas
+
+1. **Notificaciones:** Notificar por email cuando se aprueba/rechaza solicitud
+2. **Workflow approval:** Flujo de aprobación multi-nivel
+3. **Calendario de entregas:** Vista de calendario con asignaciones programadas
+4. **Alertas de devolución:** Notificar cuando se acerca fecha de devolución temporal
+5. **Firma digital:** Captura de firma en carta de responsabilidad
+6. **Export a PDF:** Generar PDF de carta de responsabilidad
+7. **Historial completo:** Timeline visual del ciclo de vida de cada dispositivo
+8. **Bulk assignments:** Asignar múltiples dispositivos a la vez
+9. **Templates de solicitud:** Plantillas pre-definidas por tipo de cargo
+10. **Analytics:** Dashboard con métricas de tiempo promedio por fase
+
+### Lecciones Aprendidas - Fase 11
+
+1. **Query params en ApiClient:** Centralizar construcción de URLs con params evita duplicación
+2. **Safe array mapping:** Siempre validar `array && array.length > 0` antes de `.map()`
+3. **Service normalization:** Normalizar respuestas del backend en servicios facilita consumo
+4. **Response structure mismatch:** Cuidado con `data` vs `results` en diferentes endpoints
+5. **Modal context awareness:** Props opcionales permiten modales reutilizables en múltiples contextos
+6. **Signals for automation:** Señales de Django ideales para efectos secundarios (estado de dispositivo)
+7. **Date validation client+server:** Validar fechas en ambos lados previene errores de negocio
+8. **Preselection UX:** Pre-llenar campos reduce fricción en flujos multi-paso
+9. **Visual feedback:** Banners informativos sobre cambios automáticos mejoran confianza del usuario
+10. **OneToOne relationships:** Usar OneToOneField para relaciones 1:1 garantiza unicidad
+
+### Testing Checklist
+
+#### **Frontend:**
+- [ ] Crear solicitud con todos los campos
+- [ ] Aprobar solicitud pendiente
+- [ ] Rechazar solicitud pendiente
+- [ ] Asignar desde solicitud aprobada
+- [ ] Crear asignación independiente
+- [ ] Registrar devolución con dispositivo óptimo → DISPONIBLE
+- [ ] Registrar devolución con daños → MANTENIMIENTO
+- [ ] Validar fecha de devolución anterior a entrega (debe fallar)
+- [ ] Validar fecha de devolución futura (debe fallar)
+- [ ] Ver detalle de asignación activa
+- [ ] Ver detalle de asignación finalizada con info de devolución
+- [ ] Filtrar solicitudes por estado
+- [ ] Filtrar asignaciones por estado
+- [ ] Búsqueda en solicitudes
+- [ ] Búsqueda en asignaciones
+
+#### **Backend:**
+- [ ] Dispositivo cambia a ASIGNADO al crear asignación
+- [ ] Dispositivo cambia a DISPONIBLE al devolver en estado OPTIMO
+- [ ] Dispositivo cambia a MANTENIMIENTO al devolver con daños
+- [ ] Asignación cambia a FINALIZADA al registrar devolución
+- [ ] No se puede asignar dispositivo que no está DISPONIBLE
+- [ ] No se puede registrar devolución con fecha anterior a entrega
+- [ ] Una asignación solo puede tener una devolución (OneToOne)
+- [ ] Todas las operaciones registran en AuditLog
+
+---
+
+**Última actualización:** Noviembre 6, 2025 - Fase 11 Completada
 **Documentado por:** Claude (Asistente IA)
-**Próxima actualización:** Al completar Fase 11 (Módulo de Asignaciones)
+**Próxima actualización:** Al completar Fase 12 (Módulo de Reportes e Inventario)

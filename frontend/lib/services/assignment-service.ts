@@ -1,65 +1,185 @@
-// Assignment and return management service
+import { apiClient } from "@/lib/api-client"
+import type { Assignment, Return, PaginatedResponse } from "@/lib/types"
 
-import { apiClient } from "../api-client"
-import type { Assignment, PaginatedResponse } from "../types"
-
-export interface AssignmentFilters {
-  search?: string
-  estado?: "activa" | "finalizada" | "todas"
-  tipoEntrega?: "permanente" | "temporal" | "todas"
-  fechaDesde?: string
-  fechaHasta?: string
+interface GetAssignmentsParams {
   page?: number
-  pageSize?: number
+  page_size?: number
+  search?: string
+  estado_asignacion?: string
+  empleado?: number
+  dispositivo?: number
+  ordering?: string
 }
 
-export interface CreateAssignmentData {
-  empleadoId: string
-  dispositivoId: string
-  fechaEntrega: string
-  tipoEntrega: "permanente" | "temporal"
-  estadoCarta: "firmada" | "pendiente" | "no_aplica"
-  observaciones?: string
-}
-
-export interface ReturnDeviceData {
-  fechaDevolucion: string
-  estadoDevolucion: "optimo" | "con_danos" | "no_funcional"
-  observacionesDevolucion?: string
+interface GetReturnsParams {
+  page?: number
+  page_size?: number
+  estado_dispositivo?: string
+  ordering?: string
 }
 
 export const assignmentService = {
-  async getAssignments(filters: AssignmentFilters = {}): Promise<PaginatedResponse<Assignment>> {
-    const params = new URLSearchParams()
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== "todas") {
-        params.append(key, String(value))
-      }
-    })
-    return apiClient.get<PaginatedResponse<Assignment>>(`/assignments?${params.toString()}`)
+  /**
+   * Obtener todas las asignaciones con filtros opcionales
+   */
+  async getAssignments(params?: GetAssignmentsParams): Promise<PaginatedResponse<Assignment>> {
+    const response = await apiClient.get<{
+      count: number
+      results: Assignment[]
+    }>("/assignments/assignments/", params)
+
+    return {
+      data: response.results,
+      total: response.count,
+      page: params?.page || 1,
+      pageSize: params?.page_size || 20,
+      totalPages: Math.ceil(response.count / (params?.page_size || 20)),
+    }
   },
 
-  async getAssignment(id: string): Promise<Assignment> {
-    return apiClient.get<Assignment>(`/assignments/${id}`)
+  /**
+   * Obtener una asignación por ID
+   */
+  async getAssignment(id: number): Promise<Assignment> {
+    return await apiClient.get<Assignment>(`/assignments/assignments/${id}/`)
   },
 
-  async createAssignment(data: CreateAssignmentData): Promise<Assignment> {
-    return apiClient.post<Assignment>("/assignments", data)
+  /**
+   * Crear una nueva asignación
+   */
+  async createAssignment(data: Partial<Assignment>): Promise<Assignment> {
+    return await apiClient.post<Assignment>("/assignments/assignments/", data)
   },
 
-  async returnDevice(id: string, data: ReturnDeviceData): Promise<Assignment> {
-    return apiClient.post<Assignment>(`/assignments/${id}/return`, data)
+  /**
+   * Actualizar una asignación existente
+   */
+  async updateAssignment(id: number, data: Partial<Assignment>): Promise<Assignment> {
+    return await apiClient.patch<Assignment>(`/assignments/assignments/${id}/`, data)
   },
 
-  async getActiveAssignments(): Promise<Assignment[]> {
-    const response = await apiClient.get<PaginatedResponse<Assignment>>("/assignments?estado=activa&pageSize=1000")
-    return response.data
+  /**
+   * Eliminar una asignación
+   */
+  async deleteAssignment(id: number): Promise<void> {
+    await apiClient.delete(`/assignments/assignments/${id}/`)
   },
 
-  async getEmployeeAssignments(empleadoId: string): Promise<Assignment[]> {
-    const response = await apiClient.get<PaginatedResponse<Assignment>>(
-      `/assignments?empleadoId=${empleadoId}&estado=activa&pageSize=1000`,
-    )
-    return response.data
+  /**
+   * Obtener todas las devoluciones con filtros opcionales
+   */
+  async getReturns(params?: GetReturnsParams): Promise<PaginatedResponse<Return>> {
+    const response = await apiClient.get<{
+      count: number
+      results: Return[]
+    }>("/assignments/returns/", params)
+
+    return {
+      data: response.results,
+      total: response.count,
+      page: params?.page || 1,
+      pageSize: params?.page_size || 20,
+      totalPages: Math.ceil(response.count / (params?.page_size || 20)),
+    }
   },
+
+  /**
+   * Obtener una devolución por ID
+   */
+  async getReturn(id: number): Promise<Return> {
+    return await apiClient.get<Return>(`/assignments/returns/${id}/`)
+  },
+
+  /**
+   * Crear una nueva devolución
+   */
+  async createReturn(data: Partial<Return>): Promise<Return> {
+    return await apiClient.post<Return>("/assignments/returns/", data)
+  },
+
+  /**
+   * Obtener devolución por asignación
+   */
+  async getReturnByAssignment(assignmentId: number): Promise<Return | null> {
+    try {
+      const response = await this.getReturns({ page_size: 1 })
+      const returnItem = response.data.find(r => r.asignacion === assignmentId)
+      return returnItem || null
+    } catch (error) {
+      return null
+    }
+  },
+}
+
+// Helper functions para UI
+export const getAssignmentStatusColor = (estado: string): string => {
+  switch (estado) {
+    case "ACTIVA":
+      return "bg-green-500"
+    case "FINALIZADA":
+      return "bg-gray-500"
+    default:
+      return "bg-gray-500"
+  }
+}
+
+export const getAssignmentStatusLabel = (estado: string): string => {
+  switch (estado) {
+    case "ACTIVA":
+      return "Activa"
+    case "FINALIZADA":
+      return "Finalizada"
+    default:
+      return estado
+  }
+}
+
+export const getTipoEntregaLabel = (tipo: string): string => {
+  switch (tipo) {
+    case "PERMANENTE":
+      return "Permanente"
+    case "TEMPORAL":
+      return "Temporal"
+    default:
+      return tipo
+  }
+}
+
+export const getEstadoCartaLabel = (estado: string): string => {
+  switch (estado) {
+    case "FIRMADA":
+      return "Firmada"
+    case "PENDIENTE":
+      return "Pendiente"
+    case "NO_APLICA":
+      return "No Aplica"
+    default:
+      return estado
+  }
+}
+
+export const getReturnStatusColor = (estado: string): string => {
+  switch (estado) {
+    case "OPTIMO":
+      return "bg-green-500"
+    case "CON_DANOS":
+      return "bg-yellow-500"
+    case "NO_FUNCIONAL":
+      return "bg-red-500"
+    default:
+      return "bg-gray-500"
+  }
+}
+
+export const getReturnStatusLabel = (estado: string): string => {
+  switch (estado) {
+    case "OPTIMO":
+      return "Óptimo"
+    case "CON_DANOS":
+      return "Con Daños"
+    case "NO_FUNCIONAL":
+      return "No Funcional"
+    default:
+      return estado
+  }
 }
