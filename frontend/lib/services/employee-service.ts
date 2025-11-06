@@ -1,59 +1,73 @@
 // Employee management service
 
 import { apiClient } from "../api-client"
-import type { Employee, PaginatedResponse } from "../types"
+import type { Employee, EmployeeHistory } from "../types"
 
 export interface EmployeeFilters {
   search?: string
-  estado?: "activo" | "inactivo" | "todos"
-  sucursalId?: string
+  estado?: "ACTIVO" | "INACTIVO" | ""
+  sucursal?: number
+  unidad_negocio?: string
   page?: number
-  pageSize?: number
-  sortBy?: string
-  sortOrder?: "asc" | "desc"
+  page_size?: number
+  ordering?: string
 }
 
 export interface CreateEmployeeData {
-  nombreCompleto: string
   rut: string
+  nombre_completo: string
   cargo: string
-  sucursalId: string
-  correoCorpo?: string
-  gmailPersonal?: string
+  sucursal: number
+  correo_corporativo?: string
+  gmail_personal?: string
   telefono?: string
-  sucursalCorregida?: string
-  estado: "activo" | "inactivo"
+  unidad_negocio?: string
+  estado: "ACTIVO" | "INACTIVO"
+}
+
+export interface EmployeePaginatedResponse {
+  count: number
+  next: string | null
+  previous: string | null
+  results: Employee[]
 }
 
 export const employeeService = {
-  async getEmployees(filters: EmployeeFilters = {}): Promise<PaginatedResponse<Employee>> {
+  async getEmployees(filters: EmployeeFilters = {}): Promise<EmployeePaginatedResponse> {
     const params = new URLSearchParams()
     Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== "todos") {
+      if (value !== undefined && value !== null && value !== "") {
         params.append(key, String(value))
       }
     })
-    return apiClient.get<PaginatedResponse<Employee>>(`/employees?${params.toString()}`)
+    const queryString = params.toString()
+    return apiClient.get<EmployeePaginatedResponse>(
+      `/employees/${queryString ? `?${queryString}` : ""}`
+    )
   },
 
-  async getEmployee(id: string): Promise<Employee> {
-    return apiClient.get<Employee>(`/employees/${id}`)
+  async getEmployee(id: number): Promise<Employee> {
+    return apiClient.get<Employee>(`/employees/${id}/`)
+  },
+
+  async getEmployeeHistory(id: number): Promise<EmployeeHistory> {
+    return apiClient.get<EmployeeHistory>(`/employees/${id}/history/`)
   },
 
   async createEmployee(data: CreateEmployeeData): Promise<Employee> {
-    return apiClient.post<Employee>("/employees", data)
+    return apiClient.post<Employee>("/employees/", data)
   },
 
-  async updateEmployee(id: string, data: Partial<CreateEmployeeData>): Promise<Employee> {
-    return apiClient.put<Employee>(`/employees/${id}`, data)
+  async updateEmployee(id: number, data: Partial<CreateEmployeeData>): Promise<Employee> {
+    return apiClient.patch<Employee>(`/employees/${id}/`, data)
   },
 
-  async deleteEmployee(id: string): Promise<void> {
-    return apiClient.delete<void>(`/employees/${id}`)
+  async deleteEmployee(id: number): Promise<void> {
+    return apiClient.delete<void>(`/employees/${id}/`)
   },
 
   async getActiveEmployees(): Promise<Employee[]> {
-    const response = await apiClient.get<PaginatedResponse<Employee>>("/employees?estado=activo&pageSize=1000")
-    return response.data
+    const response = await this.getEmployees({ estado: "ACTIVO", page_size: 1000 })
+    return response.results
   },
 }

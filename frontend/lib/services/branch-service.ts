@@ -26,10 +26,26 @@ export interface BranchListResponse {
   results: Branch[]
 }
 
+export interface BranchFilters {
+  is_active?: boolean
+  page?: number
+  page_size?: number
+}
+
 export const branchService = {
-  async getBranches(): Promise<Branch[]> {
-    const response = await apiClient.get<BranchListResponse>("/branches/")
-    return response.results
+  async getBranches(filters?: BranchFilters): Promise<BranchListResponse> {
+    const params = new URLSearchParams()
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          params.append(key, String(value))
+        }
+      })
+    }
+    const queryString = params.toString()
+    return apiClient.get<BranchListResponse>(
+      `/branches/${queryString ? `?${queryString}` : ""}`
+    )
   },
 
   async getBranch(id: number): Promise<Branch> {
@@ -49,7 +65,7 @@ export const branchService = {
   },
 
   async getActiveBranches(): Promise<Branch[]> {
-    const response = await apiClient.get<BranchListResponse>("/branches/?is_active=true")
+    const response = await this.getBranches({ is_active: true })
     return response.results
   },
 }

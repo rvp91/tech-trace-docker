@@ -4089,6 +4089,293 @@ curl http://localhost:8000/api/stats/dashboard/ \
 
 ---
 
-**Última actualización:** Noviembre 5, 2025 - Fase 5 Completada
+## 📂 Arquitectura de Archivos del Módulo de Empleados (Fase 9)
+
+### Frontend - Estructura de Archivos
+
+#### **1. Tipos y Definiciones (`frontend/lib/types.ts`)**
+
+**Propósito:** Define todas las interfaces TypeScript para garantizar type safety en toda la aplicación.
+
+**Interfaces clave:**
+- `Employee`: Representa un empleado con todos sus atributos (RUT, nombre, cargo, sucursal, etc.)
+- `EmployeeHistory`: Contiene historial de asignaciones de un empleado
+- `Branch`: Define estructura de sucursales
+- `Assignment`: Representa asignaciones de dispositivos a empleados
+
+**Convención de nombres:** Usa snake_case para alinearse con el backend Django (nombre_completo, correo_corporativo, etc.)
+
+**Ejemplo:**
+```typescript
+export interface Employee {
+  id: number
+  rut: string
+  nombre_completo: string
+  cargo: string
+  sucursal: number
+  sucursal_detail?: Branch
+  estado: "ACTIVO" | "INACTIVO"
+  // ... más campos
+}
+```
+
+#### **2. Cliente API (`frontend/lib/api-client.ts`)**
+
+**Propósito:** Clase centralizada para todas las peticiones HTTP al backend.
+
+**Responsabilidades:**
+- Configurar URL base desde `NEXT_PUBLIC_API_URL`
+- Agregar token JWT automáticamente a headers
+- Métodos HTTP: GET, POST, PUT, PATCH, DELETE
+- Manejo centralizado de errores
+- Sincronización de token con localStorage
+
+**Características clave:**
+```typescript
+class ApiClient {
+  setToken(token: string | null) // Sincroniza token
+  async get<T>(endpoint: string) // Peticiones GET
+  async post<T>(endpoint: string, data?: unknown) // Crear recursos
+  async patch<T>(endpoint: string, data?: unknown) // Actualización parcial
+  async delete<T>(endpoint: string) // Eliminar recursos
+}
+```
+
+**Uso:** Todas las peticiones al backend deben pasar por esta clase para garantizar consistencia.
+
+#### **3. Servicio de Empleados (`frontend/lib/services/employee-service.ts`)**
+
+**Propósito:** Capa de abstracción para todas las operaciones relacionadas con empleados.
+
+**Endpoints cubiertos:**
+- `GET /api/employees/` - Lista paginada con filtros
+- `GET /api/employees/{id}/` - Detalle de empleado
+- `GET /api/employees/{id}/history/` - Historial de asignaciones
+- `POST /api/employees/` - Crear empleado
+- `PATCH /api/employees/{id}/` - Actualizar empleado
+- `DELETE /api/employees/{id}/` - Eliminar empleado
+
+**Filtros soportados:**
+```typescript
+interface EmployeeFilters {
+  search?: string           // Buscar por nombre o RUT
+  sucursal?: number        // Filtrar por sucursal
+  estado?: "ACTIVO" | "INACTIVO"  // Filtrar por estado
+  page?: number            // Paginación
+  page_size?: number       // Tamaño de página
+}
+```
+
+**Patrón de respuesta paginada:**
+```typescript
+interface EmployeePaginatedResponse {
+  count: number
+  next: string | null
+  previous: string | null
+  results: Employee[]
+}
+```
+
+#### **4. Servicio de Sucursales (`frontend/lib/services/branch-service.ts`)**
+
+**Propósito:** Gestionar operaciones con sucursales.
+
+**Endpoints:**
+- `GET /api/branches/` - Lista de sucursales con paginación
+- `GET /api/branches/{id}/` - Detalle de sucursal
+- `POST /api/branches/` - Crear sucursal
+- `PUT /api/branches/{id}/` - Actualizar sucursal
+- `DELETE /api/branches/{id}/` - Eliminar sucursal
+
+**Uso en módulo de empleados:** Cargar lista de sucursales para selects en formularios de creación/edición.
+
+#### **5. Store de Autenticación (`frontend/lib/store/auth-store.ts`)**
+
+**Propósito:** Gestión global del estado de autenticación usando Zustand.
+
+**Estado gestionado:**
+```typescript
+interface AuthStore {
+  user: User | null
+  token: string | null
+  refreshToken: string | null
+  isAuthenticated: boolean
+  setAuth: (user, accessToken, refreshToken) => void
+  clearAuth: () => void
+  updateUser: (user) => void
+  initializeAuth: () => void
+}
+```
+
+**Persistencia:** Datos guardados en localStorage como `techtrace-auth`
+
+**Sincronización:**
+- Sincroniza token con ApiClient automáticamente
+- Actualiza cookie `techtrace-auth` para middleware
+- Limpia todo el estado en logout
+
+#### **6. Página de Lista de Empleados (`frontend/app/dashboard/employees/page.tsx`)**
+
+**Propósito:** Vista principal de gestión de empleados.
+
+**Características:**
+- **Búsqueda en tiempo real:** Debounce de 300ms para optimizar peticiones
+- **Filtros múltiples:** Por sucursal y estado (activo/inactivo)
+- **Tabla interactiva:** Con acciones de ver, editar y eliminar
+- **Skeleton loaders:** Estados de carga visual
+- **Modal de confirmación:** AlertDialog para eliminar con validación
+- **Estadísticas:** Contador de empleados en tiempo real
+
+**Estado local:**
+```typescript
+const [employees, setEmployees] = useState<Employee[]>([])
+const [branches, setBranches] = useState<Branch[]>([])
+const [searchQuery, setSearchQuery] = useState("")
+const [selectedBranch, setSelectedBranch] = useState("")
+const [selectedStatus, setSelectedStatus] = useState("")
+const [refreshTrigger, setRefreshTrigger] = useState(0)
+```
+
+**Patrón de actualización:** Incrementa `refreshTrigger` para forzar recarga después de crear/editar/eliminar
+
+#### **7. Página de Detalle de Empleado (`frontend/app/dashboard/employees/[id]/page.tsx`)**
+
+**Propósito:** Vista detallada de un empleado individual.
+
+**Secciones:**
+- **Información general:** RUT, cargo, sucursal, contactos
+- **Estadísticas:** Total asignaciones, activas, finalizadas
+- **Historial:** Tabla de asignaciones de dispositivos
+
+**Patrón de carga:**
+```typescript
+useEffect(() => {
+  const loadEmployeeData = async () => {
+    const [employeeData, historyData] = await Promise.all([
+      employeeService.getEmployee(employeeId),
+      employeeService.getEmployeeHistory(employeeId),
+    ])
+    setEmployee(employeeData)
+    setHistory(historyData)
+  }
+  loadEmployeeData()
+}, [employeeId, refreshTrigger])
+```
+
+**Navegación:** Botón "Asignar Dispositivo" (preparado para implementación futura)
+
+#### **8. Modal de Crear/Editar Empleado (`frontend/components/modals/create-employee-modal.tsx`)**
+
+**Propósito:** Componente reutilizable para crear y editar empleados.
+
+**Modos de operación:**
+```typescript
+const isEditMode = !!employee
+```
+
+**Campos del formulario:**
+- RUT (disabled en modo edición)
+- Nombre completo
+- Cargo
+- Sucursal (Select dinámico desde API)
+- Correo corporativo
+- Gmail personal
+- Teléfono
+- Unidad de negocio (Select con opciones predefinidas)
+- Estado (Switch para ACTIVO/INACTIVO)
+
+**Validaciones:**
+- Campos requeridos: RUT, nombre, cargo, sucursal
+- Campos opcionales: correos, teléfono, unidad
+- RUT inmutable después de creación
+
+**Flujo de guardado:**
+```typescript
+if (isEditMode) {
+  const { rut, ...updateData } = formData
+  await employeeService.updateEmployee(employee.id, updateData)
+} else {
+  await employeeService.createEmployee(formData)
+  resetForm()
+}
+```
+
+**Pre-población:** En modo edición, carga datos del empleado en `useEffect` cuando el modal se abre
+
+### Backend - API de Empleados
+
+#### **Endpoints disponibles:**
+
+1. **Lista y Creación**
+   - `GET /api/employees/` - Lista paginada con filtros
+   - `POST /api/employees/` - Crear empleado
+
+2. **Detalle, Actualización y Eliminación**
+   - `GET /api/employees/{id}/` - Obtener empleado
+   - `PATCH /api/employees/{id}/` - Actualización parcial
+   - `PUT /api/employees/{id}/` - Actualización completa
+   - `DELETE /api/employees/{id}/` - Eliminar empleado
+
+3. **Historial**
+   - `GET /api/employees/{id}/history/` - Historial de asignaciones
+
+**Parámetros de filtrado:**
+- `search`: Busca en nombre_completo y rut
+- `sucursal`: Filtra por ID de sucursal
+- `estado`: ACTIVO o INACTIVO
+- `page`: Número de página
+- `page_size`: Tamaño de página (default: 10)
+
+### Patrones de Diseño Implementados
+
+#### **1. Service Layer Pattern**
+Toda la lógica de API está encapsulada en servicios (`employee-service.ts`, `branch-service.ts`), separando la lógica de negocio de los componentes UI.
+
+#### **2. Repository Pattern**
+`ApiClient` actúa como repositorio centralizado, proporcionando una interfaz consistente para todas las peticiones HTTP.
+
+#### **3. State Management Pattern**
+- **Global:** Zustand para autenticación
+- **Local:** useState/useCallback para estado de componentes
+- **Server State:** No usa React Query, pero implementa patrón similar con `refreshTrigger`
+
+#### **4. Modal Composition Pattern**
+Modal reutilizable que acepta `employee` prop opcional:
+- Sin prop → Modo creación
+- Con prop → Modo edición
+
+#### **5. Optimistic UI Pattern**
+Cierra modal y actualiza lista antes de mostrar toast de confirmación para mejor UX.
+
+#### **6. Debounce Pattern**
+Búsqueda con delay de 300ms para reducir peticiones al backend:
+```typescript
+useEffect(() => {
+  const timer = setTimeout(() => {
+    loadEmployees()
+  }, 300)
+  return () => clearTimeout(timer)
+}, [loadEmployees, refreshTrigger])
+```
+
+### Consideraciones de Seguridad
+
+1. **Autenticación JWT:** Todos los endpoints requieren token válido
+2. **Validación de RUT:** RUT no editable después de creación
+3. **Eliminación protegida:** Backend valida que no existan asignaciones activas
+4. **CORS:** Configurado para permitir solo orígenes específicos
+5. **Sanitización:** DRF serializers validan todos los inputs
+
+### Mejoras Futuras Planificadas
+
+1. **Paginación completa:** Implementar controles de paginación en UI
+2. **Export a CSV/Excel:** Botón para exportar lista de empleados
+3. **Filtros avanzados:** Rango de fechas, unidad de negocio
+4. **Bulk operations:** Selección múltiple para acciones en lote
+5. **Real-time updates:** WebSockets para sincronización en tiempo real
+
+---
+
+**Última actualización:** Noviembre 6, 2025 - Fase 9 Completada
 **Documentado por:** Claude (Asistente IA)
-**Próxima actualización:** Al completar Fase 7 (Autenticación Frontend)
+**Próxima actualización:** Al completar Fase 10 (Módulo de Dispositivos Frontend)

@@ -24,19 +24,33 @@ export interface AuthState {
 }
 
 export interface Employee {
-  id: string
-  nombreCompleto: string
+  id: number
   rut: string
+  nombre_completo: string
   cargo: string
-  sucursalId: string
-  sucursal?: Branch
-  correoCorpo: string
-  gmailPersonal: string
-  telefono: string
-  sucursalCorregida: string
-  estado: "activo" | "inactivo"
-  createdAt: string
-  updatedAt: string
+  correo_corporativo?: string
+  gmail_personal?: string
+  telefono?: string
+  sucursal: number
+  sucursal_detail?: Branch
+  unidad_negocio?: string
+  estado: "ACTIVO" | "INACTIVO"
+  created_at: string
+  updated_at: string
+  created_by?: number
+  created_by_username?: string
+}
+
+export interface EmployeeHistory {
+  employee: {
+    id: number
+    rut: string
+    nombre_completo: string
+    cargo: string
+  }
+  total_assignments: number
+  active_assignments: number
+  assignments: Assignment[]
 }
 
 export interface Device {
@@ -57,11 +71,11 @@ export interface Device {
 }
 
 export interface Assignment {
-  id: string
-  empleadoId: string
-  empleado?: Employee
-  dispositivoId: string
-  dispositivo?: Device
+  id: number
+  empleado: number
+  dispositivo: number
+  empleado_detail?: Employee
+  dispositivo_detail?: Device
   fechaEntrega: string
   fechaDevolucion?: string
   tipoEntrega: "permanente" | "temporal"
