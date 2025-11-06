@@ -11,44 +11,34 @@ export interface LoginCredentials {
 
 export interface LoginResponse {
   user: User
-  token: string
+  access: string
+  refresh: string
 }
 
 export const authService = {
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
-    const response = await apiClient.post<LoginResponse>("/auth/login", credentials)
-    apiClient.setToken(response.token)
+    const response = await apiClient.post<LoginResponse>("/auth/login/", credentials)
+    // El token se sincronizará a través del auth-store
     return response
   },
 
-  async logout(): Promise<void> {
+  async logout(refreshToken?: string): Promise<void> {
     try {
-      await apiClient.post("/auth/logout")
-    } finally {
-      apiClient.setToken(null)
+      if (refreshToken) {
+        await apiClient.post("/auth/logout/", { refresh_token: refreshToken })
+      }
+    } catch (error) {
+      // Ignorar errores al hacer logout
+      console.error("Error al hacer logout en el servidor:", error)
     }
   },
 
   async getCurrentUser(): Promise<User> {
-    return apiClient.get<User>("/auth/me")
+    return apiClient.get<User>("/auth/me/")
   },
 
-  async refreshToken(): Promise<LoginResponse> {
-    const response = await apiClient.post<LoginResponse>("/auth/refresh")
-    apiClient.setToken(response.token)
+  async refreshToken(refreshToken: string): Promise<LoginResponse> {
+    const response = await apiClient.post<LoginResponse>("/auth/refresh/", { refresh: refreshToken })
     return response
-  },
-
-  getStoredToken(): string | null {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("auth_token")
-    }
-    return null
-  },
-
-  clearStoredToken(): void {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("auth_token")
-    }
   },
 }

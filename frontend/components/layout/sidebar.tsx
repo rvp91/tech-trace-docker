@@ -1,11 +1,13 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, Package, Zap, Building2, BarChart3, Settings, LogOut } from "lucide-react"
+import { LayoutDashboard, Users, Package, Tablet, Zap, Building2, BarChart3, Settings, LogOut } from "lucide-react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { NAVIGATION } from "@/lib/mock-data"
+import { useAuthStore } from "@/lib/store/auth-store"
+import { authService } from "@/lib/services/auth-service"
 
 interface SidebarProps {
   open: boolean
@@ -16,6 +18,7 @@ const ICON_MAP = {
   LayoutDashboard,
   Users,
   Package,
+  Tablet,
   Zap,
   Building2,
   BarChart3,
@@ -24,6 +27,20 @@ const ICON_MAP = {
 
 export function Sidebar({ open, onOpenChange }: SidebarProps) {
   const pathname = usePathname()
+  const router = useRouter()
+  const { refreshToken, clearAuth } = useAuthStore()
+
+  const handleLogout = async () => {
+    try {
+      // Intentar hacer logout en el servidor
+      await authService.logout(refreshToken || undefined)
+    } finally {
+      // Limpiar estado local siempre
+      clearAuth()
+      // Redirigir al login
+      router.push("/login")
+    }
+  }
 
   return (
     <>
@@ -71,7 +88,12 @@ export function Sidebar({ open, onOpenChange }: SidebarProps) {
               <Settings className="h-4 w-4 mr-2" />
               Configuración
             </Button>
-            <Button variant="ghost" className="w-full justify-start text-destructive hover:text-destructive" size="sm">
+            <Button
+              variant="ghost"
+              className="w-full justify-start text-destructive hover:text-destructive"
+              size="sm"
+              onClick={handleLogout}
+            >
               <LogOut className="h-4 w-4 mr-2" />
               Cerrar Sesión
             </Button>

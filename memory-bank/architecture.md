@@ -1,9 +1,9 @@
 # TechTrace - Arquitectura del Sistema
 ## Sistema de Gestion de Inventario de Dispositivos Moviles
 
-**Version:** 1.0
-**Ultima actualizacion:** Noviembre 2025
-**Estado:** En Desarrollo
+**Version:** 1.1
+**Ultima actualizacion:** Noviembre 5, 2025
+**Estado:** En Desarrollo - Fase 7 Completada (Autenticacion Frontend)
 
 ---
 
@@ -457,15 +457,15 @@ SIMPLE_JWT = {
 ```
 frontend/
 ├── app/                         # Next.js App Router
-│   ├── layout.tsx              # Layout raiz
+│   ├── layout.tsx              # Layout raiz (importa Providers)
 │   ├── page.tsx                # Landing page (redirige a /dashboard o /login)
-│   ├── providers.tsx           # Providers (Theme)
+│   ├── providers.tsx           # Global providers (AuthProvider + Toaster)
 │   ├── globals.css             # Estilos globales + Tailwind
 │   │
-│   ├── login/                  # Pagina de login
-│   │   └── page.tsx
+│   ├── login/                  # Pagina de login (publica)
+│   │   └── page.tsx            # Formulario de autenticacion con manejo de errores
 │   │
-│   └── dashboard/              # Aplicacion principal (protegida)
+│   └── dashboard/              # Aplicacion principal (protegida por middleware)
 │       ├── layout.tsx          # Layout con Sidebar + Header
 │       ├── page.tsx            # Dashboard home con estadisticas
 │       │
@@ -503,11 +503,17 @@ frontend/
 │   │   ├── select.tsx
 │   │   ├── table.tsx
 │   │   ├── toast.tsx
+│   │   ├── alert.tsx
+│   │   ├── label.tsx
+│   │   ├── card.tsx
 │   │   └── ...
 │   │
+│   ├── providers/              # React Context Providers
+│   │   └── auth-provider.tsx  # Inicializa sincronizacion de auth al cargar
+│   │
 │   ├── layout/                 # Componentes de layout
-│   │   ├── sidebar.tsx
-│   │   ├── header.tsx
+│   │   ├── sidebar.tsx         # Navegacion lateral con logout
+│   │   ├── header.tsx          # Barra superior con perfil y logout
 │   │   └── theme-toggle.tsx
 │   │
 │   └── modals/                 # Modales de creacion/edicion
@@ -520,34 +526,49 @@ frontend/
 │       └── user-modal.tsx
 │
 ├── lib/
-│   ├── api-client.ts           # Cliente HTTP centralizado
+│   ├── api-client.ts           # Cliente HTTP centralizado con Bearer token
+│   │                           # - Metodos: get, post, put, delete
+│   │                           # - Sincronizacion automatica con auth-store
+│   │                           # - Manejo de errores HTTP
 │   │
 │   ├── store/                  # Zustand stores
-│   │   └── auth-store.ts       # Estado de autenticacion
+│   │   └── auth-store.ts       # Estado global de autenticacion
+│   │                           # - Persist en localStorage (key: techtrace-auth)
+│   │                           # - Sincroniza tokens con api-client
+│   │                           # - Gestiona cookies para middleware
+│   │                           # - Actions: setAuth, clearAuth, updateUser, initializeAuth
 │   │
-│   ├── services/               # Servicios API
-│   │   ├── auth-service.ts     # Login, logout, getCurrentUser
+│   ├── services/               # Servicios API (capa de abstraccion)
+│   │   ├── auth-service.ts     # Autenticacion: login, logout, getCurrentUser, refreshToken
 │   │   ├── branch-service.ts   # CRUD sucursales
 │   │   ├── employee-service.ts # CRUD empleados + history
 │   │   ├── device-service.ts   # CRUD dispositivos + history
 │   │   ├── assignment-service.ts # CRUD asignaciones/solicitudes/devoluciones
 │   │   ├── user-service.ts     # CRUD usuarios
-│   │   └── stats-service.ts    # Estadisticas del dashboard
+│   │   └── dashboard-service.ts # Estadisticas del dashboard
 │   │
 │   ├── utils/                  # Utilidades
 │   │   └── export-csv.ts       # Funcion para exportar CSV
 │   │
-│   ├── types.ts                # Tipos TypeScript
+│   ├── types.ts                # Tipos TypeScript globales
+│   │                           # - User, UserRole ("ADMIN" | "OPERADOR")
+│   │                           # - AuthState, LoginResponse
+│   │                           # - Employee, Device, Branch, Assignment, etc.
+│   │
 │   ├── constants.ts            # Constantes de la app
 │   ├── validations.ts          # Schemas de validacion (Zod)
-│   ├── utils.ts                # Utilidades generales
+│   ├── utils.ts                # Utilidades generales (cn, formatters)
 │   └── mock-data.ts            # Datos mock para desarrollo
 │
 ├── public/                     # Archivos estaticos
 ├── styles/                     # Estilos adicionales
 ├── hooks/                      # Custom hooks
 │
-├── middleware.ts               # Middleware de proteccion de rutas
+├── middleware.ts               # Middleware de Next.js para proteccion de rutas
+│                               # - Verifica cookie "techtrace-auth"
+│                               # - Redirige /dashboard → /login si no autenticado
+│                               # - Redirige /login → /dashboard si autenticado
+│                               # - Redirige / → /dashboard o /login segun estado
 ├── package.json
 ├── tsconfig.json               # Path alias @/*
 ├── tailwind.config.ts
@@ -558,55 +579,279 @@ frontend/
 
 ### 4.2 Flujo de Autenticacion
 
-```
-
- /login
- page.tsx
-      |
-      |
-      | 1. Usuario ingresa credenciales
-      |
-      v
-
- auth-service.ts
- login(username,pwd)
-      |
-      |
-      | 2. POST /api/auth/login/
-      |
-      v
-
- ApiClient
- post(endpoint,data)
-      |
-      |
-      | 3. Fetch al backend
-      |
-      v
-
- Backend Django
- TokenObtainPairView
-      |
-      |
-      | 4. Retorna {access, refresh, user}
-      |
-      v
-
- auth-store.ts
- login(user, token)
-      |
-      |
-      | 5. Guarda en localStorage
-      |    key: 'techtrace-auth'
-      |
-      v
-
- Router
- push('/dashboard')
+#### 4.2.1 Login Flow
 
 ```
+┌─────────────────┐
+│   /login        │
+│   page.tsx      │
+└────────┬────────┘
+         │
+         │ 1. Usuario ingresa credenciales (username, password)
+         │    y hace submit del formulario
+         v
+┌────────────────────────────┐
+│  auth-service.ts           │
+│  login(credentials)        │
+└────────┬───────────────────┘
+         │
+         │ 2. POST /api/auth/login/
+         │    { username, password }
+         v
+┌────────────────────────────┐
+│  ApiClient                 │
+│  post(endpoint, data)      │
+└────────┬───────────────────┘
+         │
+         │ 3. fetch() al backend
+         │    Content-Type: application/json
+         v
+┌────────────────────────────┐
+│  Backend Django            │
+│  CustomTokenObtainPairView │
+│  (simplejwt)               │
+└────────┬───────────────────┘
+         │
+         │ 4. Valida credenciales y retorna:
+         │    {
+         │      access: "jwt_access_token",
+         │      refresh: "jwt_refresh_token",
+         │      user: { id, username, email, role, ... }
+         │    }
+         v
+┌────────────────────────────┐
+│  /login page.tsx           │
+│  handleSubmit()            │
+└────────┬───────────────────┘
+         │
+         │ 5. Llama a auth-store.setAuth()
+         v
+┌────────────────────────────┐
+│  auth-store.ts             │
+│  setAuth(user, access,     │
+│          refresh)          │
+└────────┬───────────────────┘
+         │
+         │ 6. Sincroniza estado:
+         │    - Guarda en localStorage (persist)
+         │      key: 'techtrace-auth'
+         │    - Llama apiClient.setToken(access)
+         │    - Crea cookie: techtrace-auth=true
+         │      (para middleware)
+         │    - Actualiza: isAuthenticated = true
+         v
+┌────────────────────────────┐
+│  Next.js Router            │
+│  router.push('/dashboard') │
+└────────────────────────────┘
+```
 
-### 4.3 Flujo de Peticiones API
+#### 4.2.2 Logout Flow
+
+```
+┌─────────────────┐
+│  Header.tsx o   │
+│  Sidebar.tsx    │
+│  (botón logout) │
+└────────┬────────┘
+         │
+         │ 1. Usuario hace clic en "Cerrar Sesión"
+         v
+┌────────────────────────────┐
+│  handleLogout()            │
+│  - Lee refreshToken del    │
+│    auth-store              │
+└────────┬───────────────────┘
+         │
+         │ 2. Llama auth-service.logout(refreshToken)
+         v
+┌────────────────────────────┐
+│  auth-service.ts           │
+│  logout(refreshToken)      │
+└────────┬───────────────────┘
+         │
+         │ 3. POST /api/auth/logout/
+         │    { refresh_token: "..." }
+         │    (Bearer token en header)
+         v
+┌────────────────────────────┐
+│  Backend Django            │
+│  LogoutView                │
+└────────┬───────────────────┘
+         │
+         │ 4. Agrega refresh token a blacklist
+         │    (invalida el token en servidor)
+         v
+┌────────────────────────────┐
+│  auth-store.ts             │
+│  clearAuth()               │
+└────────┬───────────────────┘
+         │
+         │ 5. Limpia estado:
+         │    - localStorage.removeItem()
+         │    - apiClient.setToken(null)
+         │    - Elimina cookie techtrace-auth
+         │    - Actualiza: isAuthenticated = false
+         v
+┌────────────────────────────┐
+│  Next.js Router            │
+│  router.push('/login')     │
+└────────────────────────────┘
+```
+
+#### 4.2.3 Proteccion de Rutas (Middleware)
+
+```
+┌─────────────────┐
+│  Usuario accede │
+│  a cualquier    │
+│  ruta           │
+└────────┬────────┘
+         │
+         v
+┌────────────────────────────┐
+│  middleware.ts             │
+│  (Next.js middleware)      │
+└────────┬───────────────────┘
+         │
+         │ Lee cookie: techtrace-auth
+         │
+         ├─> Cookie existe?
+         │
+    NO   │   SI
+         v   v
+    ┌────┴───┴────┐
+    │             │
+    │   Ruta:     │   Ruta:
+    │   /dashboard│   /login
+    │             │
+    v             v
+  Redirect      Redirect
+  to /login     to /dashboard
+    │             │
+    │   Ruta:     │   Ruta:
+    │   /login    │   /dashboard
+    │             │
+    v             v
+  Permitir      Permitir
+  acceso        acceso
+```
+
+#### 4.2.4 Inicializacion de Auth al Cargar App
+
+```
+┌─────────────────┐
+│  App carga      │
+│  layout.tsx     │
+└────────┬────────┘
+         │
+         v
+┌────────────────────────────┐
+│  Providers                 │
+│  (app/providers.tsx)       │
+└────────┬───────────────────┘
+         │
+         v
+┌────────────────────────────┐
+│  AuthProvider              │
+│  (components/providers/    │
+│   auth-provider.tsx)       │
+└────────┬───────────────────┘
+         │
+         │ useEffect en mount
+         v
+┌────────────────────────────┐
+│  auth-store.initializeAuth()│
+└────────┬───────────────────┘
+         │
+         │ 1. Lee estado de localStorage
+         │    (persist de Zustand)
+         │
+         │ 2. Si existe token:
+         │    - Sincroniza con apiClient
+         │      apiClient.setToken(token)
+         │
+         v
+┌────────────────────────────┐
+│  App lista con auth        │
+│  sincronizado              │
+└────────────────────────────┘
+```
+
+### 4.3 Arquitectura de Autenticacion Frontend
+
+#### Componentes Clave
+
+1. **auth-store.ts** (Zustand Store)
+   - Estado global de autenticacion
+   - Persistencia automatica en localStorage (key: `techtrace-auth`)
+   - Sincronizacion bidireccional con api-client
+   - Gestion de cookies para middleware
+   - **Actions:**
+     - `setAuth(user, accessToken, refreshToken)`: Guarda tokens y usuario
+     - `clearAuth()`: Limpia todo el estado de autenticacion
+     - `updateUser(user)`: Actualiza datos del usuario
+     - `initializeAuth()`: Sincroniza tokens al cargar la app
+
+2. **api-client.ts** (Cliente HTTP)
+   - Singleton que maneja todas las peticiones HTTP
+   - Agrega automaticamente Bearer token a los headers
+   - Se sincroniza con auth-store para tener siempre el token actualizado
+   - **Metodos:** `get()`, `post()`, `put()`, `delete()`
+   - Manejo centralizado de errores HTTP
+
+3. **auth-service.ts** (Capa de Servicio)
+   - Abstraccion para operaciones de autenticacion
+   - **Funciones:**
+     - `login(credentials)`: Autentica usuario y retorna tokens + user
+     - `logout(refreshToken)`: Invalida refresh token en servidor
+     - `getCurrentUser()`: Obtiene datos del usuario actual
+     - `refreshToken(refreshToken)`: Renueva access token
+
+4. **middleware.ts** (Next.js Middleware)
+   - Se ejecuta en el servidor antes de renderizar cualquier ruta
+   - Verifica cookie `techtrace-auth` (no puede leer localStorage)
+   - Redirige rutas protegidas si no hay autenticacion
+   - Redirige /login a /dashboard si ya esta autenticado
+
+5. **auth-provider.tsx** (React Context)
+   - Wrapper que inicializa la autenticacion al cargar la app
+   - Llama a `initializeAuth()` en useEffect
+   - Asegura que el token este sincronizado entre store y api-client
+
+#### Sincronizacion de Estado
+
+**Tokens JWT:**
+- **Access Token**: Vida corta (2 horas), usado en cada peticion API
+- **Refresh Token**: Vida larga (7 dias), usado para renovar access token
+
+**Almacenamiento:**
+- **localStorage** (`techtrace-auth`): Estado completo del store (user + tokens)
+  - Usado por: Zustand persist, api-client
+  - Ventaja: Persistencia entre recargas
+  - Desventaja: No accesible desde middleware (server-side)
+
+- **Cookie** (`techtrace-auth`): Flag simple booleano
+  - Usado por: middleware.ts
+  - Ventaja: Accesible desde server-side (middleware)
+  - Desventaja: No contiene el token JWT completo (solo indica autenticado)
+
+**Flujo de Sincronizacion:**
+```
+setAuth() se ejecuta:
+  1. Guarda en localStorage (Zustand persist automatico)
+  2. Llama apiClient.setToken(accessToken)
+  3. Crea cookie document.cookie = "techtrace-auth=true"
+  4. Actualiza estado isAuthenticated = true
+
+clearAuth() se ejecuta:
+  1. Limpia localStorage
+  2. Llama apiClient.setToken(null)
+  3. Elimina cookie
+  4. Actualiza estado isAuthenticated = false
+```
+
+### 4.4 Flujo de Peticiones API
 
 ```
 
@@ -627,8 +872,8 @@ frontend/
       v
 
  ApiClient
- - Lee token del
-   auth-store
+ - Lee token que fue
+   seteado al login
  - Agrega header
    Authorization:
    Bearer {token}
@@ -639,7 +884,7 @@ frontend/
       v
 
  Backend Django
- - JWT verifica
+ - JWT verifica token
  - Permisos check
  - Retorna JSON
       |

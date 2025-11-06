@@ -11,12 +11,30 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useAuthStore } from "@/lib/store/auth-store"
+import { authService } from "@/lib/services/auth-service"
+import { useRouter } from "next/navigation"
 
 interface HeaderProps {
   onSidebarToggle: () => void
 }
 
 export function Header({ onSidebarToggle }: HeaderProps) {
+  const router = useRouter()
+  const { user, refreshToken, clearAuth } = useAuthStore()
+
+  const handleLogout = async () => {
+    try {
+      // Intentar hacer logout en el servidor
+      await authService.logout(refreshToken || undefined)
+    } finally {
+      // Limpiar estado local siempre
+      clearAuth()
+      // Redirigir al login
+      router.push("/login")
+    }
+  }
+
   return (
     <header className="border-b border-border bg-card">
       <div className="flex items-center justify-between h-16 px-6">
@@ -49,12 +67,19 @@ export function Header({ onSidebarToggle }: HeaderProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Mi Cuenta</DropdownMenuLabel>
+              <DropdownMenuLabel>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium">{user?.username || "Usuario"}</span>
+                  <span className="text-xs text-muted-foreground">{user?.email || ""}</span>
+                </div>
+              </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem>Perfil</DropdownMenuItem>
               <DropdownMenuItem>Configuración</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive">Cerrar Sesión</DropdownMenuItem>
+              <DropdownMenuItem className="text-destructive" onClick={handleLogout}>
+                Cerrar Sesión
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

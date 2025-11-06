@@ -1,14 +1,20 @@
 // Core type definitions for TechTrace
 
-export type UserRole = "admin" | "operator"
+export type UserRole = "ADMIN" | "OPERADOR"
 
 export interface User {
-  id: string
+  id: number
   username: string
   email: string
   role: UserRole
-  firstName?: string
-  lastName?: string
+  first_name?: string
+  last_name?: string
+  full_name?: string
+  is_active?: boolean
+  is_staff?: boolean
+  is_superuser?: boolean
+  date_joined?: string
+  last_login?: string
 }
 
 export interface AuthState {
