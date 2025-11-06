@@ -187,21 +187,53 @@ backend/apps/
 
 | Paso | Descripcion | Estado | Notas |
 |------|-------------|--------|-------|
-| 4.1 | Instalar djangorestframework-simplejwt | [ ] | |
-| 4.2 | Configurar JWT en DRF settings | [ ] | |
-| 4.3 | Configurar tiempos de expiracion JWT | [ ] | Access: 2h, Refresh: 7d |
-| 4.4 | Crear endpoints de login y refresh | [ ] | /api/auth/login/, /api/auth/refresh/ |
-| 4.5 | Crear endpoint de logout | [ ] | Con blacklist de refresh token |
-| 4.6 | Crear endpoint de "me" (usuario actual) | [ ] | /api/auth/me/ |
-| 4.7 | Implementar sistema de permisos por rol | [ ] | IsAdmin, IsAdminOrReadOnly |
-| 4.8 | Aplicar permisos a los ViewSets | [ ] | |
+| 4.1 | Instalar djangorestframework-simplejwt | [x] | djangorestframework-simplejwt>=5.3.0 |
+| 4.2 | Configurar JWT en DRF settings | [x] | JWTAuthentication agregado |
+| 4.3 | Configurar tiempos de expiracion JWT | [x] | Access: 2h, Refresh: 7d |
+| 4.4 | Crear endpoints de login y refresh | [x] | /api/auth/login/, /api/auth/refresh/ |
+| 4.5 | Crear endpoint de logout | [x] | Con blacklist de refresh token |
+| 4.6 | Crear endpoint de "me" (usuario actual) | [x] | /api/auth/me/ |
+| 4.7 | Implementar sistema de permisos por rol | [x] | IsAdmin, IsAdminOrReadOnly, IsAdminOrOwner |
+| 4.8 | Aplicar permisos a los ViewSets | [x] | IsAuthenticated como default |
 
-**Estado de la Fase 4:** [ ] **PENDIENTE** (0% - 0/8 completados)
+**Estado de la Fase 4:** [x] **COMPLETADA** (100% - 8/8 completados)
+
+**Detalles de implementación:**
+- djangorestframework-simplejwt 5.3.0+ instalado
+- rest_framework_simplejwt.token_blacklist agregado a INSTALLED_APPS
+- Configuración SIMPLE_JWT con rotation y blacklist habilitados
+- CustomTokenObtainPairSerializer que retorna user + tokens
+- Permisos personalizados: IsAdmin, IsAdminOrReadOnly, IsAdminOrOwner
+- Todos los endpoints protegidos con IsAuthenticated por defecto
+- Endpoints probados y funcionando correctamente
+
+**Archivos creados:**
+```
+backend/apps/users/
+├── serializers.py (UserSerializer, CustomTokenObtainPairSerializer)
+├── views.py (CustomTokenObtainPairView, LogoutView, CurrentUserView)
+├── permissions.py (IsAdmin, IsAdminOrReadOnly, IsAdminOrOwner)
+└── urls.py (rutas /api/auth/)
+```
+
+**Configuración aplicada:**
+- config/settings.py: SIMPLE_JWT, DEFAULT_AUTHENTICATION_CLASSES
+- config/urls.py: /api/auth/ incluido
+- Migraciones de token_blacklist aplicadas
+
+**Endpoints funcionando:**
+- POST /api/auth/login/ - Login con username/password → retorna access, refresh y user
+- POST /api/auth/refresh/ - Renovar access token con refresh token
+- POST /api/auth/logout/ - Invalidar refresh token (blacklist)
+- GET /api/auth/me/ - Obtener usuario actual autenticado
+- PATCH /api/auth/me/ - Actualizar datos del usuario actual
 
 **Decisiones de seguridad:**
 - Refresh token rotation: Habilitado
 - Blacklist despues de rotacion: Habilitado
 - Almacenamiento: localStorage (migrar a httpOnly cookies en produccion)
+- Access token lifetime: 2 horas
+- Refresh token lifetime: 7 días
 
 ---
 
@@ -298,7 +330,7 @@ backend/apps/
 | 1 | Configuracion del Backend | 100% (7/7) | [x] Completada |
 | 2 | Modelos de Base de Datos | 100% (18/18) | [x] Completada |
 | 3 | API REST con DRF | 100% (16/16) | [x] Completada |
-| 4 | Autenticacion JWT | 0% (0/8) | [ ] Pendiente |
+| 4 | Autenticacion JWT | 100% (8/8) | [x] Completada |
 | 5 | Logica de Negocio Backend | 0% (0/10) | [ ] Pendiente |
 | 6 | Configuracion del Frontend | 100% (7/7) | [x] Completada |
 | 7 | Autenticacion Frontend | 0% (0/10) | [ ] Pendiente |
@@ -306,10 +338,10 @@ backend/apps/
 
 ### Total del Proyecto
 
-**Pasos completados:** 51 / 150+ pasos
-**Progreso general:** ~34%
+**Pasos completados:** 59 / 150+ pasos
+**Progreso general:** ~39%
 
-**Fases completadas:** 5 / 19 (Fases 0, 1, 2, 3, 6)
+**Fases completadas:** 6 / 19 (Fases 0, 1, 2, 3, 4, 6)
 **Fases en progreso:** 0
 
 ---
@@ -348,16 +380,28 @@ backend/apps/
    - [x] Configurar rutas de API
    - [x] Probar todos los endpoints
 
-2. **Siguiente: Fase 4 - Autenticacion JWT**
-   - [ ] Instalar djangorestframework-simplejwt
-   - [ ] Configurar JWT authentication
-   - [ ] Crear endpoints de login/logout/refresh
-   - [ ] Crear permisos personalizados (IsAdmin, IsAdminOrReadOnly)
-   - [ ] Actualizar permisos de ViewSets (cambiar de AllowAny a IsAuthenticated)
+2. **✅ Fase 4: Autenticacion JWT - COMPLETADA**
+   - [x] Instalar djangorestframework-simplejwt
+   - [x] Configurar JWT authentication
+   - [x] Crear endpoints de login/logout/refresh/me
+   - [x] Crear permisos personalizados (IsAdmin, IsAdminOrReadOnly, IsAdminOrOwner)
+   - [x] Actualizar permisos de ViewSets (cambiar de AllowAny a IsAuthenticated)
+   - [x] Probar autenticación con curl
 
-3. **Despues de Fase 4:**
-   - [ ] Fase 5: Logica de negocio (senales, validaciones)
-   - [ ] Fase 7: Autenticacion frontend
+3. **Siguiente: Fase 5 - Logica de Negocio Backend**
+   - [ ] Crear metodo para cambiar estado de dispositivo
+   - [ ] Validar asignacion de dispositivo disponible
+   - [ ] Implementar señales post_save en Assignment
+   - [ ] Implementar logica de devolucion
+   - [ ] Implementar validacion de RUT chileno completa
+   - [ ] Implementar prevencion de eliminacion con asignaciones activas
+   - [ ] Crear endpoints de historial (empleado y dispositivo)
+   - [ ] Implementar sistema de auditoria automatico
+   - [ ] Crear endpoint de estadisticas generales
+
+4. **Despues de Fase 5:**
+   - [ ] Fase 7: Autenticacion frontend con JWT
+   - [ ] Fase 8+: Modulos funcionales del frontend
 
 ---
 
@@ -414,6 +458,6 @@ pnpm build
 
 ---
 
-**Ultima actualizacion:** Noviembre 5, 2025 - 10:30 AM
+**Ultima actualizacion:** Noviembre 5, 2025 - 14:30
 **Actualizado por:** Claude (Asistente IA)
-**Proxima actualizacion:** Al completar Fase 3
+**Proxima actualizacion:** Al completar Fase 5 (Logica de Negocio Backend)

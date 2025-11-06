@@ -1920,6 +1920,660 @@ GET /api/employees/1/      → { "sucursal": 1, "sucursal_detail": {...} }
 
 ---
 
-**Última actualización:** Noviembre 5, 2025 - Fase 3 Completada
+## 13. Arquitectura de Autenticación JWT (Fase 4 - Completada)
+
+### 13.1 Visión General de la Autenticación
+
+TechTrace implementa autenticación basada en JSON Web Tokens (JWT) con las siguientes características:
+
+- **Tokens de acceso (Access Tokens)**: Duración de 2 horas
+- **Tokens de refresco (Refresh Tokens)**: Duración de 7 días
+- **Rotación de tokens**: Habilitada para mayor seguridad
+- **Blacklist de tokens**: Los tokens refrescados se invalidan automáticamente
+- **Algoritmo**: HS256 (HMAC con SHA-256)
+
+### 13.2 Flujo de Autenticación Completo
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    FLUJO DE AUTENTICACIÓN JWT                   │
+└─────────────────────────────────────────────────────────────────┘
+
+1. LOGIN INICIAL
+   ┌──────────┐                                    ┌──────────┐
+   │ Frontend │  POST /api/auth/login/             │ Backend  │
+   │          │  {username, password}              │          │
+   │          │ ───────────────────────────────────>│          │
+   │          │                                     │          │
+   │          │  {access, refresh, user}            │          │
+   │          │<────────────────────────────────────│          │
+   └──────────┘                                    └──────────┘
+
+   - Valida credenciales
+   - Genera access token (2h) y refresh token (7d)
+   - Retorna datos del usuario completos
+   - Incluye claims personalizados: username, email, role, is_staff
+
+
+2. REQUESTS AUTENTICADOS
+   ┌──────────┐                                    ┌──────────┐
+   │ Frontend │  GET /api/branches/                │ Backend  │
+   │          │  Authorization: Bearer {access}    │          │
+   │          │ ───────────────────────────────────>│          │
+   │          │                                     │          │
+   │          │  Verifica JWT                       │          │
+   │          │  Extrae user_id del token           │          │
+   │          │  Valida permisos                    │          │
+   │          │                                     │          │
+   │          │  {data}                             │          │
+   │          │<────────────────────────────────────│          │
+   └──────────┘                                    └──────────┘
+
+
+3. REFRESH TOKEN (cuando access expira)
+   ┌──────────┐                                    ┌──────────┐
+   │ Frontend │  POST /api/auth/refresh/           │ Backend  │
+   │          │  {refresh}                         │          │
+   │          │ ───────────────────────────────────>│          │
+   │          │                                     │          │
+   │          │  Valida refresh token               │          │
+   │          │  Blacklist token viejo              │          │
+   │          │  Genera nuevo access + refresh      │          │
+   │          │                                     │          │
+   │          │  {access, refresh}                  │          │
+   │          │<────────────────────────────────────│          │
+   └──────────┘                                    └──────────┘
+
+
+4. LOGOUT
+   ┌──────────┐                                    ┌──────────┐
+   │ Frontend │  POST /api/auth/logout/            │ Backend  │
+   │          │  {refresh_token}                   │          │
+   │          │  Authorization: Bearer {access}    │          │
+   │          │ ───────────────────────────────────>│          │
+   │          │                                     │          │
+   │          │  Agrega refresh a blacklist         │          │
+   │          │                                     │          │
+   │          │  {message: "Sesión cerrada"}        │          │
+   │          │<────────────────────────────────────│          │
+   └──────────┘                                    └──────────┘
+```
+
+### 13.3 Estructura de Archivos de Autenticación
+
+```
+backend/apps/users/
+├── models.py              # Modelo User personalizado (Fase 2)
+├── audit.py              # Modelo AuditLog (Fase 2)
+├── admin.py              # Django Admin (Fase 2)
+│
+├── serializers.py        # ← NUEVO (Fase 4)
+│   ├── UserSerializer                    # Serialización completa del usuario
+│   └── CustomTokenObtainPairSerializer   # Login personalizado con datos de usuario
+│
+├── views.py              # ← NUEVO (Fase 4)
+│   ├── CustomTokenObtainPairView         # Vista de login
+│   ├── LogoutView                        # Vista de logout con blacklist
+│   └── CurrentUserView                   # Vista de usuario actual (/me)
+│
+├── permissions.py        # ← NUEVO (Fase 4)
+│   ├── IsAdmin                           # Solo usuarios ADMIN
+│   ├── IsAdminOrReadOnly                 # ADMIN: full, OPERADOR: read-only
+│   └── IsAdminOrOwner                    # ADMIN o dueño del recurso
+│
+└── urls.py              # ← NUEVO (Fase 4)
+    └── Rutas de autenticación
+```
+
+### 13.4 Detalle de Archivos Implementados
+
+#### apps/users/serializers.py
+
+**Responsabilidades:**
+- Serialización de datos de usuario para la API
+- Personalización del proceso de login con datos adicionales
+
+**UserSerializer:**
+```python
+class UserSerializer(serializers.ModelSerializer):
+    """
+    Serializa el modelo User para la API.
+    Incluye campo calculado 'full_name'.
+    """
+    Campos expuestos:
+    - id, username, email
+    - first_name, last_name, full_name (calculado)
+    - role (ADMIN/OPERADOR)
+    - is_active, is_staff, is_superuser
+    - date_joined, last_login
+
+    Campos read-only:
+    - id, date_joined, last_login, is_superuser
+```
+
+**CustomTokenObtainPairSerializer:**
+```python
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """
+    Extiende el serializer de SimpleJWT para:
+    1. Agregar claims personalizados al token
+    2. Incluir datos del usuario en la respuesta de login
+    """
+
+    Claims personalizados en el token:
+    - username: Nombre de usuario
+    - email: Email del usuario
+    - role: Rol (ADMIN/OPERADOR)
+    - is_staff: Si es staff
+
+    Respuesta de login incluye:
+    - access: Access token JWT
+    - refresh: Refresh token JWT
+    - user: Objeto completo del usuario (UserSerializer)
+```
+
+**Ventaja:** El frontend recibe todos los datos del usuario en el login, evitando un request adicional a /api/auth/me/.
+
+---
+
+#### apps/users/views.py
+
+**Responsabilidades:**
+- Implementar endpoints de autenticación
+- Manejar login, logout y consulta de usuario actual
+
+**CustomTokenObtainPairView:**
+```python
+class CustomTokenObtainPairView(TokenObtainPairView):
+    """
+    Endpoint: POST /api/auth/login/
+    Permisos: AllowAny (público)
+
+    Input:
+    {
+        "username": "admin",
+        "password": "password123"
+    }
+
+    Output:
+    {
+        "access": "eyJhbGc...",
+        "refresh": "eyJhbGc...",
+        "user": {
+            "id": 1,
+            "username": "admin",
+            "role": "ADMIN",
+            ...
+        }
+    }
+    """
+```
+
+**LogoutView:**
+```python
+class LogoutView(APIView):
+    """
+    Endpoint: POST /api/auth/logout/
+    Permisos: IsAuthenticated
+
+    Input:
+    {
+        "refresh_token": "eyJhbGc..."
+    }
+
+    Proceso:
+    1. Recibe el refresh token
+    2. Lo agrega a la blacklist (tabla token_blacklist_outstandingtoken)
+    3. El token ya no puede ser usado para refrescar
+
+    Output:
+    {
+        "message": "Sesión cerrada exitosamente."
+    }
+
+    Manejo de errores:
+    - Token faltante → 400 Bad Request
+    - Token inválido → 400 Bad Request
+    - Token ya invalidado → 400 Bad Request
+    """
+```
+
+**CurrentUserView:**
+```python
+class CurrentUserView(APIView):
+    """
+    Endpoint: GET /api/auth/me/
+    Permisos: IsAuthenticated
+
+    Retorna los datos del usuario autenticado actual.
+    El usuario se obtiene automáticamente de request.user
+    (extraído del JWT por JWTAuthentication).
+
+    Output:
+    {
+        "id": 1,
+        "username": "admin",
+        "email": "admin@example.com",
+        "role": "ADMIN",
+        ...
+    }
+
+    También soporta PATCH para actualizar el perfil:
+    - No permite cambiar el rol (excepto ADMIN)
+    - Actualización parcial (partial=True)
+    """
+```
+
+---
+
+#### apps/users/permissions.py
+
+**Responsabilidades:**
+- Definir clases de permisos personalizadas basadas en roles
+- Controlar acceso a recursos según el rol del usuario
+
+**IsAdmin:**
+```python
+class IsAdmin(permissions.BasePermission):
+    """
+    Permiso más restrictivo.
+    Solo permite acceso a usuarios con role='ADMIN'.
+
+    Uso típico:
+    - Gestión de usuarios
+    - Acceso a logs de auditoría
+    - Eliminación de registros críticos
+
+    Verificaciones:
+    1. Usuario autenticado
+    2. user.role == 'ADMIN'
+    """
+```
+
+**IsAdminOrReadOnly:**
+```python
+class IsAdminOrReadOnly(permissions.BasePermission):
+    """
+    Permiso más usado en el sistema.
+
+    Acceso según método HTTP:
+    - GET, HEAD, OPTIONS → Todos los usuarios autenticados
+    - POST, PUT, PATCH, DELETE → Solo ADMIN
+
+    Uso típico:
+    - ViewSets de branches, employees, devices, assignments
+    - Permite a OPERADOR consultar datos
+    - Solo ADMIN puede crear/modificar/eliminar
+
+    Verificaciones:
+    1. Usuario autenticado
+    2. Si método seguro → permitir
+    3. Si método de escritura → verificar role='ADMIN'
+    """
+```
+
+**IsAdminOrOwner:**
+```python
+class IsAdminOrOwner(permissions.BasePermission):
+    """
+    Permiso a nivel de objeto.
+
+    Permite acceso si:
+    - Usuario es ADMIN (acceso completo), O
+    - Usuario es el dueño del recurso (obj.created_by == request.user)
+
+    Uso futuro:
+    - Endpoints donde usuarios pueden ver solo sus registros
+    - Edición de perfil propio
+
+    Tiene dos métodos:
+    - has_permission(): Verifica autenticación
+    - has_object_permission(): Verifica ownership
+    """
+```
+
+---
+
+#### apps/users/urls.py
+
+**Responsabilidades:**
+- Definir rutas de autenticación
+- Mapear URLs a vistas
+
+```python
+urlpatterns = [
+    # Login: Obtener access + refresh tokens
+    path('login/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
+
+    # Refresh: Renovar access token con refresh token
+    path('refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+
+    # Logout: Invalidar refresh token
+    path('logout/', LogoutView.as_view(), name='logout'),
+
+    # Me: Obtener/actualizar usuario actual
+    path('me/', CurrentUserView.as_view(), name='current_user'),
+]
+```
+
+**URLs finales (incluidas en config/urls.py bajo 'api/auth/'):**
+- `POST /api/auth/login/`
+- `POST /api/auth/refresh/`
+- `POST /api/auth/logout/`
+- `GET /api/auth/me/`
+- `PATCH /api/auth/me/`
+
+---
+
+### 13.5 Configuración en settings.py
+
+#### Configuración de Django REST Framework
+
+```python
+REST_FRAMEWORK = {
+    # Autenticación JWT como método por defecto
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
+
+    # Todos los endpoints requieren autenticación por defecto
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+
+    # Configuración existente de Fase 3
+    'DEFAULT_PAGINATION_CLASS': '...',
+    'PAGE_SIZE': 20,
+    'DEFAULT_FILTER_BACKENDS': [...],
+}
+```
+
+**Impacto:**
+- Todos los ViewSets heredan automáticamente `IsAuthenticated`
+- No es necesario especificar `permission_classes` en cada ViewSet
+- Solo los endpoints que necesitan ser públicos deben especificar `AllowAny` explícitamente
+
+#### Configuración de SimpleJWT
+
+```python
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    # Duración de tokens
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=2),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+
+    # Seguridad: Rotación y blacklist
+    'ROTATE_REFRESH_TOKENS': True,        # Cada refresh genera nuevo token
+    'BLACKLIST_AFTER_ROTATION': True,      # Token viejo va a blacklist
+
+    # Algoritmo de firma
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+
+    # Configuración de headers
+    'AUTH_HEADER_TYPES': ('Bearer',),     # Authorization: Bearer <token>
+    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
+
+    # Claims del token
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+}
+```
+
+**¿Por qué 2 horas para access token?**
+- Balance entre seguridad y experiencia de usuario
+- Lo suficientemente corto para minimizar riesgo si es robado
+- Lo suficientemente largo para no molestar al usuario
+
+**¿Por qué 7 días para refresh token?**
+- Permite "remember me" durante una semana
+- Después de 7 días, el usuario debe volver a ingresar credenciales
+- En producción, considerar reducir a 1-3 días
+
+---
+
+### 13.6 Tabla de Token Blacklist
+
+**Modelo automático de SimpleJWT:**
+```
+token_blacklist_outstandingtoken
+├── id
+├── user_id (FK a User)
+├── jti (JWT ID único del token)
+├── token (texto completo del refresh token)
+├── created_at
+├── expires_at
+
+token_blacklist_blacklistedtoken
+├── id
+├── token_id (FK a OutstandingToken)
+├── blacklisted_at
+```
+
+**Funcionamiento:**
+1. Al hacer login → se crea OutstandingToken
+2. Al hacer logout → se crea BlacklistedToken apuntando al OutstandingToken
+3. Al intentar refresh → SimpleJWT verifica si está en blacklist
+4. Tokens expirados se pueden limpiar periódicamente con:
+   ```bash
+   python manage.py flushexpiredtokens
+   ```
+
+---
+
+### 13.7 Anatomía de un JWT
+
+**Ejemplo de token generado:**
+```
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzYyMzg1Nzg5LCJpYXQiOjE3NjIzNzg1ODksImp0aSI6IjExY2ViMmI5NzZhZTRlOTc5OGIzMWIyMjAyYzZkMjg1IiwidXNlcl9pZCI6IjEiLCJ1c2VybmFtZSI6ImFkbWluIiwiZW1haWwiOiIiLCJyb2xlIjoiT1BFUkFET1IiLCJpc19zdGFmZiI6dHJ1ZX0.xVgleh5zqi0N-6v0KpgbROaOUL1AoRx9fz-vZdzXFak
+
+│                  Header                  │                           Payload                            │       Signature       │
+```
+
+**Decodificado (payload):**
+```json
+{
+  "token_type": "access",
+  "exp": 1762385789,           // Timestamp de expiración
+  "iat": 1762378589,           // Timestamp de emisión
+  "jti": "11ceb2b9...",        // JWT ID único
+  "user_id": "1",              // ID del usuario
+  "username": "admin",         // ← Claim personalizado
+  "email": "",                 // ← Claim personalizado
+  "role": "OPERADOR",          // ← Claim personalizado
+  "is_staff": true             // ← Claim personalizado
+}
+```
+
+**Ventaja de claims personalizados:**
+- El backend puede obtener role del token sin consultar la BD
+- Útil para decisiones de permisos rápidas
+- El token es autocontenido
+
+---
+
+### 13.8 Flujo de Verificación de Permisos
+
+```
+Request entrante con JWT
+        ↓
+┌───────────────────────────────────────────────────────────┐
+│ 1. JWTAuthentication Middleware                          │
+│    - Extrae token del header Authorization               │
+│    - Verifica firma del token                            │
+│    - Verifica que no esté expirado                       │
+│    - Verifica que no esté en blacklist                   │
+│    - Extrae user_id del payload                          │
+│    - Carga User desde BD → asigna a request.user         │
+└───────────────────────────────────────────────────────────┘
+        ↓
+┌───────────────────────────────────────────────────────────┐
+│ 2. Permission Classes                                     │
+│    - IsAuthenticated: Verifica request.user existe       │
+│    - IsAdminOrReadOnly: Verifica role según método HTTP  │
+└───────────────────────────────────────────────────────────┘
+        ↓
+┌───────────────────────────────────────────────────────────┐
+│ 3. ViewSet/View                                          │
+│    - Ejecuta lógica de negocio                           │
+│    - Puede acceder a request.user para auditoría         │
+│    - perform_create() usa request.user para created_by   │
+└───────────────────────────────────────────────────────────┘
+        ↓
+Response enviada al cliente
+```
+
+---
+
+### 13.9 Ejemplos de Uso en Código
+
+#### Ejemplo 1: ViewSet con permisos personalizados
+
+```python
+# apps/devices/views.py
+from apps.users.permissions import IsAdminOrReadOnly
+
+class DeviceViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAdminOrReadOnly]  # Sobrescribe default
+
+    # ADMIN puede: GET, POST, PUT, PATCH, DELETE
+    # OPERADOR puede: GET
+```
+
+#### Ejemplo 2: Endpoint solo para ADMIN
+
+```python
+# apps/users/views.py (ejemplo futuro)
+from apps.users.permissions import IsAdmin
+
+class UserManagementViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAdmin]  # Solo ADMIN
+
+    # Solo usuarios con role='ADMIN' pueden acceder
+```
+
+#### Ejemplo 3: Usar request.user en vistas
+
+```python
+# apps/employees/views.py
+class EmployeeViewSet(viewsets.ModelViewSet):
+    def perform_create(self, serializer):
+        # request.user está disponible gracias a JWTAuthentication
+        serializer.save(created_by=self.request.user)
+
+    def list(self, request):
+        # Ejemplo: filtrar por sucursal del usuario
+        if request.user.role == 'OPERADOR':
+            # Operadores solo ven su sucursal
+            queryset = Employee.objects.filter(
+                sucursal=request.user.sucursal
+            )
+        else:
+            # Admin ve todo
+            queryset = Employee.objects.all()
+```
+
+---
+
+### 13.10 Seguridad Implementada
+
+**Protecciones actuales:**
+1. ✅ Tokens firmados (no pueden ser modificados)
+2. ✅ Tokens con expiración
+3. ✅ Refresh token rotation (nuevo token cada vez)
+4. ✅ Blacklist de tokens revocados
+5. ✅ HTTPS recomendado en producción (headers)
+6. ✅ Autenticación requerida por defecto
+7. ✅ Permisos basados en roles
+
+**Consideraciones para producción:**
+1. ⚠️ Migrar refresh tokens a httpOnly cookies (actualmente localStorage)
+2. ⚠️ Implementar CSRF protection para cookies
+3. ⚠️ Rate limiting en endpoints de auth (prevenir brute force)
+4. ⚠️ Logging de intentos de login fallidos
+5. ⚠️ Considerar 2FA para usuarios ADMIN
+6. ⚠️ Política de contraseñas robustas
+7. ⚠️ Limpieza periódica de tokens expirados (flushexpiredtokens)
+
+---
+
+### 13.11 Testing Manual Realizado
+
+**1. Test de Login:**
+```bash
+curl -X POST http://localhost:8000/api/auth/login/ \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin123"}'
+
+# Respuesta esperada:
+{
+  "refresh": "eyJhbGc...",
+  "access": "eyJhbGc...",
+  "user": {
+    "id": 1,
+    "username": "admin",
+    "role": "OPERADOR",
+    ...
+  }
+}
+```
+
+**2. Test de Endpoint Protegido (sin auth):**
+```bash
+curl http://localhost:8000/api/branches/
+
+# Respuesta esperada:
+{
+  "detail": "Las credenciales de autenticación no se proveyeron."
+}
+```
+
+**3. Test de Endpoint Protegido (con auth):**
+```bash
+curl -H "Authorization: Bearer eyJhbGc..." \
+  http://localhost:8000/api/branches/
+
+# Respuesta esperada:
+{
+  "count": 3,
+  "results": [...]
+}
+```
+
+**4. Test de /api/auth/me/:**
+```bash
+curl -H "Authorization: Bearer eyJhbGc..." \
+  http://localhost:8000/api/auth/me/
+
+# Respuesta esperada:
+{
+  "id": 1,
+  "username": "admin",
+  ...
+}
+```
+
+---
+
+### 13.12 Integración con Frontend (Fase 7)
+
+**Preparación completada:**
+- Backend retorna user + tokens en login
+- Endpoints /api/auth/ listos para consumir
+- CORS configurado para localhost:3000
+
+**Próximos pasos en Fase 7:**
+1. Crear auth-service.ts en frontend
+2. Implementar almacenamiento de tokens (localStorage)
+3. Interceptor en ApiClient para agregar Bearer token
+4. Middleware de Next.js para proteger rutas
+5. Componente LoginPage
+6. Auto-refresh de tokens antes de expiración
+7. Manejo de logout
+
+---
+
+**Última actualización:** Noviembre 5, 2025 - Fase 4 Completada
 **Documentado por:** Claude (Asistente IA)
-**Próxima actualización:** Al completar Fase 4
+**Próxima actualización:** Al completar Fase 5 (Lógica de Negocio Backend)
