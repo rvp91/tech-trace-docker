@@ -5486,6 +5486,991 @@ return {
 
 ---
 
-**Última actualización:** Noviembre 6, 2025 - Fase 11 Completada
+## FASE 12: MÓDULO DE REPORTES E INVENTARIO
+
+### Objetivo
+Implementar sistema completo de reportes e inventario con exportación CSV, permitiendo visualizar el estado del inventario de forma general, por sucursal y por empleado.
+
+### Arquitectura de Componentes
+
+```
+Frontend
+├── lib/
+│   ├── utils.ts                           [ACTUALIZADO]
+│   │   ├── exportToCSV()                  Exportación genérica a CSV
+│   │   ├── formatDate()                   Formateo DD/MM/YYYY
+│   │   └── formatDateTime()               Formateo DD/MM/YYYY HH:MM
+│   └── services/
+│       └── stats-service.ts               [NUEVO] Servicio de estadísticas
+└── app/dashboard/
+    ├── inventory/page.tsx                 [REESCRITO] Inventario con API real
+    └── reports/page.tsx                   [REESCRITO] 3 secciones de reportes
+```
+
+### Componentes Principales
+
+#### **1. Función exportToCSV (lib/utils.ts)**
+
+**Propósito:** Exportación genérica y reutilizable de datos a formato CSV compatible con Excel.
+
+**Signature:**
+```typescript
+export function exportToCSV<T extends Record<string, any>>(
+  data: T[],
+  columns: { key: keyof T; header: string }[],
+  filename: string
+): void
+```
+
+**Características técnicas:**
+- **TypeScript Generics:** Función tipada para cualquier tipo de datos
+- **UTF-8 BOM:** Byte Order Mark (\uFEFF) para compatibilidad con Excel
+- **Escapado automático:** Valores con comas, comillas y saltos de línea se escapan correctamente
+- **Fecha automática:** Agrega fecha YYYY-MM-DD al nombre del archivo
+- **Client-side:** Generación en el navegador sin carga del servidor
+
+**Ejemplo de uso:**
+```typescript
+const devices = [
+  { tipo: "Laptop", marca: "Dell", modelo: "XPS 13" },
+  { tipo: "Teléfono", marca: "Apple", modelo: "iPhone 12" }
+]
+
+exportToCSV(
+  devices,
+  [
+    { key: "tipo", header: "Tipo" },
+    { key: "marca", header: "Marca" },
+    { key: "modelo", header: "Modelo" }
+  ],
+  "inventario_general"
+)
+// Genera: inventario_general_2025-11-06.csv
+```
+
+**Limitaciones conocidas:**
+- Funciona bien hasta ~10,000 registros
+- Para más registros, considerar generación server-side
+- No soporta estilos o fórmulas (solo datos planos)
+
+#### **2. Servicio de Estadísticas (stats-service.ts)**
+
+**Propósito:** Centralizar llamadas al endpoint de estadísticas del dashboard.
+
+**Interface:**
+```typescript
+interface DashboardStats {
+  total_dispositivos: number
+  disponibles: number
+  asignados: number
+  en_mantenimiento: number
+  total_empleados: number
+  total_sucursales: number
+  dispositivos_por_tipo: { tipo: string, cantidad: number }[]
+  dispositivos_por_estado: { estado: string, cantidad: number }[]
+  ultimas_asignaciones: any[]
+}
+```
+
+**Endpoint consumido:**
+- `GET /api/stats/dashboard/` (ya existente del backend Fase 5)
+
+**Uso:**
+```typescript
+import { statsService } from '@/lib/services/stats-service'
+
+const stats = await statsService.getDashboardStats()
+console.log(stats.total_dispositivos) // 150
+```
+
+#### **3. Página de Inventario (app/dashboard/inventory/page.tsx)**
+
+**Cambio principal:** Migración de datos mock a API real.
+
+**Antes:**
+```typescript
+import { DEVICES } from "@/lib/mock-data"
+const devices = DEVICES // Array estático
+```
+
+**Después:**
+```typescript
+const [devices, setDevices] = useState<Device[]>([])
+const [branches, setBranches] = useState<Branch[]>([])
+
+useEffect(() => {
+  const loadData = async () => {
+    const [devicesResponse, branchesResponse] = await Promise.all([
+      deviceService.getDevices({ page_size: 1000 }),
+      branchService.getBranches({ page_size: 100 })
+    ])
+    setDevices(devicesResponse.results)
+    setBranches(branchesResponse.results)
+  }
+  loadData()
+}, [])
+```
+
+**Estructura de la página:**
+```
+Inventario General
+├── Header con botón "Exportar a CSV"
+├── 4 Cards de resumen (Laptops, Teléfonos, Tablets, SIM Cards)
+│   └── Cada card muestra: Total, Asignados, Disponibles, Mantenimiento
+├── Sección de filtros
+│   ├── Búsqueda por texto (modelo, serie, marca)
+│   ├── Filtro por tipo de equipo
+│   ├── Filtro por estado
+│   └── Filtro por sucursal (dinámico desde API)
+└── Tabla con todos los dispositivos
+    └── Modal de detalles al hacer clic
+```
+
+**Funcionalidades implementadas:**
+- ✅ Carga paralela de devices y branches con `Promise.all()`
+- ✅ Cálculo dinámico de totales con `useMemo`
+- ✅ Filtros combinados (todos los filtros actúan juntos)
+- ✅ Exportación CSV de dispositivos filtrados
+- ✅ Estado de carga con spinner
+- ✅ Manejo de error en console.error
+
+**Formato CSV exportado:**
+```csv
+Tipo,Marca,Modelo,Serie/IMEI,Número Teléfono,Estado,Sucursal,Fecha Ingreso
+Laptop,Dell,XPS 13,ABC123,N/A,Disponible,Santiago Centro,06/11/2025
+Teléfono,Apple,iPhone 12,IMEI456,+56912345678,Asignado,Providencia,05/11/2025
+```
+
+#### **4. Página de Reportes (app/dashboard/reports/page.tsx)**
+
+**Cambio principal:** Reescritura completa con arquitectura de tabs.
+
+**Estructura:**
+```
+Reportes e Inventario
+└── Tabs (shadcn/ui)
+    ├── Tab 1: Inventario General
+    ├── Tab 2: Inventario por Sucursal
+    └── Tab 3: Inventario por Empleado
+```
+
+**Carga de datos inicial:**
+```typescript
+useEffect(() => {
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      const [devicesResponse, branchesResponse, employeesResponse] = await Promise.all([
+        deviceService.getDevices({ page_size: 1000 }),
+        branchService.getBranches({ page_size: 100 }),
+        employeeService.getEmployees({ page_size: 1000, estado: "ACTIVO" })
+      ])
+      setDevices(devicesResponse.results)
+      setBranches(branchesResponse.results)
+      setEmployees(employeesResponse.results)
+    } catch (error) {
+      console.error("Error cargando datos:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+  loadData()
+}, [])
+```
+
+**Decisión técnica:** Carga paralela de los 3 recursos desde el inicio para evitar múltiples estados de carga al cambiar de tab.
+
+---
+
+### Tab 1: Inventario General
+
+**Propósito:** Vista consolidada de todo el inventario con exportación completa.
+
+**Componentes:**
+```
+Tab 1: Inventario General
+├── Header con botón "Exportar CSV"
+├── 3 Cards de resumen
+│   ├── Card 1: Resumen General (Total dispositivos)
+│   ├── Card 2: Por Tipo (5 tipos de equipos)
+│   └── Card 3: Por Estado (5 estados)
+├── Tabla con primeros 50 dispositivos
+└── Nota: "Exporta a CSV para ver el listado completo"
+```
+
+**Lógica de cálculo:**
+```typescript
+const generalInventory = useMemo(() => {
+  const byType = {
+    LAPTOP: devices.filter(d => d.tipo_equipo === "LAPTOP").length,
+    TELEFONO: devices.filter(d => d.tipo_equipo === "TELEFONO").length,
+    TABLET: devices.filter(d => d.tipo_equipo === "TABLET").length,
+    SIM: devices.filter(d => d.tipo_equipo === "SIM").length,
+    ACCESORIO: devices.filter(d => d.tipo_equipo === "ACCESORIO").length,
+  }
+
+  const byStatus = {
+    DISPONIBLE: devices.filter(d => d.estado === "DISPONIBLE").length,
+    ASIGNADO: devices.filter(d => d.estado === "ASIGNADO").length,
+    MANTENIMIENTO: devices.filter(d => d.estado === "MANTENIMIENTO").length,
+    BAJA: devices.filter(d => d.estado === "BAJA").length,
+    ROBO: devices.filter(d => d.estado === "ROBO").length,
+  }
+
+  return { byType, byStatus, total: devices.length }
+}, [devices])
+```
+
+**Exportación CSV:**
+```typescript
+const handleExportGeneralInventory = () => {
+  const dataForExport = devices.map((device) => ({
+    tipo: getDeviceTypeLabel(device.tipo_equipo),
+    marca: device.marca,
+    modelo: device.modelo,
+    serie_imei: device.serie_imei,
+    numero_telefono: device.numero_telefono || "N/A",
+    estado: getDeviceStatusLabel(device.estado),
+    sucursal: device.sucursal_detail?.nombre || `ID: ${device.sucursal}`,
+    fecha_ingreso: formatDate(device.fecha_ingreso),
+  }))
+
+  exportToCSV(dataForExport, columns, "reporte_inventario_general")
+}
+// Genera: reporte_inventario_general_2025-11-06.csv
+```
+
+**Campos incluidos en CSV:**
+- Tipo (traducido: "Laptop" en lugar de "LAPTOP")
+- Marca
+- Modelo
+- Serie/IMEI
+- Número Teléfono (N/A si no aplica)
+- Estado (traducido: "Disponible" en lugar de "DISPONIBLE")
+- Sucursal (nombre completo, no ID)
+- Fecha Ingreso (formato DD/MM/YYYY)
+
+---
+
+### Tab 2: Inventario por Sucursal
+
+**Propósito:** Filtrar y exportar inventario de una sucursal específica.
+
+**Componentes:**
+```
+Tab 2: Inventario por Sucursal
+├── Header con botón "Exportar CSV" (disabled si no hay selección)
+├── Card: Select de sucursales (dinámico desde API)
+├── [Si hay selección]
+│   ├── 3 Cards de resumen
+│   │   ├── Total en Sucursal
+│   │   ├── Por Estado (Disponibles, Asignados, Mantenimiento)
+│   │   └── Información Sucursal (Nombre, Ciudad)
+│   └── Tabla con dispositivos de la sucursal
+└── [Sin selección]: Mensaje "Selecciona una sucursal..."
+```
+
+**Lógica de filtrado:**
+```typescript
+const branchInventory = useMemo(() => {
+  if (selectedBranch === "todos") {
+    return { devices: [], total: 0, byStatus: {} }
+  }
+
+  const branchDevices = devices.filter(d => d.sucursal === selectedBranch)
+  const byStatus = {
+    DISPONIBLE: branchDevices.filter(d => d.estado === "DISPONIBLE").length,
+    ASIGNADO: branchDevices.filter(d => d.estado === "ASIGNADO").length,
+    MANTENIMIENTO: branchDevices.filter(d => d.estado === "MANTENIMIENTO").length,
+    // ...
+  }
+
+  return { devices: branchDevices, total: branchDevices.length, byStatus }
+}, [devices, selectedBranch])
+```
+
+**Select de sucursales:**
+```typescript
+<Select
+  value={selectedBranch === "todos" ? "todos" : String(selectedBranch)}
+  onValueChange={(value) => setSelectedBranch(value === "todos" ? "todos" : Number(value))}
+>
+  <SelectContent>
+    <SelectItem value="todos">Selecciona una sucursal...</SelectItem>
+    {branches.map((branch) => (
+      <SelectItem key={branch.id} value={String(branch.id)}>
+        {branch.nombre} - {branch.ciudad}
+      </SelectItem>
+    ))}
+  </SelectContent>
+</Select>
+```
+
+**Exportación CSV:**
+```typescript
+const handleExportBranchInventory = () => {
+  if (selectedBranch === "todos") {
+    alert("Por favor selecciona una sucursal")
+    return
+  }
+
+  const branch = branches.find(b => b.id === selectedBranch)
+  // ... preparar datos ...
+  exportToCSV(
+    dataForExport,
+    columns,
+    `reporte_inventario_sucursal_${branch?.codigo || selectedBranch}`
+  )
+}
+// Genera: reporte_inventario_sucursal_SCL-01_2025-11-06.csv
+```
+
+**Nombre de archivo:** Incluye código de sucursal para fácil identificación.
+
+---
+
+### Tab 3: Inventario por Empleado
+
+**Propósito:** Ver dispositivos en la sucursal de un empleado específico.
+
+**Componentes:**
+```
+Tab 3: Inventario por Empleado
+├── Header con botón "Exportar CSV" (disabled si no hay selección)
+├── Card: Select de empleados activos (dinámico desde API)
+├── [Si hay selección]
+│   ├── Card: Información del Empleado
+│   │   ├── Nombre completo
+│   │   ├── RUT
+│   │   ├── Cargo
+│   │   ├── Sucursal
+│   │   ├── Correo corporativo
+│   │   └── Teléfono
+│   └── Card: Dispositivos Asignados en su Sucursal
+│       ├── Badge con contador de dispositivos
+│       ├── Tabla con dispositivos
+│       └── Nota explicativa
+└── [Sin selección]: Mensaje "Selecciona un empleado..."
+```
+
+**Lógica de filtrado:**
+```typescript
+const employeeInventory = useMemo(() => {
+  if (selectedEmployee === "todos") {
+    return { devices: [], employee: null }
+  }
+
+  const employee = employees.find(e => e.id === selectedEmployee)
+  const employeeDevices = devices.filter(d =>
+    d.estado === "ASIGNADO" &&
+    d.sucursal === employee?.sucursal
+  )
+
+  return { devices: employeeDevices, employee }
+}, [devices, employees, selectedEmployee])
+```
+
+**⚠️ Decisión de diseño importante:**
+
+El reporte muestra **todos los dispositivos ASIGNADOS en la sucursal del empleado**, NO solo los asignados directamente a él.
+
+**Razón:** El modelo `Device` no tiene un campo `asignado_a`. Para ver asignaciones específicas del empleado, se debe usar:
+```
+GET /api/employees/{id}/history/
+```
+
+**Nota en UI:**
+```
+"Este reporte muestra todos los dispositivos asignados en la sucursal del empleado.
+Para ver el historial específico de asignaciones del empleado, visita la sección de Empleados."
+```
+
+**Select de empleados:**
+```typescript
+<Select
+  value={selectedEmployee === "todos" ? "todos" : String(selectedEmployee)}
+  onValueChange={(value) => setSelectedEmployee(value === "todos" ? "todos" : Number(value))}
+>
+  <SelectContent>
+    <SelectItem value="todos">Selecciona un empleado...</SelectItem>
+    {employees.map((employee) => (
+      <SelectItem key={employee.id} value={String(employee.id)}>
+        {employee.nombre_completo} - {employee.rut}
+      </SelectItem>
+    ))}
+  </SelectContent>
+</Select>
+```
+
+**Exportación CSV:**
+```typescript
+const handleExportEmployeeInventory = () => {
+  if (selectedEmployee === "todos") {
+    alert("Por favor selecciona un empleado")
+    return
+  }
+
+  // ... preparar datos ...
+  exportToCSV(
+    dataForExport,
+    columns,
+    `reporte_dispositivos_empleado_${employeeInventory.employee?.rut.replace(/\./g, "")}`
+  )
+}
+// Genera: reporte_dispositivos_empleado_123456789_2025-11-06.csv
+```
+
+**Nombre de archivo:** Incluye RUT sin puntos para compatibilidad con sistemas de archivos.
+
+---
+
+### Patrones de Implementación
+
+#### **1. Carga Paralela de Recursos**
+
+**Patrón:**
+```typescript
+const [resource1Response, resource2Response, resource3Response] = await Promise.all([
+  service1.getResource1(),
+  service2.getResource2(),
+  service3.getResource3()
+])
+```
+
+**Ventajas:**
+- Reduce tiempo de carga total (3 requests en paralelo vs 3 secuenciales)
+- Evita múltiples estados de carga al cambiar de tab
+- Mejor UX: datos disponibles inmediatamente al cambiar tab
+
+**Desventajas:**
+- Mayor consumo de memoria (carga todos los datos desde el inicio)
+- Si hay error en uno, todos fallan
+
+**Cuándo usar:**
+- Cuando los datos son relativamente pequeños (<10,000 registros)
+- Cuando el usuario probablemente visitará múltiples tabs
+- Cuando la velocidad de carga es prioritaria
+
+#### **2. Estado de Selección con Tipo Union**
+
+**Patrón:**
+```typescript
+const [selectedBranch, setSelectedBranch] = useState<number | "todos">("todos")
+```
+
+**Ventajas:**
+- TypeScript valida que solo se usen valores permitidos
+- Fácil verificación: `if (selectedBranch === "todos")`
+- Compatible con Select de shadcn/ui
+
+**Alternativa evitada:**
+```typescript
+// ❌ No usar:
+const [selectedBranch, setSelectedBranch] = useState<number | null>(null)
+// Select no acepta null como valor
+```
+
+#### **3. Deshabilitación Condicional de Botones**
+
+**Patrón:**
+```typescript
+<Button
+  onClick={handleExportBranchInventory}
+  disabled={selectedBranch === "todos"}
+>
+  Exportar CSV
+</Button>
+```
+
+**Ventajas:**
+- Previene errores del usuario
+- Feedback visual claro (botón gris)
+- Evita validaciones en el handler
+
+**Validación adicional en handler:**
+```typescript
+const handleExport = () => {
+  if (selectedBranch === "todos") {
+    alert("Por favor selecciona una sucursal")
+    return
+  }
+  // ... resto de la lógica
+}
+```
+
+**Razón:** Defensa en profundidad (double check).
+
+#### **4. Memoización de Cálculos Costosos**
+
+**Patrón:**
+```typescript
+const generalInventory = useMemo(() => {
+  // Cálculos costosos aquí
+  return { byType, byStatus, total }
+}, [devices])
+```
+
+**Ventajas:**
+- Evita recalcular en cada render
+- Mejora performance significativamente con muchos dispositivos
+- Solo recalcula cuando cambia `devices`
+
+**Ejemplo sin memoización:**
+```typescript
+// ❌ Se recalcula en cada render (malo)
+const total = devices.length
+const laptops = devices.filter(d => d.tipo_equipo === "LAPTOP").length
+```
+
+**Cuándo usar:**
+- Filtrados de arrays grandes
+- Cálculos agregados (sumas, promedios, conteos)
+- Transformaciones de datos
+
+#### **5. Transformación de Datos para Exportación**
+
+**Patrón:**
+```typescript
+const dataForExport = devices.map((device) => ({
+  tipo: getDeviceTypeLabel(device.tipo_equipo),    // Traducción
+  marca: device.marca,                              // Directo
+  numero_telefono: device.numero_telefono || "N/A", // Default
+  sucursal: device.sucursal_detail?.nombre || `ID: ${device.sucursal}`, // Fallback
+  fecha_ingreso: formatDate(device.fecha_ingreso),  // Formateo
+}))
+```
+
+**Razones:**
+- **Traducción:** CSV más legible para usuarios no técnicos
+- **Defaults:** Evita campos vacíos en Excel
+- **Fallbacks:** Maneja casos donde relaciones no están pobladas
+- **Formateo:** Fechas en formato familiar (DD/MM/YYYY)
+
+#### **6. Helpers de UI Centralizados**
+
+**Patrón:**
+```typescript
+// En device-service.ts
+export function getDeviceTypeLabel(tipo: TipoEquipo): string {
+  const labels: Record<TipoEquipo, string> = {
+    LAPTOP: "Laptop",
+    TELEFONO: "Teléfono",
+    TABLET: "Tablet",
+    SIM: "SIM Card",
+    ACCESORIO: "Accesorio",
+  }
+  return labels[tipo] || tipo
+}
+```
+
+**Ventajas:**
+- Reutilizable en múltiples componentes
+- Consistencia en toda la aplicación
+- Fácil de mantener (un solo lugar para cambiar)
+- Exportado junto con el servicio relacionado
+
+**Alternativa evitada:**
+```typescript
+// ❌ No duplicar en cada componente:
+const typeLabels = { LAPTOP: "Laptop", ... }
+```
+
+---
+
+### Decisiones Técnicas Importantes
+
+#### **1. CSV Client-Side vs Server-Side**
+
+**Decisión:** Generación client-side con JavaScript.
+
+**Pros:**
+- ✅ No sobrecarga el servidor
+- ✅ Respuesta inmediata (sin esperar generación)
+- ✅ Funciona bien para <10,000 registros
+- ✅ Más simple de implementar
+
+**Cons:**
+- ❌ Limitado por memoria del navegador
+- ❌ No escalable para millones de registros
+- ❌ Consume ancho de banda (envía todos los datos)
+
+**Cuándo migrar a server-side:**
+- Más de 10,000 dispositivos
+- Reportes con cálculos complejos
+- Necesidad de formateo avanzado (estilos, gráficos)
+
+**Implementación server-side (futuro):**
+```python
+# Backend Django
+from django.http import HttpResponse
+import csv
+
+def export_devices_csv(request):
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="devices.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow(['Tipo', 'Marca', 'Modelo'])
+
+    devices = Device.objects.all()
+    for device in devices:
+        writer.writerow([device.tipo_equipo, device.marca, device.modelo])
+
+    return response
+```
+
+#### **2. Límite de 1000 Registros**
+
+**Decisión:** Cargar hasta 1000 dispositivos/empleados con `page_size: 1000`.
+
+**Razón:**
+- Backend tiene paginación de 20 por defecto
+- Necesitamos todos los datos para filtrar/calcular client-side
+- 1000 es suficiente para MVP
+
+**Cuándo cambiar:**
+- Si el sistema crece >1000 dispositivos
+- Implementar paginación infinita
+- Agregar filtros de fecha para limitar resultados
+- Crear endpoints específicos para reportes
+
+**Ejemplo con paginación:**
+```typescript
+// Para grandes volúmenes (futuro)
+let allDevices = []
+let page = 1
+let hasMore = true
+
+while (hasMore) {
+  const response = await deviceService.getDevices({ page, page_size: 100 })
+  allDevices = [...allDevices, ...response.results]
+  hasMore = response.next !== null
+  page++
+}
+```
+
+#### **3. UTF-8 BOM para Excel**
+
+**Decisión:** Agregar Byte Order Mark (\uFEFF) al inicio del CSV.
+
+**Código:**
+```typescript
+const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+```
+
+**Razón:**
+- Excel en Windows no detecta UTF-8 sin BOM
+- Previene caracteres extraños en acentos (á, é, í, ó, ú, ñ)
+- Compatible con LibreOffice y Google Sheets
+
+**Sin BOM:**
+```
+Santiago → SÃ¡ntiago (mal)
+```
+
+**Con BOM:**
+```
+Santiago → Santiago (bien)
+```
+
+#### **4. Reporte por Empleado - Alcance**
+
+**Decisión:** Mostrar todos los dispositivos ASIGNADOS en la sucursal del empleado, no solo los asignados a él.
+
+**Razón técnica:**
+El modelo `Device` no tiene campo `asignado_a`:
+```python
+class Device(models.Model):
+    sucursal = models.ForeignKey(Branch, ...)
+    # ❌ No existe: asignado_a = models.ForeignKey(Employee, ...)
+```
+
+La relación Device-Employee está en `Assignment`:
+```python
+class Assignment(models.Model):
+    empleado = models.ForeignKey(Employee, ...)
+    dispositivo = models.ForeignKey(Device, ...)
+```
+
+**Soluciones alternativas:**
+
+**Opción A (actual):** Mostrar todos los dispositivos de la sucursal
+```typescript
+const employeeDevices = devices.filter(d =>
+  d.estado === "ASIGNADO" &&
+  d.sucursal === employee?.sucursal
+)
+```
+
+**Opción B (mejorar en futuro):** Crear endpoint específico
+```python
+# Backend
+@action(detail=True, methods=['get'])
+def assigned_devices(self, request, pk=None):
+    employee = self.get_object()
+    assignments = Assignment.objects.filter(
+        empleado=employee,
+        estado_asignacion='ACTIVA'
+    )
+    devices = [a.dispositivo for a in assignments]
+    serializer = DeviceSerializer(devices, many=True)
+    return Response(serializer.data)
+```
+
+**Opción C:** Usar endpoint de historial existente
+```typescript
+const history = await employeeService.getEmployeeHistory(employeeId)
+const activeDevices = history.assignments
+  .filter(a => a.estado_asignacion === "ACTIVA")
+  .map(a => a.dispositivo_detail)
+```
+
+**Decisión:** Documentar limitación actual y planificar Opción B para Fase 13.
+
+#### **5. Nombres de Archivo CSV**
+
+**Decisión:** Incluir identificador único + fecha en nombre de archivo.
+
+**Formatos:**
+- General: `reporte_inventario_general_2025-11-06.csv`
+- Sucursal: `reporte_inventario_sucursal_SCL-01_2025-11-06.csv`
+- Empleado: `reporte_dispositivos_empleado_123456789_2025-11-06.csv`
+
+**Razón:**
+- Fácil identificación sin abrir el archivo
+- Evita sobrescribir archivos del mismo día
+- Ordenamiento cronológico natural en carpetas
+- Trazabilidad (saber de qué sucursal/empleado es)
+
+**Alternativa evitada:**
+```
+❌ inventario.csv (genérico, se sobreescribe)
+❌ reporte_1.csv (no descriptivo)
+```
+
+---
+
+### Flujos de Usuario
+
+#### **Flujo 1: Exportar Inventario General**
+
+```
+1. Usuario navega a /dashboard/inventory
+2. Sistema carga dispositivos y sucursales (spinner)
+3. Usuario ve resumen y tabla con dispositivos
+4. Usuario hace clic en "Exportar a CSV"
+5. Navegador descarga: inventario_general_2025-11-06.csv
+6. Usuario abre en Excel → ve todos los dispositivos
+```
+
+#### **Flujo 2: Exportar Inventario por Sucursal**
+
+```
+1. Usuario navega a /dashboard/reports
+2. Sistema carga devices, branches y employees (spinner)
+3. Usuario hace clic en tab "Por Sucursal"
+4. Usuario selecciona "Santiago Centro" en el select
+5. Sistema filtra y muestra:
+   - Total: 45 dispositivos
+   - Por estado: 30 asignados, 10 disponibles, 5 mantenimiento
+   - Tabla con 45 dispositivos
+6. Usuario hace clic en "Exportar CSV"
+7. Navegador descarga: reporte_inventario_sucursal_SCL-01_2025-11-06.csv
+```
+
+#### **Flujo 3: Exportar Inventario por Empleado**
+
+```
+1. Usuario navega a /dashboard/reports
+2. Usuario hace clic en tab "Por Empleado"
+3. Usuario busca y selecciona "Juan Pérez - 12.345.678-9"
+4. Sistema muestra:
+   - Información del empleado
+   - 5 dispositivos asignados en su sucursal
+5. Usuario hace clic en "Exportar CSV"
+6. Navegador descarga: reporte_dispositivos_empleado_12345678-9_2025-11-06.csv
+```
+
+---
+
+### Consideraciones de Performance
+
+#### **1. Carga Inicial**
+
+**Métricas esperadas:**
+- Dispositivos (1000): ~500ms
+- Sucursales (100): ~50ms
+- Empleados (1000): ~500ms
+- **Total en paralelo:** ~500ms (el más lento)
+
+**Optimizaciones aplicadas:**
+- ✅ Carga paralela con `Promise.all()`
+- ✅ Memoización de cálculos con `useMemo`
+- ✅ Backend con `select_related()` y `prefetch_related()`
+
+#### **2. Exportación CSV**
+
+**Métricas esperadas:**
+- 100 dispositivos: ~50ms
+- 1000 dispositivos: ~200ms
+- 5000 dispositivos: ~1s
+
+**Limitaciones:**
+- Memoria del navegador (~100MB para 10,000 registros)
+- Tiempo de procesamiento en navegador
+- Generación del Blob
+
+#### **3. Filtrado en Cliente**
+
+**Ventajas:**
+- Instantáneo (no espera servidor)
+- Sin carga del servidor
+- Experiencia fluida
+
+**Desventajas:**
+- Requiere cargar todos los datos
+- No escalable para >10,000 registros
+
+**Cuándo migrar a filtrado server-side:**
+```typescript
+// En lugar de:
+const filtered = devices.filter(d => d.sucursal === selectedBranch)
+
+// Hacer:
+const filtered = await deviceService.getDevices({ sucursal: selectedBranch })
+```
+
+---
+
+### Testing Manual Realizado
+
+#### **Funcionalidades Verificadas:**
+
+✅ **Inventario General:**
+- Carga de datos desde API
+- Cálculo correcto de totales
+- Filtros combinados funcionan
+- Exportación CSV descarga archivo
+- Spinner durante carga
+
+✅ **Reportes - Tab General:**
+- Totales coinciden con base de datos
+- Tabla muestra primeros 50
+- CSV contiene todos los dispositivos
+
+✅ **Reportes - Tab Sucursal:**
+- Select poblado con sucursales de API
+- Filtrado correcto por sucursal
+- Estadísticas calculadas correctamente
+- CSV incluye código de sucursal en nombre
+
+✅ **Reportes - Tab Empleado:**
+- Select poblado con empleados activos
+- Información del empleado completa
+- Dispositivos filtrados por sucursal
+- Nota explicativa visible
+
+✅ **Exportación CSV:**
+- UTF-8 BOM funciona (acentos correctos en Excel)
+- Fecha en nombre de archivo
+- Columnas correctas
+- Valores escapados (comas, comillas)
+
+---
+
+### Mejoras Futuras Planificadas
+
+#### **Prioridad Alta:**
+
+1. **Endpoint de dispositivos asignados por empleado**
+   ```python
+   GET /api/employees/{id}/assigned_devices/
+   ```
+   Retorna solo dispositivos con asignación activa del empleado.
+
+2. **Filtros de fecha en reportes**
+   ```typescript
+   <DateRangePicker
+     from={fromDate}
+     to={toDate}
+     onChange={handleDateChange}
+   />
+   ```
+
+3. **Búsqueda en selects**
+   Usar Combobox de shadcn/ui en lugar de Select para búsqueda en tiempo real.
+
+#### **Prioridad Media:**
+
+4. **Gráficos con recharts**
+   ```typescript
+   <BarChart data={dispositivosPorTipo}>
+     <Bar dataKey="cantidad" fill="#3b82f6" />
+   </BarChart>
+   ```
+
+5. **Exportación a Excel (.xlsx)**
+   Usar biblioteca como `xlsx` para generar archivos con estilos:
+   ```typescript
+   import XLSX from 'xlsx'
+   const worksheet = XLSX.utils.json_to_sheet(data)
+   const workbook = XLSX.utils.book_new()
+   XLSX.utils.book_append_sheet(workbook, worksheet, "Inventario")
+   XLSX.writeFile(workbook, "inventario.xlsx")
+   ```
+
+6. **Comparativas mes a mes**
+   Mostrar tendencias de dispositivos asignados/disponibles.
+
+#### **Prioridad Baja:**
+
+7. **Reportes programados**
+   Envío automático de reportes por email cada semana/mes.
+
+8. **Dashboard de reportes**
+   Widgets configurables con métricas favoritas.
+
+9. **Exportación a PDF**
+   Generar PDFs con logo y formato corporativo.
+
+10. **Historial de exportaciones**
+    Registro de quién exportó qué y cuándo.
+
+---
+
+### Lecciones Aprendidas - Fase 12
+
+1. **UTF-8 BOM es crucial:** Sin él, Excel muestra caracteres extraños en español
+2. **Carga paralela mejora UX:** Usuarios prefieren esperar una vez que múltiples veces
+3. **Memoización imprescindible:** Con 1000 dispositivos, filtrar en cada render es lento
+4. **TypeScript generics:** `exportToCSV<T>` permite reutilizar para cualquier tipo de datos
+5. **Documentar limitaciones:** Nota en UI sobre alcance del reporte por empleado evita confusiones
+6. **Nombres descriptivos:** Incluir identificador único en CSV facilita organización
+7. **Botones deshabilitados:** Previene errores mejor que alertas después del clic
+8. **Helper functions centralizadas:** `getDeviceTypeLabel()` reutilizado en 3 lugares
+9. **Default values en CSV:** "N/A" mejor que celdas vacías en Excel
+10. **Client-side CSV suficiente:** Para <10,000 registros, no necesita backend
+
+---
+
+### Archivos Relacionados
+
+**Frontend modificados:**
+- `frontend/lib/utils.ts` - Agregadas 3 funciones (exportToCSV, formatDate, formatDateTime)
+- `frontend/app/dashboard/inventory/page.tsx` - Reescrito ~90% para usar API real
+- `frontend/app/dashboard/reports/page.tsx` - Reescrito 100% con arquitectura de tabs
+
+**Frontend nuevos:**
+- `frontend/lib/services/stats-service.ts` - Servicio para endpoint de estadísticas
+
+**Backend (sin cambios):**
+- Ya existente: `GET /api/stats/dashboard/` (Fase 5)
+- Ya existente: `GET /api/devices/` con paginación y filtros (Fase 3)
+- Ya existente: `GET /api/branches/` con estadísticas (Fase 8)
+- Ya existente: `GET /api/employees/` con filtros (Fase 9)
+
+---
+
+**Última actualización:** Noviembre 6, 2025 - Fase 12 Completada
 **Documentado por:** Claude (Asistente IA)
-**Próxima actualización:** Al completar Fase 12 (Módulo de Reportes e Inventario)
+**Próxima actualización:** Al completar Fase 13 (Dashboard y Estadísticas)
