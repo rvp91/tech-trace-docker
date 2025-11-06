@@ -1,9 +1,9 @@
 # TechTrace - Arquitectura del Sistema
 ## Sistema de Gestion de Inventario de Dispositivos Moviles
 
-**Version:** 1.1
-**Ultima actualizacion:** Noviembre 5, 2025
-**Estado:** En Desarrollo - Fase 7 Completada (Autenticacion Frontend)
+**Version:** 1.2
+**Ultima actualizacion:** Noviembre 6, 2025
+**Estado:** En Desarrollo - Fase 8 Completada (Módulo de Sucursales)
 
 ---
 
@@ -1142,7 +1142,344 @@ LOGGING = {
 
 ---
 
-## 9. Deployment (Futuro)
+## 9. Módulos Funcionales Implementados
+
+Esta sección documenta la arquitectura y funcionamiento de cada módulo funcional del sistema.
+
+### 9.1 Módulo de Sucursales (Branches)
+
+**Estado:** ✅ Completado (Fase 8)
+
+#### 9.1.1 Backend - Estructura de Archivos
+
+```
+backend/apps/branches/
+├── models.py          # Modelo Branch con campos base
+├── serializers.py     # BranchSerializer con estadísticas calculadas
+├── views.py           # BranchViewSet con CRUD completo
+├── urls.py            # Router de DRF
+├── admin.py           # Configuración de Django Admin
+└── apps.py            # Configuración de la app
+```
+
+**Modelo Branch (`models.py`):**
+```python
+class Branch(models.Model):
+    nombre = CharField(max_length=100)           # Nombre de la sucursal
+    codigo = CharField(max_length=20, unique=True)  # Código único (ej: SCL-01)
+    direccion = TextField(blank=True, null=True)    # Dirección física
+    ciudad = CharField(max_length=100)              # Ciudad
+    is_active = BooleanField(default=True)          # Estado activo/inactivo
+    created_at = DateTimeField(auto_now_add=True)
+    updated_at = DateTimeField(auto_now=True)
+```
+
+**Serializer con Estadísticas (`serializers.py`):**
+
+El `BranchSerializer` extiende el modelo base con campos calculados dinámicamente:
+
+- **`total_dispositivos`** (SerializerMethodField): Cuenta el total de dispositivos asociados a la sucursal usando `obj.device_set.count()`
+
+- **`total_empleados`** (SerializerMethodField): Cuenta el total de empleados asociados usando `obj.employee_set.count()`
+
+- **`dispositivos_por_tipo`** (SerializerMethodField): Retorna un diccionario con el desglose de dispositivos por tipo:
+  ```python
+  {
+    'LAPTOP': 30,
+    'TELEFONO': 35,
+    'TABLET': 15,
+    'SIM': 5,
+    'ACCESORIO': 0
+  }
+  ```
+
+  Implementación optimizada usando anotaciones de Django:
+  ```python
+  def get_dispositivos_por_tipo(self, obj):
+      from django.db.models import Count
+      dispositivos = obj.device_set.values('tipo_equipo').annotate(
+          cantidad=Count('id')
+      )
+      # Retorna diccionario con todos los tipos inicializados en 0
+      # y actualiza con valores reales
+  ```
+
+**ViewSet (`views.py`):**
+```python
+class BranchViewSet(viewsets.ModelViewSet):
+    queryset = Branch.objects.all()
+    serializer_class = BranchSerializer
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['is_active', 'ciudad']
+    search_fields = ['nombre', 'codigo', 'ciudad', 'direccion']
+    ordering_fields = ['nombre', 'codigo', 'ciudad', 'created_at']
+    ordering = ['nombre']
+```
+
+**Endpoints disponibles:**
+- `GET /api/branches/` - Lista todas las sucursales con estadísticas
+- `GET /api/branches/?is_active=true` - Filtra solo sucursales activas
+- `GET /api/branches/?search=santiago` - Búsqueda por texto
+- `GET /api/branches/{id}/` - Detalle de una sucursal
+- `POST /api/branches/` - Crear sucursal
+- `PUT/PATCH /api/branches/{id}/` - Actualizar sucursal
+- `DELETE /api/branches/{id}/` - Eliminar sucursal
+
+#### 9.1.2 Frontend - Estructura de Archivos
+
+```
+frontend/
+├── lib/
+│   ├── types.ts                          # Interface Branch con estadísticas
+│   └── services/
+│       └── branch-service.ts             # Servicio API para sucursales
+├── app/dashboard/branches/
+│   └── page.tsx                          # Página principal del módulo
+└── components/modals/
+    └── branch-modal.tsx                  # Modal crear/editar
+```
+
+**Tipos TypeScript (`lib/types.ts`):**
+```typescript
+export interface Branch {
+  id: number
+  nombre: string
+  codigo: string                    // Código único
+  direccion?: string
+  ciudad: string
+  is_active: boolean                // Estado activo/inactivo
+  created_at: string
+  updated_at: string
+  // Campos calculados por el backend:
+  total_dispositivos?: number
+  total_empleados?: number
+  dispositivos_por_tipo?: {
+    LAPTOP: number
+    TELEFONO: number
+    TABLET: number
+    SIM: number
+    ACCESORIO: number
+  }
+}
+```
+
+**Servicio API (`lib/services/branch-service.ts`):**
+
+Maneja toda la comunicación con el backend:
+
+```typescript
+export const branchService = {
+  // Obtiene lista de sucursales (maneja paginación del backend)
+  async getBranches(): Promise<Branch[]> {
+    const response = await apiClient.get<BranchListResponse>("/branches/")
+    return response.results  // Extrae results de respuesta paginada
+  },
+
+  // CRUD completo con tipos TypeScript
+  async getBranch(id: number): Promise<Branch>
+  async createBranch(data: CreateBranchData): Promise<Branch>
+  async updateBranch(id: number, data: UpdateBranchData): Promise<Branch>
+  async deleteBranch(id: number): Promise<void>
+
+  // Filtro helper
+  async getActiveBranches(): Promise<Branch[]>
+}
+```
+
+**Página Principal (`app/dashboard/branches/page.tsx`):**
+
+Componente principal del módulo con las siguientes responsabilidades:
+
+1. **Gestión de Estado:**
+   - `branches`: Array de sucursales
+   - `loading`: Estado de carga
+   - `editingBranch`: Sucursal en edición
+   - `deletingBranch`: Sucursal a eliminar
+   - `modalOpen`: Control del modal
+
+2. **Carga de Datos:**
+   ```typescript
+   const loadBranches = async () => {
+     try {
+       setLoading(true)
+       const data = await branchService.getBranches()
+       setBranches(data)
+     } catch (error) {
+       toast({ variant: "destructive", ... })
+     } finally {
+       setLoading(false)
+     }
+   }
+   ```
+
+3. **Vista de Tarjetas (Cards):**
+   - Grid responsive: 1 columna (móvil), 2 (tablet), 4 (desktop)
+   - Cada tarjeta muestra:
+     - Nombre y ciudad de la sucursal
+     - Badge de estado (Activo/Inactivo)
+     - Código de sucursal
+     - **Total de dispositivos** (número grande destacado)
+     - Desglose por tipo con iconos:
+       - 💻 Laptops
+       - 📱 Teléfonos
+       - 📱 Tablets
+       - 📇 SIM Cards (icono personalizado)
+     - 👥 Total de empleados
+     - Botones de editar y eliminar
+
+4. **Estados de UI:**
+   - **Loading**: Skeleton loaders animados (4 tarjetas)
+   - **Empty**: Mensaje y botón para crear primera sucursal
+   - **Loaded**: Grid con todas las sucursales
+
+5. **Operaciones CRUD:**
+   - **Crear**: Abre modal sin sucursal
+   - **Editar**: Abre modal con datos pre-cargados
+   - **Eliminar**: Muestra AlertDialog de confirmación
+
+**Modal Crear/Editar (`components/modals/branch-modal.tsx`):**
+
+Modal reutilizable con doble modo de uso:
+
+1. **Modo Controlado** (usado en la página):
+   ```typescript
+   <BranchModal
+     open={modalOpen}
+     onOpenChange={setModalOpen}
+     branch={editingBranch}  // null para crear, objeto para editar
+     onSuccess={handleSuccess}
+   />
+   ```
+
+2. **Modo No Controlado** (con DialogTrigger propio):
+   ```typescript
+   <BranchModal />  // Incluye botón "Nueva Sucursal"
+   ```
+
+**Características del Modal:**
+
+- **Formulario Completo:**
+  - Nombre (requerido)
+  - Código (requerido, formato validado, no editable en modo edición)
+  - Ciudad (requerida)
+  - Dirección (opcional, textarea)
+  - Estado activo (Switch con descripción)
+
+- **Validaciones:**
+  ```typescript
+  validateForm(): boolean {
+    - Campos requeridos no vacíos
+    - Código con formato: /^[A-Z0-9-]+$/
+    - Muestra errores específicos por campo
+  }
+  ```
+
+- **Estados de Carga:**
+  - Botón deshabilitado durante guardado
+  - Spinner de carga (Loader2 icon)
+  - Campos deshabilitados durante operación
+
+- **Manejo de Errores:**
+  - Errores de validación in-line
+  - Errores de API con toast notification
+  - Limpieza automática de errores al escribir
+
+#### 9.1.3 Flujo de Datos
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  1. Usuario accede a /dashboard/branches               │
+└────────────────┬────────────────────────────────────────┘
+                 │
+                 v
+┌─────────────────────────────────────────────────────────┐
+│  2. BranchesPage.useEffect() ejecuta loadBranches()    │
+└────────────────┬────────────────────────────────────────┘
+                 │
+                 v
+┌─────────────────────────────────────────────────────────┐
+│  3. branchService.getBranches()                         │
+│     → GET /api/branches/                                │
+└────────────────┬────────────────────────────────────────┘
+                 │
+                 v
+┌─────────────────────────────────────────────────────────┐
+│  4. Backend: BranchViewSet                              │
+│     - Query: Branch.objects.all()                       │
+│     - Serializer calcula estadísticas por cada Branch:  │
+│       * obj.device_set.count()                          │
+│       * obj.employee_set.count()                        │
+│       * Agrupa dispositivos por tipo                    │
+└────────────────┬────────────────────────────────────────┘
+                 │
+                 v
+┌─────────────────────────────────────────────────────────┐
+│  5. Response JSON con estadísticas:                     │
+│     {                                                   │
+│       count: 3,                                         │
+│       results: [                                        │
+│         {                                               │
+│           id: 1,                                        │
+│           nombre: "Centro",                             │
+│           total_dispositivos: 85,                       │
+│           dispositivos_por_tipo: {                      │
+│             LAPTOP: 30,                                 │
+│             TELEFONO: 35, ...                           │
+│           },                                            │
+│           total_empleados: 32                           │
+│         }                                               │
+│       ]                                                 │
+│     }                                                   │
+└────────────────┬────────────────────────────────────────┘
+                 │
+                 v
+┌─────────────────────────────────────────────────────────┐
+│  6. Frontend actualiza estado y renderiza tarjetas     │
+│     con estadísticas en tiempo real                     │
+└─────────────────────────────────────────────────────────┘
+```
+
+#### 9.1.4 Optimizaciones Implementadas
+
+**Backend:**
+- ✅ Uso de `Count` de Django ORM para agregaciones eficientes
+- ✅ Queries agrupadas para evitar N+1 queries
+- ✅ Campos calculados en serializer (no en modelo)
+- ✅ Filtros e índices en campos de búsqueda
+
+**Frontend:**
+- ✅ Skeleton loaders para feedback inmediato
+- ✅ Estado de carga granular (no bloquea toda la UI)
+- ✅ Toast notifications no invasivas
+- ✅ Validación optimista (frontend + backend)
+- ✅ Grid responsive con breakpoints optimizados
+- ✅ Reutilización de componentes (modal modo dual)
+
+#### 9.1.5 Decisiones de Diseño
+
+1. **Estadísticas en Tiempo Real:**
+   - Calculadas en cada request (no cacheadas)
+   - Justificación: Los datos cambian frecuentemente y el volumen es bajo
+   - Alternativa futura: Cachear con invalidación por señales
+
+2. **Código No Editable:**
+   - El código de sucursal no puede modificarse después de creación
+   - Justificación: El código se usa como referencia en otros registros
+   - Implementado con `disabled={!!branch}` en el input
+
+3. **Vista de Tarjetas vs Tabla:**
+   - Se eligió vista de tarjetas sobre tabla tradicional
+   - Justificación: Mejor visualización de estadísticas múltiples
+   - Más amigable en dispositivos móviles
+
+4. **Confirmación de Eliminación:**
+   - AlertDialog bloqueante antes de eliminar
+   - Justificación: Operación destructiva e irreversible
+   - Muestra nombre de sucursal para confirmar
+
+---
+
+## 10. Deployment (Futuro)
 
 ### 9.1 Checklist de Produccion
 

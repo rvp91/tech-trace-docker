@@ -75,14 +75,23 @@ export interface Assignment {
 }
 
 export interface Branch {
-  id: string
+  id: number
   nombre: string
   codigo: string
   direccion?: string
   ciudad: string
-  estado: "activo" | "inactivo"
-  createdAt: string
-  updatedAt: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  total_dispositivos?: number
+  total_empleados?: number
+  dispositivos_por_tipo?: {
+    LAPTOP: number
+    TELEFONO: number
+    TABLET: number
+    SIM: number
+    ACCESORIO: number
+  }
 }
 
 export interface DashboardMetrics {
