@@ -224,7 +224,7 @@ export default function EmployeeDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{history.total_assignments}</div>
+            <div className="text-3xl font-bold">{history.total_assignments || 0}</div>
           </CardContent>
         </Card>
 
@@ -236,7 +236,7 @@ export default function EmployeeDetailPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-green-600">
-              {history.active_assignments}
+              {history.active_assignments || 0}
             </div>
           </CardContent>
         </Card>
@@ -249,7 +249,7 @@ export default function EmployeeDetailPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-muted-foreground">
-              {history.total_assignments - history.active_assignments}
+              {(history.total_assignments || 0) - (history.active_assignments || 0)}
             </div>
           </CardContent>
         </Card>

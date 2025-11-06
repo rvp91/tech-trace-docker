@@ -1,15 +1,140 @@
 "use client"
 
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Search, Edit2, Trash2 } from "lucide-react"
-import { DEVICES } from "@/lib/mock-data"
-import { CreateDeviceModal } from "@/components/modals/create-device-modal"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Search, Edit2, Trash2, Eye, Plus } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useToast } from "@/hooks/use-toast"
+import { deviceService, getDeviceStatusColor, getDeviceStatusLabel, getDeviceTypeLabel } from "@/lib/services/device-service"
+import { branchService } from "@/lib/services/branch-service"
+import type { Device, Branch, TipoEquipo, EstadoDispositivo } from "@/lib/types"
+import { DeviceModal } from "@/components/modals/device-modal"
 
 export default function DevicesPage() {
+  const router = useRouter()
+  const { toast } = useToast()
+
+  const [devices, setDevices] = useState<Device[]>([])
+  const [branches, setBranches] = useState<Branch[]>([])
+  const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedType, setSelectedType] = useState<string>("")
+  const [selectedStatus, setSelectedStatus] = useState<string>("")
+  const [selectedBranch, setSelectedBranch] = useState<string>("")
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deviceToDelete, setDeviceToDelete] = useState<Device | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [deviceToEdit, setDeviceToEdit] = useState<Device | null>(null)
+
+  // Cargar dispositivos con filtros
+  const loadDevices = useCallback(async () => {
+    try {
+      setLoading(true)
+      const response = await deviceService.getDevices({
+        search: searchQuery || undefined,
+        tipo_equipo: selectedType ? (selectedType as TipoEquipo) : undefined,
+        estado: selectedStatus ? (selectedStatus as EstadoDispositivo) : undefined,
+        sucursal: selectedBranch ? Number(selectedBranch) : undefined,
+        page_size: 100,
+      })
+      setDevices(response.results)
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Error al cargar dispositivos",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }, [searchQuery, selectedType, selectedStatus, selectedBranch, toast])
+
+  // Cargar sucursales
+  const loadBranches = useCallback(async () => {
+    try {
+      const response = await branchService.getBranches({ page_size: 100 })
+      setBranches(response.results)
+    } catch (error) {
+      console.error("Error al cargar sucursales:", error)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadBranches()
+  }, [loadBranches])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadDevices()
+    }, 300) // Debounce de 300ms para la búsqueda
+
+    return () => clearTimeout(timer)
+  }, [loadDevices, refreshTrigger])
+
+  const handleDelete = async () => {
+    if (!deviceToDelete) return
+
+    try {
+      setIsDeleting(true)
+      await deviceService.deleteDevice(deviceToDelete.id)
+      toast({
+        title: "Dispositivo eliminado",
+        description: `${deviceToDelete.marca} ${deviceToDelete.modelo} ha sido eliminado exitosamente.`,
+      })
+      setRefreshTrigger(prev => prev + 1)
+      setDeleteDialogOpen(false)
+      setDeviceToDelete(null)
+    } catch (error) {
+      toast({
+        title: "Error al eliminar",
+        description: error instanceof Error ? error.message : "No se pudo eliminar el dispositivo. Puede tener asignaciones activas.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const handleDeviceCreated = () => {
+    setRefreshTrigger(prev => prev + 1)
+    setModalOpen(false)
+    setDeviceToEdit(null)
+  }
+
+  const handleEditClick = (device: Device) => {
+    setDeviceToEdit(device)
+    setModalOpen(true)
+  }
+
+  const handleCreateClick = () => {
+    setDeviceToEdit(null)
+    setModalOpen(true)
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -17,20 +142,75 @@ export default function DevicesPage() {
           <h1 className="text-3xl font-bold">Gestión de Dispositivos</h1>
           <p className="text-muted-foreground mt-1">Administra el inventario de dispositivos</p>
         </div>
-        <CreateDeviceModal />
+        <Button onClick={handleCreateClick}>
+          <Plus className="h-4 w-4 mr-2" />
+          Nuevo Dispositivo
+        </Button>
       </div>
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Dispositivos</CardTitle>
-            <div className="flex items-center gap-2 bg-input rounded-lg px-3 py-2 w-64">
-              <Search className="h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Buscar dispositivo..."
-                className="border-0 bg-transparent outline-none placeholder:text-muted-foreground"
-              />
+          <div className="flex flex-col gap-4">
+            <CardTitle>Dispositivos ({devices.length})</CardTitle>
+
+            {/* Filtros */}
+            <div className="flex flex-col sm:flex-row gap-4">
+              {/* Búsqueda */}
+              <div className="flex items-center gap-2 bg-input rounded-lg px-3 py-2 flex-1">
+                <Search className="h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Buscar por marca, modelo o serie/IMEI..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="border-0 bg-transparent outline-none placeholder:text-muted-foreground"
+                />
+              </div>
+
+              {/* Filtro por tipo */}
+              <Select value={selectedType || "all"} onValueChange={(value) => setSelectedType(value === "all" ? "" : value)}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Todos los tipos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los tipos</SelectItem>
+                  <SelectItem value="LAPTOP">Laptop</SelectItem>
+                  <SelectItem value="TELEFONO">Teléfono</SelectItem>
+                  <SelectItem value="TABLET">Tablet</SelectItem>
+                  <SelectItem value="SIM">SIM Card</SelectItem>
+                  <SelectItem value="ACCESORIO">Accesorio</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Filtro por estado */}
+              <Select value={selectedStatus || "all"} onValueChange={(value) => setSelectedStatus(value === "all" ? "" : value)}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Todos los estados" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="DISPONIBLE">Disponible</SelectItem>
+                  <SelectItem value="ASIGNADO">Asignado</SelectItem>
+                  <SelectItem value="MANTENIMIENTO">Mantenimiento</SelectItem>
+                  <SelectItem value="BAJA">Baja</SelectItem>
+                  <SelectItem value="ROBO">Robo</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Filtro por sucursal */}
+              <Select value={selectedBranch || "all"} onValueChange={(value) => setSelectedBranch(value === "all" ? "" : value)}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Todas las sucursales" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las sucursales</SelectItem>
+                  {branches.map((branch) => (
+                    <SelectItem key={branch.id} value={String(branch.id)}>
+                      {branch.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardHeader>
@@ -39,51 +219,125 @@ export default function DevicesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Modelo</TableHead>
-                  <TableHead>Serial</TableHead>
                   <TableHead>Tipo</TableHead>
+                  <TableHead>Marca</TableHead>
+                  <TableHead>Modelo</TableHead>
+                  <TableHead>Serie/IMEI</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Sucursal</TableHead>
-                  <TableHead className="w-20">Acciones</TableHead>
+                  <TableHead className="w-32">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {DEVICES.map((device) => (
-                  <TableRow key={device.id}>
-                    <TableCell className="font-medium">{device.modelo}</TableCell>
-                    <TableCell className="font-mono text-sm">{device.serial}</TableCell>
-                    <TableCell>{device.tipo}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          device.estado === "Asignado"
-                            ? "default"
-                            : device.estado === "En Stock"
-                              ? "secondary"
-                              : "outline"
-                        }
-                      >
-                        {device.estado}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{device.sucursal}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                {loading ? (
+                  // Skeleton loaders
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                      <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-8 w-20" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : devices.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      No se encontraron dispositivos
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  devices.map((device) => (
+                    <TableRow key={device.id}>
+                      <TableCell className="font-medium">{getDeviceTypeLabel(device.tipo_equipo)}</TableCell>
+                      <TableCell>{device.marca}</TableCell>
+                      <TableCell>{device.modelo}</TableCell>
+                      <TableCell className="font-mono text-sm">{device.serie_imei}</TableCell>
+                      <TableCell>
+                        <Badge className={getDeviceStatusColor(device.estado)}>
+                          {getDeviceStatusLabel(device.estado)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {device.sucursal_detail ? device.sucursal_detail.nombre : `ID: ${device.sucursal}`}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => router.push(`/dashboard/devices/${device.id}`)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleEditClick(device)}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => {
+                              setDeviceToDelete(device)
+                              setDeleteDialogOpen(true)
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
         </CardContent>
       </Card>
+
+      {/* Modal de crear/editar */}
+      <DeviceModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        device={deviceToEdit}
+        onSuccess={handleDeviceCreated}
+      />
+
+      {/* Dialog de confirmación de eliminación */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar dispositivo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de que deseas eliminar el dispositivo <strong>{deviceToDelete?.marca} {deviceToDelete?.modelo}</strong>?
+              Esta acción no se puede deshacer.
+              {deviceToDelete && (
+                <span className="block mt-2 text-sm">
+                  Si el dispositivo tiene asignaciones activas, no podrá ser eliminado.
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -4376,6 +4376,468 @@ useEffect(() => {
 
 ---
 
-**Última actualización:** Noviembre 6, 2025 - Fase 9 Completada
+## MÓDULO DE DISPOSITIVOS (Fase 10)
+
+### Arquitectura del Módulo
+
+El módulo de dispositivos sigue el mismo patrón arquitectónico que los módulos de Sucursales y Empleados, implementando un CRUD completo con funcionalidades adicionales específicas como cambio manual de estado y gestión de asignaciones.
+
+### Frontend - Estructura de Archivos
+
+```
+frontend/
+├── lib/
+│   ├── types.ts                              # Tipos TypeScript actualizados
+│   │   ├── Device interface                  # Interfaz principal del dispositivo
+│   │   ├── DeviceHistory interface           # Historial de asignaciones
+│   │   ├── TipoEquipo enum                   # LAPTOP | TELEFONO | TABLET | SIM | ACCESORIO
+│   │   ├── EstadoDispositivo enum            # DISPONIBLE | ASIGNADO | MANTENIMIENTO | BAJA | ROBO
+│   │   └── Assignment interface (actualizada) # Con campos del backend
+│   │
+│   └── services/
+│       └── device-service.ts                 # Servicio de API de dispositivos
+│           ├── getDevices()                  # Lista con filtros múltiples
+│           ├── getDevice()                   # Detalle de dispositivo
+│           ├── getDeviceHistory()            # Historial de asignaciones
+│           ├── createDevice()                # Crear dispositivo
+│           ├── updateDevice()                # Actualizar parcialmente
+│           ├── deleteDevice()                # Eliminar dispositivo
+│           ├── changeDeviceStatus()          # Cambio manual de estado
+│           ├── getAvailableDevices()         # Solo dispositivos DISPONIBLE
+│           └── Helper Functions:
+│               ├── getDeviceStatusColor()    # Colores de badges por estado
+│               ├── getDeviceStatusLabel()    # Etiquetas traducidas
+│               ├── getDeviceTypeLabel()      # Nombres de tipos de equipo
+│               └── getDeviceTypeIcon()       # Emojis por tipo de equipo
+│
+├── app/dashboard/devices/
+│   ├── page.tsx                              # Listado principal de dispositivos
+│   │   ├── Tabla con 7 columnas             # Tipo, Marca, Modelo, Serie/IMEI, Estado, Sucursal, Acciones
+│   │   ├── Búsqueda en tiempo real          # Debounce 300ms
+│   │   ├── Filtros combinados:
+│   │   │   ├── Tipo de equipo               # Select con 5 tipos
+│   │   │   ├── Estado                       # Select con 5 estados
+│   │   │   └── Sucursal                     # Select dinámico desde API
+│   │   ├── Badges de colores                # Verde, Azul, Amarillo, Gris, Rojo
+│   │   ├── Skeleton loaders                 # Durante carga
+│   │   └── CRUD Actions:
+│   │       ├── Ver detalle (Eye icon)
+│   │       ├── Editar (Edit2 icon)
+│   │       └── Eliminar (Trash2 icon)
+│   │
+│   └── [id]/
+│       └── page.tsx                          # Detalle del dispositivo
+│           ├── Header con navegación        # Breadcrumb y botones de acción
+│           ├── Información General          # Card con todos los datos del dispositivo
+│           ├── Estadísticas (3 cards):
+│           │   ├── Total Asignaciones       # Con || 0 para evitar NaN
+│           │   ├── Asignaciones Activas     # Verde, con || 0
+│           │   └── Asignaciones Finalizadas # Gris, cálculo seguro
+│           ├── Historial de Asignaciones    # Tabla con empleado, fechas, tipo, estado
+│           └── Acciones:
+│               ├── Cambiar Estado           # Dialog modal
+│               ├── Editar                   # Abre DeviceModal
+│               └── Asignar                  # Solo si estado = DISPONIBLE
+│
+└── components/modals/
+    └── device-modal.tsx                      # Modal crear/editar dispositivo
+        ├── Modo detección automática        # isEditMode = !!device
+        ├── Formulario completo:
+        │   ├── Tipo de equipo (Select)      # 5 opciones
+        │   ├── Marca y Modelo               # Text inputs
+        │   ├── Serie/IMEI                   # No editable en modo edición
+        │   ├── Número de teléfono           # Requerido solo para TELEFONO/SIM
+        │   ├── Número de factura            # Opcional
+        │   ├── Estado (Select)              # 5 estados
+        │   ├── Sucursal (Select)            # Dinámico desde API
+        │   └── Fecha de ingreso             # Date picker
+        ├── Validaciones frontend:
+        │   ├── Campos requeridos dinámicos
+        │   ├── Número teléfono condicional
+        │   └── Serie/IMEI única (backend)
+        └── Pre-llenado en modo edición
+```
+
+### Tipos TypeScript - device-service.ts
+
+#### **Interfaces principales:**
+
+```typescript
+export interface DeviceFilters {
+  search?: string               // Busca en marca, modelo, serie_imei
+  tipo_equipo?: TipoEquipo | ""
+  estado?: EstadoDispositivo | ""
+  sucursal?: number
+  page?: number
+  page_size?: number
+  ordering?: string
+}
+
+export interface CreateDeviceData {
+  tipo_equipo: TipoEquipo
+  marca: string
+  modelo: string
+  serie_imei: string
+  numero_telefono?: string
+  numero_factura?: string
+  estado: EstadoDispositivo
+  sucursal: number
+  fecha_ingreso: string
+}
+
+export interface DevicePaginatedResponse {
+  count: number
+  next: string | null
+  previous: string | null
+  results: Device[]
+}
+```
+
+#### **Helper Functions:**
+
+```typescript
+// Retorna clases de Tailwind para badges de estado
+getDeviceStatusColor(estado: EstadoDispositivo): string
+// Ejemplo: "bg-green-100 text-green-800 border-green-200"
+
+// Retorna etiqueta en español
+getDeviceStatusLabel(estado: EstadoDispositivo): string
+// Ejemplo: "Disponible"
+
+// Retorna nombre del tipo de equipo
+getDeviceTypeLabel(tipo: TipoEquipo): string
+// Ejemplo: "Laptop"
+
+// Retorna emoji representativo
+getDeviceTypeIcon(tipo: TipoEquipo): string
+// Ejemplo: "💻"
+```
+
+### Página de Listado - devices/page.tsx
+
+#### **Estado del componente:**
+
+```typescript
+const [devices, setDevices] = useState<Device[]>([])
+const [branches, setBranches] = useState<Branch[]>([])
+const [loading, setLoading] = useState(true)
+const [searchQuery, setSearchQuery] = useState("")
+const [selectedType, setSelectedType] = useState<string>("")
+const [selectedStatus, setSelectedStatus] = useState<string>("")
+const [selectedBranch, setSelectedBranch] = useState<string>("")
+const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+const [deviceToDelete, setDeviceToDelete] = useState<Device | null>(null)
+const [refreshTrigger, setRefreshTrigger] = useState(0)
+const [modalOpen, setModalOpen] = useState(false)
+const [deviceToEdit, setDeviceToEdit] = useState<Device | null>(null)
+```
+
+#### **Carga de datos con filtros:**
+
+```typescript
+const loadDevices = useCallback(async () => {
+  try {
+    setLoading(true)
+    const response = await deviceService.getDevices({
+      search: searchQuery || undefined,
+      tipo_equipo: selectedType ? (selectedType as TipoEquipo) : undefined,
+      estado: selectedStatus ? (selectedStatus as EstadoDispositivo) : undefined,
+      sucursal: selectedBranch ? Number(selectedBranch) : undefined,
+      page_size: 100,
+    })
+    setDevices(response.results)
+  } catch (error) {
+    toast({ title: "Error", description: error.message, variant: "destructive" })
+  } finally {
+    setLoading(false)
+  }
+}, [searchQuery, selectedType, selectedStatus, selectedBranch, toast])
+```
+
+#### **Búsqueda con debounce:**
+
+```typescript
+useEffect(() => {
+  const timer = setTimeout(() => {
+    loadDevices()
+  }, 300) // Debounce de 300ms
+  return () => clearTimeout(timer)
+}, [loadDevices, refreshTrigger])
+```
+
+#### **Badges de colores por estado:**
+
+Los badges utilizan clases de Tailwind dinámicas basadas en el estado:
+- **DISPONIBLE:** `bg-green-100 text-green-800` (Verde)
+- **ASIGNADO:** `bg-blue-100 text-blue-800` (Azul)
+- **MANTENIMIENTO:** `bg-yellow-100 text-yellow-800` (Amarillo)
+- **BAJA:** `bg-gray-100 text-gray-800` (Gris)
+- **ROBO:** `bg-red-100 text-red-800` (Rojo)
+
+### Modal de Dispositivo - device-modal.tsx
+
+#### **Props del modal:**
+
+```typescript
+interface DeviceModalProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  device?: Device | null          // null = crear, Device = editar
+  onSuccess?: () => void
+}
+```
+
+#### **Validación dinámica del número de teléfono:**
+
+```typescript
+const isTelefonoRequired = formData.tipo_equipo === "TELEFONO" || formData.tipo_equipo === "SIM"
+
+// En el form:
+<Input
+  id="numero_telefono"
+  name="numero_telefono"
+  value={formData.numero_telefono}
+  onChange={handleInputChange}
+  placeholder="+56 9 1234 5678"
+  required={isTelefonoRequired}  // ← Requerido condicionalmente
+/>
+```
+
+#### **Protección del campo Serie/IMEI:**
+
+```typescript
+<Input
+  id="serie_imei"
+  name="serie_imei"
+  value={formData.serie_imei}
+  onChange={handleInputChange}
+  required
+  disabled={isEditMode}  // ← No editable en modo edición
+  className={isEditMode ? "bg-muted cursor-not-allowed" : ""}
+/>
+```
+
+#### **Manejo de creación vs edición:**
+
+```typescript
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault()
+
+  if (isEditMode && device) {
+    // Excluir serie_imei en actualización
+    const { serie_imei, ...updateData } = formData
+    await deviceService.updateDevice(device.id, updateData)
+  } else {
+    // Incluir todos los campos en creación
+    await deviceService.createDevice(formData)
+  }
+}
+```
+
+### Página de Detalle - devices/[id]/page.tsx
+
+#### **Estado del componente:**
+
+```typescript
+const [device, setDevice] = useState<Device | null>(null)
+const [history, setHistory] = useState<DeviceHistory | null>(null)
+const [loading, setLoading] = useState(true)
+const [editModalOpen, setEditModalOpen] = useState(false)
+const [changeStatusDialogOpen, setChangeStatusDialogOpen] = useState(false)
+const [newStatus, setNewStatus] = useState<EstadoDispositivo>("DISPONIBLE")
+const [changingStatus, setChangingStatus] = useState(false)
+```
+
+#### **Carga paralela de datos:**
+
+```typescript
+useEffect(() => {
+  const loadDeviceData = async () => {
+    try {
+      setLoading(true)
+      // Carga paralela para optimizar performance
+      const [deviceData, historyData] = await Promise.all([
+        deviceService.getDevice(deviceId),
+        deviceService.getDeviceHistory(deviceId),
+      ])
+      setDevice(deviceData)
+      setHistory(historyData)
+      setNewStatus(deviceData.estado)
+    } catch (error) {
+      toast({ title: "Error", description: error.message })
+      router.push("/dashboard/devices")
+    } finally {
+      setLoading(false)
+    }
+  }
+  loadDeviceData()
+}, [deviceId, router, toast, refreshTrigger])
+```
+
+#### **Estadísticas con protección contra NaN:**
+
+```typescript
+<div className="text-3xl font-bold">{history.total_assignments || 0}</div>
+<div className="text-3xl font-bold text-green-600">{history.active_assignments || 0}</div>
+<div className="text-3xl font-bold text-muted-foreground">
+  {(history.total_assignments || 0) - (history.active_assignments || 0)}
+</div>
+```
+
+**Explicación:** El operador `|| 0` asegura que si el valor es `undefined`, `null`, o `0`, siempre se muestre "0" en lugar de vacío o "NaN".
+
+#### **Cambio manual de estado:**
+
+```typescript
+const handleStatusChange = async () => {
+  if (!device) return
+  try {
+    setChangingStatus(true)
+    await deviceService.changeDeviceStatus(device.id, newStatus)
+    toast({
+      title: "Estado actualizado",
+      description: `El estado del dispositivo ha sido cambiado a ${getDeviceStatusLabel(newStatus)}.`,
+    })
+    setRefreshTrigger(prev => prev + 1)
+    setChangeStatusDialogOpen(false)
+  } catch (error) {
+    toast({ title: "Error", description: error.message, variant: "destructive" })
+  } finally {
+    setChangingStatus(false)
+  }
+}
+```
+
+#### **Botón "Asignar" condicional:**
+
+```typescript
+{device.estado === "DISPONIBLE" && (
+  <Button>
+    <Package className="h-4 w-4 mr-2" />
+    Asignar
+  </Button>
+)}
+```
+
+Solo se muestra si el dispositivo está disponible para asignación.
+
+#### **Dialog de cambio de estado:**
+
+El dialog excluye el estado "ASIGNADO" de las opciones manuales:
+
+```typescript
+<Select value={newStatus} onValueChange={(value) => setNewStatus(value as EstadoDispositivo)}>
+  <SelectContent>
+    <SelectItem value="DISPONIBLE">Disponible</SelectItem>
+    <SelectItem value="MANTENIMIENTO">Mantenimiento</SelectItem>
+    <SelectItem value="BAJA">Baja</SelectItem>
+    <SelectItem value="ROBO">Robo</SelectItem>
+    {/* ASIGNADO excluido - solo mediante asignación formal */}
+  </SelectContent>
+</Select>
+<p className="text-sm text-muted-foreground mt-2">
+  Nota: El estado "Asignado" solo se puede establecer mediante una asignación formal a un empleado.
+</p>
+```
+
+### Backend - API de Dispositivos
+
+#### **Endpoints disponibles:**
+
+1. **Lista y Creación**
+   - `GET /api/devices/` - Lista paginada con filtros
+   - `POST /api/devices/` - Crear dispositivo
+
+2. **Detalle, Actualización y Eliminación**
+   - `GET /api/devices/{id}/` - Obtener dispositivo
+   - `PATCH /api/devices/{id}/` - Actualización parcial
+   - `PUT /api/devices/{id}/` - Actualización completa
+   - `DELETE /api/devices/{id}/` - Eliminar dispositivo
+
+3. **Historial**
+   - `GET /api/devices/{id}/history/` - Historial de asignaciones
+
+**Parámetros de filtrado:**
+- `search`: Busca en marca, modelo y serie_imei
+- `tipo_equipo`: LAPTOP, TELEFONO, TABLET, SIM, ACCESORIO
+- `estado`: DISPONIBLE, ASIGNADO, MANTENIMIENTO, BAJA, ROBO
+- `sucursal`: Filtra por ID de sucursal
+- `page`: Número de página
+- `page_size`: Tamaño de página (default: 20)
+
+### Patrones de Diseño Implementados
+
+#### **1. Service Layer Pattern**
+Toda la lógica de API encapsulada en `device-service.ts`, separando la lógica de negocio de los componentes UI.
+
+#### **2. Helper Functions Pattern**
+Funciones auxiliares (`getDeviceStatusColor`, `getDeviceTypeLabel`, etc.) exportadas desde el servicio para reutilización consistente en toda la aplicación.
+
+#### **3. Modal Composition Pattern**
+Modal reutilizable que acepta prop `device` opcional:
+- Sin prop → Modo creación
+- Con prop → Modo edición
+
+#### **4. Conditional Validation Pattern**
+Validación dinámica del campo `numero_telefono` basada en `tipo_equipo`:
+```typescript
+const isTelefonoRequired = tipo_equipo === "TELEFONO" || tipo_equipo === "SIM"
+```
+
+#### **5. Optimistic UI Pattern**
+Cierra modal y actualiza lista antes de mostrar toast de confirmación.
+
+#### **6. Debounce Pattern**
+Búsqueda con delay de 300ms para reducir peticiones al backend.
+
+#### **7. Parallel Data Loading Pattern**
+Uso de `Promise.all()` para cargar dispositivo e historial simultáneamente:
+```typescript
+const [deviceData, historyData] = await Promise.all([
+  deviceService.getDevice(deviceId),
+  deviceService.getDeviceHistory(deviceId),
+])
+```
+
+#### **8. Safe Arithmetic Pattern**
+Uso de `|| 0` para evitar NaN en operaciones aritméticas con valores potencialmente undefined:
+```typescript
+{(history.total_assignments || 0) - (history.active_assignments || 0)}
+```
+
+### Consideraciones de Seguridad
+
+1. **Autenticación JWT:** Todos los endpoints requieren token válido
+2. **Validación de Serie/IMEI:** Serie/IMEI no editable después de creación
+3. **Eliminación protegida:** Backend valida que no existan asignaciones activas
+4. **Estado ASIGNADO:** Solo se puede establecer mediante asignación formal, no manualmente
+5. **Auditoría automática:** Todos los cambios de estado se registran en AuditLog
+6. **CORS:** Configurado para permitir solo orígenes específicos
+7. **Sanitización:** DRF serializers validan todos los inputs
+
+### Mejoras Futuras Planificadas
+
+1. **Paginación completa:** Implementar controles de paginación en UI
+2. **Export a CSV/Excel:** Botón para exportar lista de dispositivos
+3. **Filtros avanzados:** Rango de fechas de ingreso, múltiples estados
+4. **Bulk operations:** Selección múltiple para cambio de estado en lote
+5. **QR Code generation:** Generar QR codes para serie/IMEI
+6. **Historial de mantenimiento:** Registro detallado de reparaciones
+7. **Alertas de garantía:** Notificaciones cuando se acerca vencimiento
+8. **Upload de facturas:** Adjuntar PDF de factura de compra
+
+### Lecciones Aprendidas - Fase 10
+
+1. **Operador || 0 para valores numéricos:** Esencial para evitar NaN en estadísticas cuando no hay datos
+2. **Validación condicional de campos:** React permite validación dinámica del atributo `required`
+3. **Exclusión de campos en edición:** Usar destructuring para excluir `serie_imei` en updates
+4. **Helper functions en servicios:** Mantener funciones UI cerca de la lógica de datos mejora cohesión
+5. **Badges con clases dinámicas:** Mejor usar helper functions que lógica inline en JSX
+6. **Promise.all para performance:** Cargar datos relacionados en paralelo reduce tiempo de espera
+7. **Consistencia en tipos:** snake_case en backend, snake_case en frontend (no camelCase) para evitar transformaciones
+
+---
+
+**Última actualización:** Noviembre 6, 2025 - Fase 10 Completada
 **Documentado por:** Claude (Asistente IA)
-**Próxima actualización:** Al completar Fase 10 (Módulo de Dispositivos Frontend)
+**Próxima actualización:** Al completar Fase 11 (Módulo de Asignaciones)

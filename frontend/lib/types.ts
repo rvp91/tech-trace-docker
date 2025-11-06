@@ -53,39 +53,61 @@ export interface EmployeeHistory {
   assignments: Assignment[]
 }
 
+export type TipoEquipo = "LAPTOP" | "TELEFONO" | "TABLET" | "SIM" | "ACCESORIO"
+export type EstadoDispositivo = "DISPONIBLE" | "ASIGNADO" | "MANTENIMIENTO" | "BAJA" | "ROBO"
+
 export interface Device {
-  id: string
-  tipoEquipo: "laptop" | "telefono" | "tablet" | "sim_card" | "accesorio"
+  id: number
+  tipo_equipo: TipoEquipo
   marca: string
   modelo: string
-  serieImei: string
-  numeroTelefono?: string
-  procedencia: "compra" | "arriendo" | "leasing" | "otro"
-  sucursalId: string
-  sucursal?: Branch
-  fechaIngreso: string
-  estado: "disponible" | "asignado" | "mantenimiento" | "baja"
-  observaciones?: string
-  createdAt: string
-  updatedAt: string
+  serie_imei: string
+  numero_telefono?: string
+  numero_factura?: string
+  estado: EstadoDispositivo
+  sucursal: number
+  sucursal_detail?: Branch
+  fecha_ingreso: string
+  created_at: string
+  updated_at: string
+  created_by?: number
+  created_by_username?: string
 }
+
+export interface DeviceHistory {
+  device: {
+    id: number
+    tipo_equipo: TipoEquipo
+    marca: string
+    modelo: string
+    serie_imei: string
+  }
+  total_assignments: number
+  active_assignments: number
+  assignments: Assignment[]
+}
+
+export type TipoEntrega = "PERMANENTE" | "TEMPORAL"
+export type EstadoCarta = "FIRMADA" | "PENDIENTE" | "NO_APLICA"
+export type EstadoAsignacion = "ACTIVA" | "FINALIZADA"
 
 export interface Assignment {
   id: number
+  solicitud?: number
   empleado: number
   dispositivo: number
   empleado_detail?: Employee
   dispositivo_detail?: Device
-  fechaEntrega: string
-  fechaDevolucion?: string
-  tipoEntrega: "permanente" | "temporal"
-  estadoCarta: "firmada" | "pendiente" | "no_aplica"
-  estadoDevolucion?: "optimo" | "con_danos" | "no_funcional"
+  tipo_entrega: TipoEntrega
+  fecha_entrega: string
+  fecha_devolucion?: string
+  estado_carta: EstadoCarta
+  estado_asignacion: EstadoAsignacion
   observaciones?: string
-  observacionesDevolucion?: string
-  estado: "activa" | "finalizada"
-  createdAt: string
-  updatedAt: string
+  created_at: string
+  updated_at: string
+  created_by?: number
+  created_by_username?: string
 }
 
 export interface Branch {
