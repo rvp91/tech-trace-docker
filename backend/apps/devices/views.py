@@ -131,6 +131,17 @@ class StatsViewSet(viewsets.ViewSet):
             'sucursal__codigo'
         ).annotate(total=Count('id')).order_by('-total')
 
+        # 9. Últimas 5 devoluciones
+        from apps.assignments.models import Return
+        from apps.assignments.serializers import ReturnSerializer
+        recent_returns = Return.objects.select_related(
+            'asignacion__empleado',
+            'asignacion__dispositivo',
+            'created_by'
+        ).order_by('-created_at')[:5]
+
+        recent_returns_serializer = ReturnSerializer(recent_returns, many=True)
+
         return Response({
             'summary': {
                 'total_devices': total_devices,
@@ -142,4 +153,5 @@ class StatsViewSet(viewsets.ViewSet):
             'devices_by_type': devices_by_type_dict,
             'devices_by_branch': list(devices_by_branch),
             'recent_assignments': recent_assignments_serializer.data,
+            'recent_returns': recent_returns_serializer.data,
         })

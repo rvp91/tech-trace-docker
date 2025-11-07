@@ -1,23 +1,30 @@
 // Statistics and dashboard service
 
 import { apiClient } from "../api-client"
+import { Assignment, Return } from "../types"
+
+export interface DevicesByBranch {
+  sucursal__nombre: string | null
+  sucursal__codigo: string | null
+  total: number
+}
 
 export interface DashboardStats {
-  total_dispositivos: number
-  disponibles: number
-  asignados: number
-  en_mantenimiento: number
-  total_empleados: number
-  total_sucursales: number
-  dispositivos_por_tipo: {
-    tipo: string
-    cantidad: number
-  }[]
-  dispositivos_por_estado: {
-    estado: string
-    cantidad: number
-  }[]
-  ultimas_asignaciones: any[]
+  summary: {
+    total_devices: number
+    available_devices: number
+    active_employees: number
+    active_assignments: number
+  }
+  devices_by_status: {
+    [key: string]: number
+  }
+  devices_by_type: {
+    [key: string]: number
+  }
+  devices_by_branch: DevicesByBranch[]
+  recent_assignments: Assignment[]
+  recent_returns: Return[]
 }
 
 export const statsService = {
