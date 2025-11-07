@@ -1,7 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Plus, Search } from "lucide-react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -28,6 +30,7 @@ import { RequestModal } from "@/components/modals/request-modal"
 import { AssignmentModal } from "@/components/modals/assignment-modal"
 
 export default function RequestsPage() {
+  const router = useRouter()
   const [requests, setRequests] = useState<Request[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
@@ -65,7 +68,11 @@ export default function RequestsPage() {
   }
 
   useEffect(() => {
-    loadRequests()
+    const timer = setTimeout(() => {
+      loadRequests()
+    }, 300) // Debounce de 300ms para la búsqueda
+
+    return () => clearTimeout(timer)
   }, [searchTerm, estadoFilter])
 
   const handleCreateRequest = () => {
@@ -153,10 +160,17 @@ export default function RequestsPage() {
             Gestiona las solicitudes de dispositivos de los empleados
           </p>
         </div>
-        <Button onClick={handleCreateRequest}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nueva Solicitud
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/dashboard/assignments">
+              Volver
+            </Link>
+          </Button>
+          <Button onClick={handleCreateRequest}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nueva Solicitud
+          </Button>
+        </div>
       </div>
 
       {/* Filtros */}

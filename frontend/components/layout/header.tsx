@@ -1,8 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Menu, Search, Bell, User } from "lucide-react"
-import { Input } from "@/components/ui/input"
+import { Menu, Bell, User } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,6 +13,7 @@ import {
 import { useAuthStore } from "@/lib/store/auth-store"
 import { authService } from "@/lib/services/auth-service"
 import { useRouter } from "next/navigation"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 interface HeaderProps {
   onSidebarToggle: () => void
@@ -36,22 +36,13 @@ export function Header({ onSidebarToggle }: HeaderProps) {
   }
 
   return (
-    <header className="border-b border-border bg-card">
-      <div className="flex items-center justify-between h-16 px-6">
+    <header className="border-b border-border bg-card h-16">
+      <div className="flex items-center justify-between h-full px-6">
         {/* Left Section */}
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={onSidebarToggle} className="lg:hidden">
             <Menu className="h-5 w-5" />
           </Button>
-
-          <div className="hidden sm:flex items-center gap-2 bg-input rounded-lg px-3 py-2 w-64">
-            <Search className="h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Buscar..."
-              className="border-0 bg-transparent outline-none placeholder:text-muted-foreground"
-            />
-          </div>
         </div>
 
         {/* Right Section */}
@@ -59,6 +50,8 @@ export function Header({ onSidebarToggle }: HeaderProps) {
           <Button variant="ghost" size="icon">
             <Bell className="h-5 w-5" />
           </Button>
+
+          <ThemeToggle />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

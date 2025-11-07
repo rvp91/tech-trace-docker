@@ -1,11 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Plus, Search, Eye } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Select,
   SelectContent,
@@ -23,6 +24,7 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
+import { TablePagination } from "@/components/ui/table-pagination"
 import { useToast } from "@/hooks/use-toast"
 import {
   assignmentService,
@@ -42,10 +44,18 @@ export default function AssignmentsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const { toast } = useToast()
 
-  const loadAssignments = async () => {
+  // Estados de paginación
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+  const [totalCount, setTotalCount] = useState(0)
+
+  const loadAssignments = useCallback(async () => {
     try {
       setLoading(true)
-      const params: any = {}
+      const params: any = {
+        page: currentPage,
+        page_size: pageSize,
+      }
 
       if (searchTerm) {
         params.search = searchTerm
@@ -57,6 +67,7 @@ export default function AssignmentsPage() {
 
       const response = await assignmentService.getAssignments(params)
       setAssignments(response.data)
+      setTotalCount(response.total)
     } catch (error) {
       toast({
         title: "Error",
@@ -66,11 +77,20 @@ export default function AssignmentsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [searchTerm, estadoFilter, currentPage, pageSize, toast])
+
+  // Resetear a página 1 cuando cambien los filtros
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, estadoFilter])
 
   useEffect(() => {
-    loadAssignments()
-  }, [searchTerm, estadoFilter])
+    const timer = setTimeout(() => {
+      loadAssignments()
+    }, 300) // Debounce de 300ms
+
+    return () => clearTimeout(timer)
+  }, [loadAssignments])
 
   const handleCreateAssignment = () => {
     setIsModalOpen(true)
@@ -84,6 +104,18 @@ export default function AssignmentsPage() {
   const handleViewDetails = (id: number) => {
     router.push(`/dashboard/assignments/${id}`)
   }
+
+  // Handlers de paginación
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
+
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize)
+    setCurrentPage(1)
+  }
+
+  const totalPages = Math.ceil(totalCount / pageSize)
 
   return (
     <div className="space-y-6">
@@ -138,76 +170,95 @@ export default function AssignmentsPage() {
       </div>
 
       {/* Tabla */}
-      <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>ID</TableHead>
-              <TableHead>Empleado</TableHead>
-              <TableHead>Dispositivo</TableHead>
-              <TableHead>Tipo Entrega</TableHead>
-              <TableHead>Fecha Entrega</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              // Skeleton loaders
-              Array.from({ length: 5 }).map((_, index) => (
-                <TableRow key={index}>
-                  <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell><Skeleton className="h-6 w-20" /></TableCell>
-                  <TableCell><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+      <Card>
+        <CardHeader>
+          <CardTitle>Asignaciones ({totalCount})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ID</TableHead>
+                  <TableHead>Empleado</TableHead>
+                  <TableHead>Dispositivo</TableHead>
+                  <TableHead>Tipo Entrega</TableHead>
+                  <TableHead>Fecha Entrega</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
-              ))
-            ) : assignments.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                  No se encontraron asignaciones
-                </TableCell>
-              </TableRow>
-            ) : (
-              assignments.map((assignment) => (
-                <TableRow key={assignment.id}>
-                  <TableCell className="font-medium">#{assignment.id}</TableCell>
-                  <TableCell>
-                    {assignment.empleado_detail?.nombre_completo || `ID: ${assignment.empleado}`}
-                  </TableCell>
-                  <TableCell>
-                    {assignment.dispositivo_detail
-                      ? `${assignment.dispositivo_detail.marca} ${assignment.dispositivo_detail.modelo} (${assignment.dispositivo_detail.serie_imei})`
-                      : `ID: ${assignment.dispositivo}`}
-                  </TableCell>
-                  <TableCell>{getTipoEntregaLabel(assignment.tipo_entrega)}</TableCell>
-                  <TableCell>
-                    {new Date(assignment.fecha_entrega).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getAssignmentStatusColor(assignment.estado_asignacion)}>
-                      {getAssignmentStatusLabel(assignment.estado_asignacion)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleViewDetails(assignment.id)}
-                    >
-                      <Eye className="mr-2 h-4 w-4" />
-                      Ver Detalles
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  // Skeleton loaders
+                  Array.from({ length: 5 }).map((_, index) => (
+                    <TableRow key={index}>
+                      <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : assignments.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      No se encontraron asignaciones
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  assignments.map((assignment) => (
+                    <TableRow key={assignment.id}>
+                      <TableCell className="font-medium">#{assignment.id}</TableCell>
+                      <TableCell>
+                        {assignment.empleado_detail?.nombre_completo || `ID: ${assignment.empleado}`}
+                      </TableCell>
+                      <TableCell>
+                        {assignment.dispositivo_detail
+                          ? `${assignment.dispositivo_detail.marca} ${assignment.dispositivo_detail.modelo} (${assignment.dispositivo_detail.serie_imei})`
+                          : `ID: ${assignment.dispositivo}`}
+                      </TableCell>
+                      <TableCell>{getTipoEntregaLabel(assignment.tipo_entrega)}</TableCell>
+                      <TableCell>
+                        {new Date(assignment.fecha_entrega).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getAssignmentStatusColor(assignment.estado_asignacion)}>
+                          {getAssignmentStatusLabel(assignment.estado_asignacion)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleViewDetails(assignment.id)}
+                        >
+                          <Eye className="mr-2 h-4 w-4" />
+                          Ver Detalles
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Paginación */}
+          {!loading && totalCount > 0 && (
+            <TablePagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              totalCount={totalCount}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+            />
+          )}
+        </CardContent>
+      </Card>
 
       <AssignmentModal
         open={isModalOpen}

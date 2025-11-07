@@ -3,12 +3,12 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Edit2, Trash2, Building2, MapPin, Laptop, Smartphone, Tablet, Users } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Edit2, Trash2, Building2, MapPin, Laptop, Smartphone, Tablet, Users, Search, Plus } from "lucide-react"
 import { CardSimIcon } from "@/components/ui/icons/lucide-card-sim"
 import { branchService } from "@/lib/services/branch-service"
 import { BranchModal } from "@/components/modals/branch-modal"
 import type { Branch } from "@/lib/types"
-import { Badge } from "@/components/ui/badge"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,7 +23,9 @@ import { useToast } from "@/hooks/use-toast"
 
 export default function BranchesPage() {
   const [branches, setBranches] = useState<Branch[]>([])
+  const [filteredBranches, setFilteredBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState("")
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null)
   const [deletingBranch, setDeletingBranch] = useState<Branch | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
@@ -33,7 +35,8 @@ export default function BranchesPage() {
     try {
       setLoading(true)
       const data = await branchService.getBranches()
-      setBranches(data)
+      setBranches(data.results)
+      setFilteredBranches(data.results)
     } catch (error) {
       console.error("Error loading branches:", error)
       toast({
@@ -49,6 +52,20 @@ export default function BranchesPage() {
   useEffect(() => {
     loadBranches()
   }, [])
+
+  useEffect(() => {
+    // Filtrar sucursales basado en la búsqueda
+    if (searchQuery.trim() === "") {
+      setFilteredBranches(branches)
+    } else {
+      const filtered = branches.filter(branch =>
+        branch.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        branch.ciudad.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        branch.codigo.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+      setFilteredBranches(filtered)
+    }
+  }, [searchQuery, branches])
 
   const handleEdit = (branch: Branch) => {
     setEditingBranch(branch)
@@ -124,15 +141,29 @@ export default function BranchesPage() {
           <h1 className="text-3xl font-bold">Gestión de Sucursales</h1>
           <p className="text-muted-foreground mt-1">Administra las sucursales de tu empresa</p>
         </div>
-        <BranchModal
-          open={modalOpen}
-          onOpenChange={setModalOpen}
-          branch={editingBranch}
-          onSuccess={handleSuccess}
-        />
+        <Button onClick={() => setModalOpen(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Nueva Sucursal
+        </Button>
       </div>
 
-      {branches.length === 0 ? (
+      {/* Filtros */}
+      <div className="flex gap-4 items-end">
+        <div className="flex-1">
+          <label className="text-sm font-medium mb-2 block">Buscar</label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nombre, ciudad o código..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </div>
+      </div>
+
+      {filteredBranches.length === 0 && branches.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
             <Building2 className="h-16 w-16 text-muted-foreground mb-4" />
@@ -144,9 +175,17 @@ export default function BranchesPage() {
             </Button>
           </CardContent>
         </Card>
+      ) : filteredBranches.length === 0 && branches.length > 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-16">
+            <Search className="h-16 w-16 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No se encontraron sucursales</h3>
+            <p className="text-muted-foreground mb-4">Intenta con otros términos de búsqueda</p>
+          </CardContent>
+        </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {branches.map((branch) => (
+          {filteredBranches.map((branch) => (
             <Card key={branch.id} className="hover:shadow-lg transition-shadow">
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
@@ -239,6 +278,13 @@ export default function BranchesPage() {
           ))}
         </div>
       )}
+
+      <BranchModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        branch={editingBranch}
+        onSuccess={handleSuccess}
+      />
 
       <AlertDialog open={!!deletingBranch} onOpenChange={() => setDeletingBranch(null)}>
         <AlertDialogContent>

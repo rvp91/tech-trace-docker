@@ -1,8 +1,78 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import { toast } from '@/components/ui/use-toast'
+import { ApiError } from './api-client'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
+}
+
+/**
+ * Maneja errores de API y muestra toast con el mensaje apropiado
+ * @param error - Error capturado del try-catch
+ * @param defaultMessage - Mensaje por defecto si no se puede extraer uno del error
+ */
+export function handleApiError(error: unknown, defaultMessage: string = 'Ocurrió un error'): void {
+  console.error('API Error:', error)
+
+  // Si es un error con estructura ApiError
+  if (error instanceof Error && 'apiError' in error) {
+    const apiError = (error as any).apiError as ApiError
+
+    // Mostrar toast con el mensaje del error
+    toast({
+      variant: 'destructive',
+      title: 'Error',
+      description: apiError.message,
+    })
+
+    // Si hay detalles de validación, mostrarlos en consola (para depuración)
+    if (apiError.details) {
+      console.log('Detalles de validación:', apiError.details)
+    }
+
+    return
+  }
+
+  // Para otros tipos de errores
+  if (error instanceof Error) {
+    toast({
+      variant: 'destructive',
+      title: 'Error',
+      description: error.message || defaultMessage,
+    })
+    return
+  }
+
+  // Fallback para errores desconocidos
+  toast({
+    variant: 'destructive',
+    title: 'Error',
+    description: defaultMessage,
+  })
+}
+
+/**
+ * Muestra un toast de éxito
+ * @param message - Mensaje a mostrar
+ */
+export function showSuccessToast(message: string): void {
+  toast({
+    title: 'Éxito',
+    description: message,
+  })
+}
+
+/**
+ * Muestra un toast de advertencia
+ * @param message - Mensaje a mostrar
+ */
+export function showWarningToast(message: string): void {
+  toast({
+    title: 'Advertencia',
+    description: message,
+    variant: 'default',
+  })
 }
 
 /**

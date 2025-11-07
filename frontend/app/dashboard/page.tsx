@@ -1,10 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Package, Users, CheckCircle, Activity, Loader2 } from "lucide-react"
-import { statsService, DashboardStats } from "@/lib/services/stats-service"
-import { useToast } from "@/hooks/use-toast"
+import { useDashboardStats } from "@/lib/hooks/use-swr-data"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
@@ -44,42 +42,21 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<DashboardStats | null>(null)
-  const [loading, setLoading] = useState(true)
-  const { toast } = useToast()
+  // Usar SWR para caching y revalidación automática
+  const { data: stats, isLoading, error } = useDashboardStats()
 
-  const loadStats = async () => {
-    try {
-      setLoading(true)
-      const data = await statsService.getDashboardStats()
-      setStats(data)
-    } catch (error) {
-      console.error("Error loading dashboard stats:", error)
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar las estadísticas del dashboard",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    loadStats()
-
-    // Actualización automática cada 60 segundos
-    const interval = setInterval(() => {
-      loadStats()
-    }, 60000)
-
-    return () => clearInterval(interval)
-  }, [])
-
-  if (loading || !stats) {
+  if (isLoading || !stats) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-200px)]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-200px)]">
+        <p className="text-destructive">Error al cargar las estadísticas del dashboard</p>
       </div>
     )
   }

@@ -55,9 +55,11 @@ export function Sidebar({ open, onOpenChange }: SidebarProps) {
         )}
       >
         <div className="flex flex-col h-full">
-          <div className="p-6 border-b border-sidebar-border">
-            <h1 className="text-xl font-bold text-sidebar-foreground">TechTrace</h1>
-            <p className="text-xs text-sidebar-foreground/60 mt-1">Gestión de Inventario</p>
+          <div className="h-16 flex items-center justify-center px-6 border-b border-border">
+            <div>
+              <h1 className="text-xl font-bold text-sidebar-foreground">TechTrace</h1>
+              <p className="text-xs text-sidebar-foreground/60 mt-1">Gestión de Inventario</p>
+            </div>
           </div>
 
           <nav className="flex-1 overflow-auto p-4 space-y-1">

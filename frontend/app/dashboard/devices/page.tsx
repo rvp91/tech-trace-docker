@@ -24,6 +24,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
+import { TablePagination } from "@/components/ui/table-pagination"
 import { Search, Edit2, Trash2, Eye, Plus } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
@@ -50,6 +51,11 @@ export default function DevicesPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [deviceToEdit, setDeviceToEdit] = useState<Device | null>(null)
 
+  // Estados de paginación
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+  const [totalCount, setTotalCount] = useState(0)
+
   // Cargar dispositivos con filtros
   const loadDevices = useCallback(async () => {
     try {
@@ -59,9 +65,11 @@ export default function DevicesPage() {
         tipo_equipo: selectedType ? (selectedType as TipoEquipo) : undefined,
         estado: selectedStatus ? (selectedStatus as EstadoDispositivo) : undefined,
         sucursal: selectedBranch ? Number(selectedBranch) : undefined,
-        page_size: 100,
+        page: currentPage,
+        page_size: pageSize,
       })
       setDevices(response.results)
+      setTotalCount(response.count)
     } catch (error) {
       toast({
         title: "Error",
@@ -71,7 +79,7 @@ export default function DevicesPage() {
     } finally {
       setLoading(false)
     }
-  }, [searchQuery, selectedType, selectedStatus, selectedBranch, toast])
+  }, [searchQuery, selectedType, selectedStatus, selectedBranch, currentPage, pageSize, toast])
 
   // Cargar sucursales
   const loadBranches = useCallback(async () => {
@@ -87,6 +95,11 @@ export default function DevicesPage() {
     loadBranches()
   }, [loadBranches])
 
+  // Resetear a página 1 cuando cambien los filtros
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery, selectedType, selectedStatus, selectedBranch])
+
   useEffect(() => {
     const timer = setTimeout(() => {
       loadDevices()
@@ -94,6 +107,18 @@ export default function DevicesPage() {
 
     return () => clearTimeout(timer)
   }, [loadDevices, refreshTrigger])
+
+  // Handlers de paginación
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
+
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize)
+    setCurrentPage(1) // Resetear a página 1 cuando cambie el tamaño
+  }
+
+  const totalPages = Math.ceil(totalCount / pageSize)
 
   const handleDelete = async () => {
     if (!deviceToDelete) return
@@ -148,71 +173,76 @@ export default function DevicesPage() {
         </Button>
       </div>
 
+      {/* Filtros */}
+      <div className="flex gap-4 items-end">
+        <div className="flex-1">
+          <label className="text-sm font-medium mb-2 block">Buscar</label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por marca, modelo o serie/IMEI..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </div>
+
+        <div className="w-[180px]">
+          <label className="text-sm font-medium mb-2 block">Tipo</label>
+          <Select value={selectedType || "all"} onValueChange={(value) => setSelectedType(value === "all" ? "" : value)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Todos los tipos" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los tipos</SelectItem>
+              <SelectItem value="LAPTOP">Laptop</SelectItem>
+              <SelectItem value="TELEFONO">Teléfono</SelectItem>
+              <SelectItem value="TABLET">Tablet</SelectItem>
+              <SelectItem value="SIM">SIM Card</SelectItem>
+              <SelectItem value="ACCESORIO">Accesorio</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="w-[180px]">
+          <label className="text-sm font-medium mb-2 block">Estado</label>
+          <Select value={selectedStatus || "all"} onValueChange={(value) => setSelectedStatus(value === "all" ? "" : value)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Todos los estados" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="DISPONIBLE">Disponible</SelectItem>
+              <SelectItem value="ASIGNADO">Asignado</SelectItem>
+              <SelectItem value="MANTENIMIENTO">Mantenimiento</SelectItem>
+              <SelectItem value="BAJA">Baja</SelectItem>
+              <SelectItem value="ROBO">Robo</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="w-[200px]">
+          <label className="text-sm font-medium mb-2 block">Sucursal</label>
+          <Select value={selectedBranch || "all"} onValueChange={(value) => setSelectedBranch(value === "all" ? "" : value)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Todas las sucursales" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las sucursales</SelectItem>
+              {branches.map((branch) => (
+                <SelectItem key={branch.id} value={String(branch.id)}>
+                  {branch.nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       <Card>
         <CardHeader>
-          <div className="flex flex-col gap-4">
-            <CardTitle>Dispositivos ({devices.length})</CardTitle>
-
-            {/* Filtros */}
-            <div className="flex flex-col sm:flex-row gap-4">
-              {/* Búsqueda */}
-              <div className="flex items-center gap-2 bg-input rounded-lg px-3 py-2 flex-1">
-                <Search className="h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Buscar por marca, modelo o serie/IMEI..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="border-0 bg-transparent outline-none placeholder:text-muted-foreground"
-                />
-              </div>
-
-              {/* Filtro por tipo */}
-              <Select value={selectedType || "all"} onValueChange={(value) => setSelectedType(value === "all" ? "" : value)}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Todos los tipos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los tipos</SelectItem>
-                  <SelectItem value="LAPTOP">Laptop</SelectItem>
-                  <SelectItem value="TELEFONO">Teléfono</SelectItem>
-                  <SelectItem value="TABLET">Tablet</SelectItem>
-                  <SelectItem value="SIM">SIM Card</SelectItem>
-                  <SelectItem value="ACCESORIO">Accesorio</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {/* Filtro por estado */}
-              <Select value={selectedStatus || "all"} onValueChange={(value) => setSelectedStatus(value === "all" ? "" : value)}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Todos los estados" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="DISPONIBLE">Disponible</SelectItem>
-                  <SelectItem value="ASIGNADO">Asignado</SelectItem>
-                  <SelectItem value="MANTENIMIENTO">Mantenimiento</SelectItem>
-                  <SelectItem value="BAJA">Baja</SelectItem>
-                  <SelectItem value="ROBO">Robo</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {/* Filtro por sucursal */}
-              <Select value={selectedBranch || "all"} onValueChange={(value) => setSelectedBranch(value === "all" ? "" : value)}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Todas las sucursales" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas las sucursales</SelectItem>
-                  {branches.map((branch) => (
-                    <SelectItem key={branch.id} value={String(branch.id)}>
-                      {branch.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          <CardTitle>Dispositivos ({totalCount})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="border rounded-lg overflow-hidden">
@@ -300,6 +330,18 @@ export default function DevicesPage() {
               </TableBody>
             </Table>
           </div>
+
+          {/* Paginación */}
+          {!loading && totalCount > 0 && (
+            <TablePagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              totalCount={totalCount}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+            />
+          )}
         </CardContent>
       </Card>
 
