@@ -1,10 +1,15 @@
 """
-URLs para el módulo de autenticación de usuarios.
+URLs para el módulo de autenticación y gestión de usuarios.
 """
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from .views import CustomTokenObtainPairView, LogoutView, CurrentUserView
+from .views import CustomTokenObtainPairView, LogoutView, CurrentUserView, UserViewSet
+
+# Router para el ViewSet de usuarios
+router = DefaultRouter()
+router.register(r'users', UserViewSet, basename='user')
 
 urlpatterns = [
     # Autenticación JWT
@@ -14,4 +19,7 @@ urlpatterns = [
 
     # Usuario actual
     path('me/', CurrentUserView.as_view(), name='current_user'),
+
+    # Gestión de usuarios (incluye el router)
+    path('', include(router.urls)),
 ]

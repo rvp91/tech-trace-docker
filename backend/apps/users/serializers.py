@@ -42,6 +42,49 @@ class UserSerializer(serializers.ModelSerializer):
         return f"{obj.first_name} {obj.last_name}".strip() or obj.username
 
 
+class CreateUserSerializer(serializers.ModelSerializer):
+    """
+    Serializer para crear usuarios (solo Admin).
+    Incluye el campo de contraseña.
+    """
+    password = serializers.CharField(write_only=True, required=True, min_length=6)
+
+    class Meta:
+        model = User
+        fields = [
+            'username',
+            'email',
+            'password',
+            'first_name',
+            'last_name',
+            'role',
+        ]
+
+    def create(self, validated_data):
+        """Crea un usuario con contraseña encriptada."""
+        password = validated_data.pop('password')
+        user = User.objects.create(**validated_data)
+        user.set_password(password)
+        user.save()
+        return user
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    """
+    Serializer para cambiar la contraseña de un usuario.
+    """
+    new_password = serializers.CharField(required=True, min_length=6)
+    confirm_password = serializers.CharField(required=True, min_length=6)
+
+    def validate(self, data):
+        """Valida que las contraseñas coincidan."""
+        if data['new_password'] != data['confirm_password']:
+            raise serializers.ValidationError({
+                'confirm_password': 'Las contraseñas no coinciden.'
+            })
+        return data
+
+
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     """
     Serializer personalizado para obtener tokens JWT.

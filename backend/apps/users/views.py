@@ -1,15 +1,23 @@
 """
 Views para autenticación y gestión de usuarios.
 """
-from rest_framework import status, generics
+from rest_framework import status, generics, viewsets, filters
 from rest_framework.views import APIView
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
+from django_filters.rest_framework import DjangoFilterBackend
 
-from .serializers import CustomTokenObtainPairSerializer, UserSerializer
+from .models import User
+from .serializers import (
+    CustomTokenObtainPairSerializer,
+    UserSerializer,
+    CreateUserSerializer,
+    ChangePasswordSerializer,
+)
 from .permissions import IsAdmin
 
 
@@ -95,5 +103,81 @@ class CurrentUserView(APIView):
 
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UserViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet para gestión de usuarios (solo Admin).
+    Permite CRUD completo de usuarios y acciones adicionales.
+    """
+    queryset = User.objects.all()
+    permission_classes = [IsAuthenticated, IsAdmin]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['role', 'is_active']
+    search_fields = ['username', 'email', 'first_name', 'last_name']
+    ordering_fields = ['username', 'email', 'date_joined']
+    ordering = ['-date_joined']
+
+    def get_serializer_class(self):
+        """Retorna el serializer apropiado según la acción."""
+        if self.action == 'create':
+            return CreateUserSerializer
+        return UserSerializer
+
+    def create(self, request, *args, **kwargs):
+        """Crea un nuevo usuario."""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+
+        # Retornar el usuario creado con UserSerializer
+        output_serializer = UserSerializer(user)
+        return Response(
+            output_serializer.data,
+            status=status.HTTP_201_CREATED
+        )
+
+    def update(self, request, *args, **kwargs):
+        """Actualiza un usuario (no permite cambiar password aquí)."""
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+
+        # No permitir cambiar la contraseña con este endpoint
+        if 'password' in request.data:
+            return Response(
+                {'error': 'Para cambiar la contraseña usa el endpoint /change_password/'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        serializer = self.get_serializer(
+            instance,
+            data=request.data,
+            partial=partial
+        )
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def change_password(self, request, pk=None):
+        """
+        Endpoint para cambiar la contraseña de un usuario.
+        POST /api/users/{id}/change_password/
+        """
+        user = self.get_object()
+        serializer = ChangePasswordSerializer(data=request.data)
+
+        if serializer.is_valid():
+            # Cambiar la contraseña
+            user.set_password(serializer.validated_data['new_password'])
+            user.save()
+
+            return Response(
+                {'message': 'Contraseña actualizada correctamente.'},
+                status=status.HTTP_200_OK
+            )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -6962,6 +6962,1289 @@ const loadStats = async () => {
 
 ---
 
-**Última actualización:** Noviembre 6, 2025 - Fase 13 Completada
+## FASE 14: GESTIÓN DE USUARIOS
+
+### Objetivo
+Implementar un sistema completo de gestión de usuarios con control de acceso basado en roles (ADMIN/OPERADOR), permitiendo crear, editar, activar/desactivar usuarios y cambiar contraseñas desde la interfaz web.
+
+### Arquitectura del Módulo
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    GESTIÓN DE USUARIOS                       │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  ROLES:                                                      │
+│  ├─ ADMIN: Acceso completo (CRUD usuarios)                 │
+│  └─ OPERADOR: Solo lectura (sin acceso a gestión usuarios) │
+│                                                              │
+│  OPERACIONES:                                                │
+│  1. Crear usuario (username, email, password, rol)          │
+│  2. Editar usuario (email, nombres, rol, estado)           │
+│  3. Cambiar contraseña (solo Admin)                        │
+│  4. Activar/Desactivar (soft delete)                       │
+│  5. Eliminar permanentemente (hard delete)                  │
+│                                                              │
+│  PROTECCIONES:                                               │
+│  ├─ Cuenta "admin" oculta en frontend                      │
+│  ├─ Usuario no puede eliminarse a sí mismo                 │
+│  ├─ Username no editable después de creación               │
+│  ├─ Contraseñas encriptadas con Django hash                │
+│  └─ Validaciones en frontend y backend                     │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Estructura de Archivos
+
+```
+frontend/
+├── lib/
+│   └── services/
+│       └── user-service.ts              # CRUD de usuarios
+│
+├── app/dashboard/users/
+│   └── page.tsx                         # Lista de usuarios (Admin only)
+│
+└── components/modals/
+    ├── user-modal.tsx                   # Crear/Editar usuario
+    └── change-password-modal.tsx        # Cambiar contraseña
+
+backend/apps/users/
+├── models.py                            # User model (ya existente)
+├── serializers.py                       # CreateUserSerializer, ChangePasswordSerializer
+├── views.py                             # UserViewSet con CRUD completo
+├── permissions.py                       # IsAdmin, IsAdminOrReadOnly, IsAdminOrOwner
+└── urls.py                              # Router con rutas de usuarios
+```
+
+### Modelos y Permisos
+
+#### **User Model (Existente)**
+
+```python
+class User(AbstractUser):
+    role = models.CharField(
+        max_length=20,
+        choices=[('ADMIN', 'Administrador'), ('OPERADOR', 'Operador')],
+        default='OPERADOR'
+    )
+    is_active = models.BooleanField(default=True)
+    email = models.EmailField(unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+```
+
+#### **Clases de Permisos**
+
+```python
+# permissions.py
+
+class IsAdmin(permissions.BasePermission):
+    """Permiso que solo permite acceso a usuarios con rol ADMIN."""
+    message = 'Solo los administradores pueden realizar esta acción.'
+
+    def has_permission(self, request, view):
+        return (
+            request.user and
+            request.user.is_authenticated and
+            request.user.role == 'ADMIN'
+        )
+
+class IsAdminOrReadOnly(permissions.BasePermission):
+    """
+    Permiso que permite:
+    - Acceso completo (CRUD) a usuarios con rol ADMIN
+    - Solo lectura (GET, HEAD, OPTIONS) a usuarios OPERADOR
+    """
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        # Métodos seguros permitidos para todos los usuarios autenticados
+        if request.method in permissions.SAFE_METHODS:
+            return True
+
+        # Métodos de escritura solo para ADMIN
+        return request.user.role == 'ADMIN'
+
+class IsAdminOrOwner(permissions.BasePermission):
+    """
+    Permiso que permite:
+    - Acceso completo a usuarios ADMIN
+    - Acceso solo a sus propios recursos para OPERADOR
+    """
+    def has_object_permission(self, request, view, obj):
+        # ADMIN tiene acceso completo
+        if request.user.role == 'ADMIN':
+            return True
+
+        # Para otros usuarios, verificar si el objeto tiene un campo 'created_by'
+        if hasattr(obj, 'created_by'):
+            return obj.created_by == request.user
+
+        # Si el objeto es el propio usuario
+        if obj == request.user:
+            return True
+
+        return False
+```
+
+### Backend - Serializers
+
+#### **1. CreateUserSerializer**
+
+```python
+class CreateUserSerializer(serializers.ModelSerializer):
+    """
+    Serializer para crear usuarios (solo Admin).
+    Incluye el campo de contraseña.
+    """
+    password = serializers.CharField(write_only=True, required=True, min_length=6)
+
+    class Meta:
+        model = User
+        fields = [
+            'username',
+            'email',
+            'password',
+            'first_name',
+            'last_name',
+            'role',
+        ]
+
+    def create(self, validated_data):
+        """Crea un usuario con contraseña encriptada."""
+        password = validated_data.pop('password')
+        user = User.objects.create(**validated_data)
+        user.set_password(password)
+        user.save()
+        return user
+```
+
+**Características:**
+- Campo `password` es `write_only` (no se retorna en responses)
+- Validación de longitud mínima: 6 caracteres
+- Método `create()` personalizado para encriptar password con `set_password()`
+- No incluye `is_active` (default True en el modelo)
+
+#### **2. ChangePasswordSerializer**
+
+```python
+class ChangePasswordSerializer(serializers.Serializer):
+    """
+    Serializer para cambiar la contraseña de un usuario.
+    """
+    new_password = serializers.CharField(required=True, min_length=6)
+    confirm_password = serializers.CharField(required=True, min_length=6)
+
+    def validate(self, data):
+        """Valida que las contraseñas coincidan."""
+        if data['new_password'] != data['confirm_password']:
+            raise serializers.ValidationError({
+                'confirm_password': 'Las contraseñas no coinciden.'
+            })
+        return data
+```
+
+**Características:**
+- No hereda de `ModelSerializer` (no modifica directamente el modelo)
+- Validación custom en método `validate()`
+- Error específico en campo `confirm_password`
+
+### Backend - ViewSet
+
+#### **UserViewSet**
+
+```python
+class UserViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet para gestión de usuarios (solo Admin).
+    Permite CRUD completo de usuarios y acciones adicionales.
+    """
+    queryset = User.objects.all()
+    permission_classes = [IsAuthenticated, IsAdmin]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['role', 'is_active']
+    search_fields = ['username', 'email', 'first_name', 'last_name']
+    ordering_fields = ['username', 'email', 'date_joined']
+    ordering = ['-date_joined']
+
+    def get_serializer_class(self):
+        """Retorna el serializer apropiado según la acción."""
+        if self.action == 'create':
+            return CreateUserSerializer
+        return UserSerializer
+
+    def create(self, request, *args, **kwargs):
+        """Crea un nuevo usuario."""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+
+        # Retornar el usuario creado con UserSerializer
+        output_serializer = UserSerializer(user)
+        return Response(
+            output_serializer.data,
+            status=status.HTTP_201_CREATED
+        )
+
+    def update(self, request, *args, **kwargs):
+        """Actualiza un usuario (no permite cambiar password aquí)."""
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+
+        # No permitir cambiar la contraseña con este endpoint
+        if 'password' in request.data:
+            return Response(
+                {'error': 'Para cambiar la contraseña usa el endpoint /change_password/'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        serializer = self.get_serializer(
+            instance,
+            data=request.data,
+            partial=partial
+        )
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def change_password(self, request, pk=None):
+        """
+        Endpoint para cambiar la contraseña de un usuario.
+        POST /api/auth/users/{id}/change_password/
+        """
+        user = self.get_object()
+        serializer = ChangePasswordSerializer(data=request.data)
+
+        if serializer.is_valid():
+            # Cambiar la contraseña
+            user.set_password(serializer.validated_data['new_password'])
+            user.save()
+
+            return Response(
+                {'message': 'Contraseña actualizada correctamente.'},
+                status=status.HTTP_200_OK
+            )
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+```
+
+**Características clave:**
+
+1. **Filtros y búsqueda:**
+   - Filtros: `role`, `is_active`
+   - Búsqueda: `username`, `email`, `first_name`, `last_name`
+   - Ordenamiento: por `username`, `email`, `date_joined` (default: `-date_joined`)
+
+2. **Serializer dinámico:**
+   - `create`: Usa `CreateUserSerializer` (incluye password)
+   - Resto: Usa `UserSerializer` (sin password)
+
+3. **Validación de password:**
+   - Endpoint `update` rechaza cambios de password
+   - Password solo se cambia vía acción custom `change_password`
+
+4. **Acción custom:**
+   - `@action(detail=True, methods=['post'])` registra automáticamente la ruta
+   - URL: `/api/auth/users/{id}/change_password/`
+
+### Backend - URLs
+
+```python
+# urls.py
+
+from rest_framework.routers import DefaultRouter
+
+router = DefaultRouter()
+router.register(r'users', UserViewSet, basename='user')
+
+urlpatterns = [
+    # Autenticación JWT
+    path('login/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('logout/', LogoutView.as_view(), name='logout'),
+
+    # Usuario actual
+    path('me/', CurrentUserView.as_view(), name='current_user'),
+
+    # Gestión de usuarios (incluye el router)
+    path('', include(router.urls)),
+]
+```
+
+**Endpoints generados:**
+
+```
+GET    /api/auth/users/                      # Listar usuarios
+POST   /api/auth/users/                      # Crear usuario
+GET    /api/auth/users/{id}/                 # Obtener usuario
+PATCH  /api/auth/users/{id}/                 # Actualizar usuario
+DELETE /api/auth/users/{id}/                 # Eliminar usuario
+POST   /api/auth/users/{id}/change_password/ # Cambiar contraseña
+```
+
+### Frontend - Servicio de Usuarios
+
+**Archivo:** `frontend/lib/services/user-service.ts`
+
+#### **Interfaces TypeScript**
+
+```typescript
+export interface CreateUserData {
+  username: string
+  email: string
+  password: string
+  role: "ADMIN" | "OPERADOR"
+  first_name?: string
+  last_name?: string
+}
+
+export interface UpdateUserData {
+  email?: string
+  role?: "ADMIN" | "OPERADOR"
+  first_name?: string
+  last_name?: string
+  is_active?: boolean
+}
+
+export interface ChangePasswordData {
+  new_password: string
+  confirm_password: string
+}
+
+export interface PaginatedResponse<T> {
+  count: number
+  next: string | null
+  previous: string | null
+  results: T[]
+}
+
+export interface UserFilters {
+  search?: string
+  role?: string
+  is_active?: boolean
+  ordering?: string
+  page?: number
+  page_size?: number
+}
+```
+
+#### **Funciones del Servicio**
+
+```typescript
+export const userService = {
+  /**
+   * Obtiene la lista de usuarios con filtros opcionales
+   */
+  async getUsers(filters?: UserFilters): Promise<PaginatedResponse<User>> {
+    const params = new URLSearchParams()
+
+    if (filters?.search) params.append("search", filters.search)
+    if (filters?.role) params.append("role", filters.role)
+    if (filters?.is_active !== undefined) params.append("is_active", filters.is_active.toString())
+    if (filters?.ordering) params.append("ordering", filters.ordering)
+    if (filters?.page) params.append("page", filters.page.toString())
+    if (filters?.page_size) params.append("page_size", filters.page_size.toString())
+
+    const queryString = params.toString()
+    const url = queryString ? `/auth/users/?${queryString}` : "/auth/users/"
+
+    return apiClient.get<PaginatedResponse<User>>(url)
+  },
+
+  async getUser(id: number): Promise<User> {...},
+  async createUser(data: CreateUserData): Promise<User> {...},
+  async updateUser(id: number, data: UpdateUserData): Promise<User> {...},
+  async changePassword(id: number, data: ChangePasswordData): Promise<void> {...},
+  async deactivateUser(id: number): Promise<User> {...},
+  async activateUser(id: number): Promise<User> {...},
+  async deleteUser(id: number): Promise<void> {...},
+}
+```
+
+### Frontend - Página de Usuarios
+
+**Archivo:** `frontend/app/dashboard/users/page.tsx`
+
+#### **Estructura del Componente**
+
+```
+Página de Gestión de Usuarios (/dashboard/users)
+├── Header
+│   ├── Título: "Gestión de Usuarios"
+│   └── Botón: "Nuevo Usuario"
+│
+├── Card de Filtros
+│   ├── Search (búsqueda en tiempo real)
+│   ├── Select: Filtro por Rol (Todos/Admin/Operador)
+│   └── Select: Filtro por Estado (Todos/Activos/Inactivos)
+│
+├── Tabla de Usuarios
+│   ├── Columnas: Username, Nombre, Email, Rol, Estado, Acciones
+│   ├── Badge por Rol (default: Admin, secondary: Operador)
+│   ├── Badge por Estado (default: Activo, secondary: Inactivo)
+│   └── Acciones por fila:
+│       ├── Botón: Editar (ícono Edit2)
+│       ├── Botón: Cambiar Contraseña (ícono Key)
+│       ├── Botón: Activar/Desactivar (ícono UserCheck/UserX)
+│       └── Botón: Eliminar (ícono Trash2, no visible para usuario actual)
+│
+├── UserModal (Crear/Editar)
+└── ChangePasswordModal
+```
+
+#### **Protecciones Implementadas**
+
+**1. Acceso solo Admin:**
+
+```typescript
+useEffect(() => {
+  if (currentUser && currentUser.role !== "ADMIN") {
+    toast({
+      title: "Acceso denegado",
+      description: "Solo los administradores pueden acceder a esta sección.",
+      variant: "destructive",
+    })
+    window.location.href = "/dashboard"
+  }
+}, [currentUser, toast])
+```
+
+**2. Ocultar cuenta admin:**
+
+```typescript
+{users.filter((user) => user.username !== "admin").map((user) => (
+  <TableRow key={user.id}>
+    {/* ... */}
+  </TableRow>
+))}
+```
+
+**Razón:** Evita que se pueda desactivar o eliminar accidentalmente la cuenta de administrador principal.
+
+**3. Prevención de auto-eliminación:**
+
+```typescript
+{currentUser?.id !== user.id && (
+  <Button
+    variant="ghost"
+    size="icon"
+    onClick={() => setUserToDelete(user)}
+    title="Eliminar usuario"
+  >
+    <Trash2 className="h-4 w-4" />
+  </Button>
+)}
+```
+
+#### **Filtros Combinados**
+
+```typescript
+useEffect(() => {
+  loadUsers()
+}, [searchQuery, roleFilter, statusFilter])
+
+const loadUsers = async () => {
+  const filters: any = { page_size: 100 }
+
+  if (searchQuery) filters.search = searchQuery
+  if (roleFilter !== "all") filters.role = roleFilter
+  if (statusFilter !== "all") filters.is_active = statusFilter === "active"
+
+  const response = await userService.getUsers(filters)
+  setUsers(response.results)
+}
+```
+
+**Características:**
+- Los 3 filtros actúan juntos (AND lógico)
+- Búsqueda en tiempo real (cada cambio de input)
+- Backend maneja el filtrado (eficiente para muchos registros)
+
+### Frontend - Modal de Usuario
+
+**Archivo:** `frontend/components/modals/user-modal.tsx`
+
+#### **Props**
+
+```typescript
+interface UserModalProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  user?: User | null
+  onSuccess: () => void
+}
+```
+
+#### **Modo Dual: Crear vs Editar**
+
+```typescript
+const isEditMode = !!user
+
+useEffect(() => {
+  if (open) {
+    if (user) {
+      // Modo edición: pre-llenar campos
+      setFormData({
+        username: user.username,
+        email: user.email,
+        password: "",
+        confirmPassword: "",
+        role: user.role,
+        first_name: user.first_name || "",
+        last_name: user.last_name || "",
+      })
+    } else {
+      // Modo creación: campos vacíos
+      setFormData({
+        username: "",
+        email: "",
+        password: "",
+        confirmPassword: "",
+        role: "OPERADOR",
+        first_name: "",
+        last_name: "",
+      })
+    }
+  }
+}, [open, user])
+```
+
+#### **Validaciones Frontend**
+
+```typescript
+const validateForm = () => {
+  const newErrors: Record<string, string> = {}
+
+  // Username
+  if (!formData.username.trim()) {
+    newErrors.username = "El username es requerido"
+  } else if (formData.username.length < 3) {
+    newErrors.username = "El username debe tener al menos 3 caracteres"
+  }
+
+  // Email
+  if (!formData.email.trim()) {
+    newErrors.email = "El email es requerido"
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    newErrors.email = "El email no es válido"
+  }
+
+  // Password (solo en modo creación)
+  if (!isEditMode) {
+    if (!formData.password) {
+      newErrors.password = "La contraseña es requerida"
+    } else if (formData.password.length < 6) {
+      newErrors.password = "La contraseña debe tener al menos 6 caracteres"
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = "Las contraseñas no coinciden"
+    }
+  }
+
+  setErrors(newErrors)
+  return Object.keys(newErrors).length === 0
+}
+```
+
+#### **Campos del Formulario**
+
+**Grid 2 columnas:**
+```typescript
+<div className="grid grid-cols-2 gap-4">
+  <div className="space-y-2">
+    <Label htmlFor="username">
+      Username <span className="text-destructive">*</span>
+    </Label>
+    <Input
+      id="username"
+      value={formData.username}
+      onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+      disabled={isEditMode}  // No editable en modo edición
+      placeholder="juanperez"
+      className={errors.username ? "border-destructive" : ""}
+    />
+    {errors.username && (
+      <p className="text-sm text-destructive">{errors.username}</p>
+    )}
+  </div>
+
+  <div className="space-y-2">
+    <Label htmlFor="email">
+      Email <span className="text-destructive">*</span>
+    </Label>
+    <Input
+      id="email"
+      type="email"
+      value={formData.email}
+      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+      placeholder="juan.perez@empresa.com"
+      className={errors.email ? "border-destructive" : ""}
+    />
+    {errors.email && (
+      <p className="text-sm text-destructive">{errors.email}</p>
+    )}
+  </div>
+</div>
+
+<div className="grid grid-cols-2 gap-4">
+  <div className="space-y-2">
+    <Label htmlFor="first_name">Nombre</Label>
+    <Input
+      id="first_name"
+      value={formData.first_name}
+      onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+      placeholder="Juan"
+    />
+  </div>
+
+  <div className="space-y-2">
+    <Label htmlFor="last_name">Apellido</Label>
+    <Input
+      id="last_name"
+      value={formData.last_name}
+      onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+      placeholder="Pérez"
+    />
+  </div>
+</div>
+
+<div className="space-y-2">
+  <Label htmlFor="role">
+    Rol <span className="text-destructive">*</span>
+  </Label>
+  <Select
+    value={formData.role}
+    onValueChange={(value: "ADMIN" | "OPERADOR") => setFormData({ ...formData, role: value })}
+  >
+    <SelectTrigger>
+      <SelectValue />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="ADMIN">Administrador</SelectItem>
+      <SelectItem value="OPERADOR">Operador</SelectItem>
+    </SelectContent>
+  </Select>
+</div>
+
+{/* Campos de contraseña: solo en modo creación */}
+{!isEditMode && (
+  <>
+    <div className="space-y-2">
+      <Label htmlFor="password">
+        Contraseña <span className="text-destructive">*</span>
+      </Label>
+      <Input
+        id="password"
+        type="password"
+        value={formData.password}
+        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+        placeholder="Contraseña"
+        className={errors.password ? "border-destructive" : ""}
+      />
+      {errors.password && (
+        <p className="text-sm text-destructive">{errors.password}</p>
+      )}
+      <p className="text-xs text-muted-foreground">
+        Mínimo 6 caracteres
+      </p>
+    </div>
+
+    <div className="space-y-2">
+      <Label htmlFor="confirmPassword">
+        Confirmar Contraseña <span className="text-destructive">*</span>
+      </Label>
+      <Input
+        id="confirmPassword"
+        type="password"
+        value={formData.confirmPassword}
+        onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+        placeholder="Confirmar contraseña"
+        className={errors.confirmPassword ? "border-destructive" : ""}
+      />
+      {errors.confirmPassword && (
+        <p className="text-sm text-destructive">{errors.confirmPassword}</p>
+      )}
+    </div>
+  </>
+)}
+```
+
+#### **Manejo del Submit**
+
+```typescript
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault()
+
+  if (!validateForm()) {
+    return
+  }
+
+  try {
+    setLoading(true)
+
+    if (isEditMode) {
+      const updateData: UpdateUserData = {
+        email: formData.email,
+        role: formData.role,
+        first_name: formData.first_name || undefined,
+        last_name: formData.last_name || undefined,
+      }
+
+      await userService.updateUser(user.id, updateData)
+
+      toast({
+        title: "Usuario actualizado",
+        description: `El usuario ${formData.username} ha sido actualizado correctamente.`,
+      })
+    } else {
+      const createData: CreateUserData = {
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
+        role: formData.role,
+        first_name: formData.first_name || undefined,
+        last_name: formData.last_name || undefined,
+      }
+
+      await userService.createUser(createData)
+
+      toast({
+        title: "Usuario creado",
+        description: `El usuario ${formData.username} ha sido creado exitosamente.`,
+      })
+    }
+
+    onSuccess()
+  } catch (error: any) {
+    console.error("Error guardando usuario:", error)
+
+    const errorMessage = error.response?.data?.username?.[0] ||
+                          error.response?.data?.email?.[0] ||
+                          "No se pudo guardar el usuario"
+
+    toast({
+      title: "Error",
+      description: errorMessage,
+      variant: "destructive",
+    })
+  } finally {
+    setLoading(false)
+  }
+}
+```
+
+**Características:**
+- Validación antes de enviar
+- Distingue entre crear y actualizar
+- Manejo de errores específicos (username/email duplicado)
+- Toast notifications para feedback
+- Loading state durante la petición
+
+### Frontend - Modal de Cambio de Contraseña
+
+**Archivo:** `frontend/components/modals/change-password-modal.tsx`
+
+#### **Props**
+
+```typescript
+interface ChangePasswordModalProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  userId: number | null
+  onSuccess: () => void
+}
+```
+
+#### **Campos del Formulario**
+
+```typescript
+<div className="space-y-4">
+  <div className="space-y-2">
+    <Label htmlFor="new_password">
+      Nueva Contraseña <span className="text-destructive">*</span>
+    </Label>
+    <Input
+      id="new_password"
+      type="password"
+      value={formData.new_password}
+      onChange={(e) => setFormData({ ...formData, new_password: e.target.value })}
+      placeholder="Nueva contraseña"
+      className={errors.new_password ? "border-destructive" : ""}
+    />
+    {errors.new_password && (
+      <p className="text-sm text-destructive">{errors.new_password}</p>
+    )}
+    <p className="text-xs text-muted-foreground">
+      Mínimo 6 caracteres
+    </p>
+  </div>
+
+  <div className="space-y-2">
+    <Label htmlFor="confirm_password">
+      Confirmar Contraseña <span className="text-destructive">*</span>
+    </Label>
+    <Input
+      id="confirm_password"
+      type="password"
+      value={formData.confirm_password}
+      onChange={(e) => setFormData({ ...formData, confirm_password: e.target.value })}
+      placeholder="Confirmar contraseña"
+      className={errors.confirm_password ? "border-destructive" : ""}
+    />
+    {errors.confirm_password && (
+      <p className="text-sm text-destructive">{errors.confirm_password}</p>
+    )}
+  </div>
+</div>
+```
+
+#### **Validación y Submit**
+
+```typescript
+const validateForm = () => {
+  const newErrors: Record<string, string> = {}
+
+  if (!formData.new_password) {
+    newErrors.new_password = "La contraseña es requerida"
+  } else if (formData.new_password.length < 6) {
+    newErrors.new_password = "La contraseña debe tener al menos 6 caracteres"
+  }
+
+  if (formData.new_password !== formData.confirm_password) {
+    newErrors.confirm_password = "Las contraseñas no coinciden"
+  }
+
+  setErrors(newErrors)
+  return Object.keys(newErrors).length === 0
+}
+
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault()
+
+  if (!userId || !validateForm()) {
+    return
+  }
+
+  try {
+    setLoading(true)
+
+    await userService.changePassword(userId, {
+      new_password: formData.new_password,
+      confirm_password: formData.confirm_password,
+    })
+
+    toast({
+      title: "Contraseña actualizada",
+      description: "La contraseña ha sido cambiada exitosamente.",
+    })
+
+    onSuccess()
+  } catch (error) {
+    console.error("Error cambiando contraseña:", error)
+    toast({
+      title: "Error",
+      description: "No se pudo cambiar la contraseña",
+      variant: "destructive",
+    })
+  } finally {
+    setLoading(false)
+  }
+}
+```
+
+### Flujos de Usuario
+
+#### **Flujo 1: Crear Nuevo Usuario**
+
+```
+1. Admin navega a /dashboard/users
+2. Sistema carga lista de usuarios (sin "admin")
+3. Admin hace clic en "Nuevo Usuario"
+4. Modal se abre con campos vacíos
+5. Admin llena:
+   - Username: "operador1"
+   - Email: "operador1@empresa.com"
+   - Nombre: "Carlos"
+   - Apellido: "López"
+   - Rol: "OPERADOR"
+   - Contraseña: "123456"
+   - Confirmar: "123456"
+6. Admin hace clic en "Crear Usuario"
+7. Frontend valida campos
+8. Petición POST a /api/auth/users/
+9. Backend valida, encripta password, guarda usuario
+10. Toast de éxito: "Usuario operador1 creado exitosamente"
+11. Modal se cierra, tabla se recarga
+12. Nuevo usuario aparece en la lista
+```
+
+#### **Flujo 2: Editar Usuario Existente**
+
+```
+1. Admin ve usuario "operador1" en la tabla
+2. Admin hace clic en botón "Editar" (ícono Edit2)
+3. Modal se abre con datos pre-llenados
+4. Admin observa:
+   - Username: "operador1" (campo deshabilitado, no editable)
+   - Email: "operador1@empresa.com" (editable)
+   - Nombre: "Carlos" (editable)
+   - Apellido: "López" (editable)
+   - Rol: "OPERADOR" (editable)
+   - NO aparecen campos de contraseña
+5. Admin cambia:
+   - Email: "carlos.lopez@empresa.com"
+   - Rol: "ADMIN"
+6. Admin hace clic en "Actualizar Usuario"
+7. Petición PATCH a /api/auth/users/2/
+8. Backend actualiza campos (sin tocar password)
+9. Toast de éxito: "Usuario operador1 actualizado correctamente"
+10. Modal se cierra, tabla se recarga
+11. Usuario muestra nuevo rol "Administrador" en badge azul
+```
+
+#### **Flujo 3: Cambiar Contraseña**
+
+```
+1. Admin hace clic en botón "Cambiar Contraseña" (ícono Key)
+2. Modal se abre con 2 campos de contraseña
+3. Admin ingresa:
+   - Nueva contraseña: "nuevaPass123"
+   - Confirmar: "nuevaPass123"
+4. Admin hace clic en "Cambiar Contraseña"
+5. Frontend valida que coincidan y mínimo 6 chars
+6. Petición POST a /api/auth/users/2/change_password/
+7. Backend valida y encripta con set_password()
+8. Toast de éxito: "Contraseña actualizada"
+9. Modal se cierra
+10. Usuario puede loguearse con nueva contraseña
+```
+
+#### **Flujo 4: Desactivar Usuario**
+
+```
+1. Admin ve usuario "operador1" con estado "Activo" (badge azul)
+2. Admin hace clic en botón "Desactivar" (ícono UserX naranja)
+3. Petición PATCH a /api/auth/users/2/ con { is_active: false }
+4. Backend actualiza is_active = False
+5. Toast de éxito: "Usuario operador1 desactivado"
+6. Tabla se recarga
+7. Usuario muestra badge gris "Inactivo"
+8. Botón cambia a "Activar" (ícono UserCheck verde)
+9. Usuario no puede hacer login hasta reactivación
+```
+
+#### **Flujo 5: Eliminar Usuario Permanentemente**
+
+```
+1. Admin hace clic en botón "Eliminar" (ícono Trash2 rojo)
+   - Nota: Botón NO aparece si el usuario es el actual
+2. AlertDialog se abre con confirmación:
+   "¿Estás seguro? Esta acción no se puede deshacer.
+   Se eliminará permanentemente el usuario operador1 del sistema."
+3. Admin hace clic en "Eliminar" (botón rojo)
+4. Petición DELETE a /api/auth/users/2/
+5. Backend elimina registro de la base de datos (hard delete)
+6. Toast de éxito: "Usuario operador1 eliminado correctamente"
+7. AlertDialog se cierra, tabla se recarga
+8. Usuario ya no aparece en la lista
+9. Todas sus asignaciones quedan con created_by apuntando a un usuario eliminado
+```
+
+### Patrones de Diseño Implementados
+
+#### **1. Role-Based Access Control (RBAC)**
+
+**Backend:**
+```python
+class IsAdmin(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return request.user.role == 'ADMIN'
+```
+
+**Frontend:**
+```typescript
+useEffect(() => {
+  if (currentUser && currentUser.role !== "ADMIN") {
+    window.location.href = "/dashboard"
+  }
+}, [currentUser])
+```
+
+#### **2. Soft Delete Pattern**
+
+En lugar de eliminar registros, se desactiva con `is_active=False`:
+
+```typescript
+async deactivateUser(id: number): Promise<User> {
+  return apiClient.patch<User>(`/auth/users/${id}/`, { is_active: false })
+}
+```
+
+**Ventajas:**
+- Recuperación posible
+- Auditoría completa
+- Relaciones intactas
+
+#### **3. Separation of Concerns - Password Management**
+
+Password NO se cambia en endpoint de actualización:
+
+```python
+def update(self, request, *args, **kwargs):
+    if 'password' in request.data:
+        return Response(
+            {'error': 'Para cambiar la contraseña usa el endpoint /change_password/'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+```
+
+**Razón:**
+- Evita cambios accidentales de password
+- Endpoint dedicado con validaciones específicas
+- Mejor seguridad
+
+#### **4. Modal Dual-Mode Pattern**
+
+Un solo componente para crear y editar:
+
+```typescript
+const isEditMode = !!user
+
+// Diferencias:
+// - Crear: Campos vacíos, password visible, username editable
+// - Editar: Campos pre-llenados, sin password, username bloqueado
+```
+
+#### **5. Client-Side Filtering Pattern**
+
+Filtros se aplican en el backend, no en frontend:
+
+```typescript
+const filters: any = { page_size: 100 }
+if (searchQuery) filters.search = searchQuery
+if (roleFilter !== "all") filters.role = roleFilter
+if (statusFilter !== "all") filters.is_active = statusFilter === "active"
+
+const response = await userService.getUsers(filters)
+```
+
+**Ventajas:**
+- Eficiente para muchos registros
+- Backend optimiza queries
+- Paginación futura más fácil
+
+#### **6. Protected Principal Account Pattern**
+
+Cuenta "admin" oculta en frontend:
+
+```typescript
+users.filter((user) => user.username !== "admin")
+```
+
+**Razón:**
+- Evita desactivación accidental
+- Evita eliminación del único admin
+- Mantiene acceso al sistema garantizado
+
+### Consideraciones de Seguridad
+
+#### **1. Encriptación de Contraseñas**
+
+```python
+def create(self, validated_data):
+    password = validated_data.pop('password')
+    user = User.objects.create(**validated_data)
+    user.set_password(password)  # Django pbkdf2_sha256 hashing
+    user.save()
+    return user
+```
+
+**Características:**
+- PBKDF2 con SHA256 (default de Django)
+- Salt automático por usuario
+- Nunca se almacena password en texto plano
+- Password nunca se retorna en responses (write_only=True)
+
+#### **2. Validación Dual (Frontend + Backend)**
+
+**Frontend (UX):**
+```typescript
+if (formData.password.length < 6) {
+  newErrors.password = "La contraseña debe tener al menos 6 caracteres"
+}
+```
+
+**Backend (Seguridad):**
+```python
+password = serializers.CharField(write_only=True, required=True, min_length=6)
+```
+
+**Principio:** Frontend para feedback inmediato, Backend para garantizar cumplimiento.
+
+#### **3. Prevención de Auto-Eliminación**
+
+```typescript
+{currentUser?.id !== user.id && (
+  <Button onClick={() => setUserToDelete(user)}>
+    <Trash2 />
+  </Button>
+)}
+```
+
+**Razón:** Evita que un admin se elimine a sí mismo y pierda acceso.
+
+#### **4. Username Inmutable**
+
+```typescript
+<Input
+  id="username"
+  value={formData.username}
+  disabled={isEditMode}  // No editable en modo edición
+/>
+```
+
+**Razón:**
+- Username es identificador único
+- Cambiar username puede romper relaciones (created_by)
+- Mejor práctica: crear nuevo usuario si se necesita otro username
+
+#### **5. Protección de Cuenta Principal**
+
+```typescript
+users.filter((user) => user.username !== "admin")
+```
+
+**Alternativa futura (Backend):**
+
+```python
+def destroy(self, request, *args, **kwargs):
+    instance = self.get_object()
+
+    if instance.username == 'admin':
+        return Response(
+            {'error': 'No se puede eliminar la cuenta de administrador principal.'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    self.perform_destroy(instance)
+    return Response(status=status.HTTP_204_NO_CONTENT)
+```
+
+### Mejoras Futuras Sugeridas
+
+#### **Prioridad Alta:**
+
+1. **Validación de fortaleza de contraseña**
+   ```typescript
+   // Requerir: mayúsculas, minúsculas, números, símbolos
+   const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/
+   ```
+
+2. **Cambio de contraseña forzado en primer login**
+   ```python
+   class User(AbstractUser):
+       must_change_password = models.BooleanField(default=True)
+   ```
+
+3. **Recuperación de contraseña por email**
+   - Token de reseteo
+   - Link de restablecimiento
+   - Expiración de token (1 hora)
+
+#### **Prioridad Media:**
+
+4. **Historial de cambios de usuario (Audit Log)**
+   ```python
+   UserChangeLog.objects.create(
+       user=user,
+       changed_by=request.user,
+       change_type='PASSWORD_CHANGE',
+       timestamp=timezone.now()
+   )
+   ```
+
+5. **Página de perfil de usuario**
+   - Ver información propia
+   - Cambiar password propio
+   - Actualizar datos personales
+
+6. **Bloqueo de cuenta después de N intentos fallidos**
+   ```python
+   if user.failed_login_attempts >= 5:
+       user.is_active = False
+       user.save()
+   ```
+
+#### **Prioridad Baja:**
+
+7. **Autenticación de dos factores (2FA)**
+   - TOTP con Google Authenticator
+   - Códigos de respaldo
+
+8. **Roles personalizados**
+   - Permisos granulares por módulo
+   - Grupos de permisos
+
+9. **Sesiones activas**
+   - Ver dispositivos logueados
+   - Cerrar sesiones remotas
+
+10. **Exportar lista de usuarios a CSV**
+    - Similar a dispositivos
+    - Incluir fecha de último login
+
+### Lecciones Aprendidas - Fase 14
+
+1. **Username inmutable es mejor práctica:** Evita problemas con foreign keys
+2. **Dual-mode modals son reutilizables:** Un componente para crear y editar
+3. **Ocultar cuenta admin en UI:** Más simple que deshabilitarla con validaciones
+4. **Validación dual es esencial:** Frontend para UX, Backend para seguridad
+5. **Soft delete > Hard delete:** Permite recuperación y auditoría
+6. **Contraseñas en endpoint separado:** Mejor que mezclar con update general
+7. **Prevención de auto-eliminación:** Evita pérdida de acceso al sistema
+8. **Filters en backend:** Más eficiente que client-side para muchos registros
+9. **Toast notifications críticas:** Usuario necesita feedback inmediato
+10. **AlertDialog para acciones destructivas:** Confirmación previene errores
+
+### Archivos Relacionados
+
+**Backend modificados:**
+- `backend/apps/users/serializers.py` - Agregados CreateUserSerializer y ChangePasswordSerializer
+- `backend/apps/users/views.py` - Agregado UserViewSet con CRUD completo
+- `backend/apps/users/urls.py` - Agregado router para UserViewSet
+
+**Backend sin cambios:**
+- `backend/apps/users/models.py` - User model ya existía
+- `backend/apps/users/permissions.py` - Ya existía de Fase 7
+
+**Frontend modificados:**
+- `frontend/lib/services/user-service.ts` - Reescrito completamente con 8 funciones
+- `frontend/app/dashboard/users/page.tsx` - Reescrito completamente (345 líneas)
+
+**Frontend nuevos:**
+- `frontend/components/modals/user-modal.tsx` - Crear/Editar usuarios (280 líneas)
+- `frontend/components/modals/change-password-modal.tsx` - Cambiar contraseña (150 líneas)
+
+### Dependencias
+
+**Backend (sin cambios):**
+- django-filter (ya instalado)
+- djangorestframework (ya instalado)
+- djangorestframework-simplejwt (ya instalado)
+
+**Frontend (sin nuevas):**
+- shadcn/ui components (ya usados)
+- lucide-react icons (ya usado)
+- zustand (ya usado)
+
+---
+
+**Última actualización:** Noviembre 6, 2025 - Fase 14 Completada
 **Documentado por:** Claude (Asistente IA)
-**Próxima actualización:** Al completar Fase 14 (Gestión de Usuarios)
+**Próxima actualización:** Al completar Fase 15 (Validaciones y Manejo de Errores)

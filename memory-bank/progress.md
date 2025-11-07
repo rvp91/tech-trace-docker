@@ -197,9 +197,9 @@ python manage.py show_urls | grep -E "(devices|stats|employees|branches)"
 ```
 
 ### Estado del proyecto después de esta sesión
-- **Progreso:** 77% (123/160+ pasos)
-- **Fases completadas:** 14/19 (Fases 0-13)
-- **Próxima fase recomendada:** Fase 14 - Gestión de Usuarios
+- **Progreso:** 80% (128/160+ pasos)
+- **Fases completadas:** 15/19 (Fases 0-14)
+- **Próxima fase recomendada:** Fase 15 - Validaciones y Manejo de Errores
 
 ---
 
@@ -1154,7 +1154,141 @@ frontend/
 - ROBO: Rojo (#ef4444)
 
 ### FASE 14: GESTION DE USUARIOS
-**Estado:** [ ] **PENDIENTE** (0% - 0/5 completados)
+**Estado:** [x] **COMPLETADA** (100% - 5/5 completados)
+
+| Paso | Descripcion | Estado | Notas |
+|------|-------------|--------|-------|
+| 14.1 | Crear serializers para gestión de usuarios en backend | [x] | CreateUserSerializer y ChangePasswordSerializer creados |
+| 14.2 | Crear UserViewSet en backend con CRUD completo | [x] | ViewSet con filtros, búsqueda y acción change_password |
+| 14.3 | Configurar rutas del ViewSet en backend | [x] | Router agregado a apps/users/urls.py |
+| 14.4 | Crear servicio de usuarios en frontend | [x] | user-service.ts con funciones CRUD y cambio de contraseña |
+| 14.5 | Crear página de listado de usuarios (solo Admin) | [x] | Página con tabla, filtros y acciones |
+| 14.6 | Crear modal de creación/edición de usuario | [x] | UserModal con validaciones |
+| 14.7 | Crear modal de cambio de contraseña | [x] | ChangePasswordModal implementado |
+| 14.8 | Implementar desactivación/activación de usuarios | [x] | Toggle de estado implementado |
+| 14.9 | Verificar protección de rutas solo para Admin | [x] | useEffect verifica rol ADMIN |
+
+**Detalles de implementación:**
+
+**Backend:**
+- **Serializers actualizados** (`apps/users/serializers.py`):
+  - `CreateUserSerializer`: Para crear usuarios con contraseña encriptada
+  - `ChangePasswordSerializer`: Para cambiar contraseñas con validación de coincidencia
+  - Validaciones de longitud mínima (6 caracteres) y coincidencia de contraseñas
+
+- **UserViewSet creado** (`apps/users/views.py`):
+  - CRUD completo de usuarios (solo Admin)
+  - Filtros: `role`, `is_active`
+  - Búsqueda: `username`, `email`, `first_name`, `last_name`
+  - Ordenamiento: por `username`, `email`, `date_joined` (default: `-date_joined`)
+  - Acción personalizada: `change_password()` para cambiar contraseñas
+  - Validación: no permite cambiar password con UPDATE, solo con endpoint específico
+  - get_serializer_class() dinámico: usa CreateUserSerializer para create, UserSerializer para el resto
+
+- **Rutas configuradas** (`apps/users/urls.py`):
+  - Router DRF agregado para UserViewSet
+  - Endpoints disponibles:
+    - `GET /api/auth/users/` - Listar usuarios
+    - `POST /api/auth/users/` - Crear usuario
+    - `GET /api/auth/users/{id}/` - Obtener usuario
+    - `PATCH /api/auth/users/{id}/` - Actualizar usuario
+    - `DELETE /api/auth/users/{id}/` - Eliminar usuario
+    - `POST /api/auth/users/{id}/change_password/` - Cambiar contraseña
+
+**Frontend:**
+- **Servicio de usuarios** (`lib/services/user-service.ts`):
+  - Interfaces: `CreateUserData`, `UpdateUserData`, `ChangePasswordData`, `UserFilters`
+  - Funciones completas:
+    - `getUsers(filters)` - Con filtros opcionales (search, role, is_active, ordering, paginación)
+    - `getUser(id)` - Obtener usuario individual
+    - `createUser(data)` - Crear nuevo usuario
+    - `updateUser(id, data)` - Actualizar usuario
+    - `changePassword(id, data)` - Cambiar contraseña
+    - `deactivateUser(id)` - Desactivar (soft delete)
+    - `activateUser(id)` - Activar usuario
+    - `deleteUser(id)` - Eliminar permanentemente
+
+- **Página de listado** (`app/dashboard/users/page.tsx`):
+  - Tabla con columnas: Username, Nombre, Email, Rol, Estado, Acciones
+  - Filtros combinados:
+    - Búsqueda en tiempo real por nombre o email
+    - Filtro por rol (ADMIN/OPERADOR)
+    - Filtro por estado (Activos/Inactivos)
+  - Acciones por usuario:
+    - Editar (ícono Edit2)
+    - Cambiar contraseña (ícono Key)
+    - Activar/Desactivar (ícono UserCheck/UserX)
+    - Eliminar (ícono Trash2, no visible para el usuario actual)
+  - Protección: Solo Admin puede acceder (verificación con useEffect)
+  - Estados de carga con spinner
+  - Toast notifications para feedback
+  - AlertDialog para confirmación de eliminación
+  - Badges de colores para roles y estados
+
+- **Modal de usuario** (`components/modals/user-modal.tsx`):
+  - Modo dual: crear/editar
+  - Campos:
+    - Username (no editable en modo edición)
+    - Email con validación de formato
+    - Nombre y Apellido (opcionales)
+    - Contraseña y Confirmar contraseña (solo en modo creación)
+    - Rol (select: Administrador/Operador)
+  - Validaciones frontend:
+    - Username mínimo 3 caracteres
+    - Email formato válido
+    - Contraseña mínimo 6 caracteres
+    - Contraseñas coincidentes
+  - Mensajes de error específicos por campo
+  - Loading state durante guardado
+
+- **Modal de cambio de contraseña** (`components/modals/change-password-modal.tsx`):
+  - Campos: Nueva contraseña, Confirmar contraseña
+  - Validaciones:
+    - Mínimo 6 caracteres
+    - Coincidencia de contraseñas
+  - Toast notification de éxito
+  - Limpieza de formulario al cerrar
+
+**Características implementadas:**
+- ✅ CRUD completo de usuarios conectado a API real
+- ✅ Solo Admin puede acceder a gestión de usuarios
+- ✅ Filtros múltiples (rol, estado, búsqueda)
+- ✅ Cambio de contraseña con validaciones
+- ✅ Activación/desactivación de usuarios (soft delete)
+- ✅ Validación de formularios en frontend y backend
+- ✅ Prevención de auto-eliminación (usuario actual no puede eliminarse)
+- ✅ Username no editable después de creación
+- ✅ Contraseñas encriptadas en backend
+- ✅ Toast notifications para feedback
+- ✅ AlertDialog para confirmaciones
+- ✅ Skeleton loaders durante carga
+- ✅ Responsive design
+- ✅ Build exitoso sin errores
+
+**Archivos creados/modificados:**
+```
+backend/apps/users/
+├── serializers.py (agregados CreateUserSerializer y ChangePasswordSerializer)
+├── views.py (agregado UserViewSet)
+└── urls.py (agregado router para UserViewSet)
+
+frontend/
+├── lib/services/
+│   └── user-service.ts (actualizado completamente)
+├── app/dashboard/users/
+│   └── page.tsx (reescrita completamente)
+└── components/modals/
+    ├── user-modal.tsx (NUEVO)
+    └── change-password-modal.tsx (NUEVO)
+```
+
+**Próximas mejoras sugeridas:**
+- Agregar paginación en la tabla de usuarios
+- Implementar filtros avanzados (fecha de creación, último login)
+- Agregar vista de perfil de usuario
+- Implementar cambio de contraseña para el propio usuario
+- Agregar validación de fortaleza de contraseña
+- Implementar recuperación de contraseña por email
 
 ### FASE 15: VALIDACIONES Y MANEJO DE ERRORES
 **Estado:** [ ] **PENDIENTE** (0% - 0/5 completados)
@@ -1190,14 +1324,15 @@ frontend/
 | 11 | Modulo de Asignaciones | 100% (10/10) | [x] Completada |
 | 12 | Modulo de Reportes e Inventario | 100% (6/6) | [x] Completada |
 | 13 | Dashboard y Estadísticas | 100% (6/6) | [x] Completada |
-| 14-18 | Otros Modulos Funcionales | 0% | [ ] Pendiente |
+| 14 | Gestión de Usuarios | 100% (9/9) | [x] Completada |
+| 15-18 | Validaciones, Optimizaciones y Documentación | 0% | [ ] Pendiente |
 
 ### Total del Proyecto
 
-**Pasos completados:** 123 / 160+ pasos
-**Progreso general:** ~77%
+**Pasos completados:** 128 / 160+ pasos
+**Progreso general:** ~80%
 
-**Fases completadas:** 14 / 19 (Fases 0-13)
+**Fases completadas:** 15 / 19 (Fases 0-14)
 **Fases en progreso:** 0
 
 ---
