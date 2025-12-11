@@ -16,7 +16,7 @@ class DeviceViewSet(viewsets.ModelViewSet):
     serializer_class = DeviceSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['tipo_equipo', 'estado', 'sucursal', 'marca']
-    search_fields = ['serie_imei', 'marca', 'modelo', 'numero_telefono', 'numero_factura']
+    search_fields = ['numero_serie', 'imei', 'marca', 'modelo', 'numero_telefono', 'numero_factura']
     ordering_fields = ['marca', 'modelo', 'fecha_ingreso', 'created_at']
     ordering = ['-fecha_ingreso']
 
@@ -54,7 +54,8 @@ class DeviceViewSet(viewsets.ModelViewSet):
                 'tipo_equipo': device.tipo_equipo,
                 'marca': device.marca,
                 'modelo': device.modelo,
-                'serie_imei': device.serie_imei,
+                'numero_serie': device.numero_serie,
+                'imei': device.imei,
                 'estado': device.estado,
             },
             'total_assignments': assignments.count(),
