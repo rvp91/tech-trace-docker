@@ -167,7 +167,7 @@ export const REPORTS_DEVICES = [
 ]
 
 export const NAVIGATION = [
-  { name: "Panel", href: "/dashboard", icon: "LayoutDashboard" },
+  { name: "Dashboard", href: "/dashboard", icon: "LayoutDashboard" },
   { name: "Empleados", href: "/dashboard/employees", icon: "Users" },
   { name: "Dispositivos", href: "/dashboard/devices", icon: "Tablet" },
   { name: "Asignaciones", href: "/dashboard/assignments", icon: "Zap" },

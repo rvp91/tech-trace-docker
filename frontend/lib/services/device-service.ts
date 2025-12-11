@@ -16,13 +16,17 @@ export interface DeviceFilters {
 export interface CreateDeviceData {
   tipo_equipo: TipoEquipo
   marca: string
-  modelo: string
-  serie_imei: string
+  modelo?: string
+  numero_serie?: string
+  imei?: string
   numero_telefono?: string
   numero_factura?: string
   estado: EstadoDispositivo
   sucursal: number
   fecha_ingreso: string
+  valor_inicial?: number
+  valor_depreciado?: number
+  es_valor_manual?: boolean
 }
 
 export interface DevicePaginatedResponse {
@@ -74,6 +78,23 @@ export const deviceService = {
     const response = await this.getDevices({ estado: "DISPONIBLE", page_size: 1000 })
     return response.results
   },
+
+  async getAllDevices(filters: Omit<DeviceFilters, 'page' | 'page_size'> = {}): Promise<Device[]> {
+    const allDevices: Device[] = []
+    let page = 1
+    let hasMore = true
+
+    while (hasMore) {
+      const response = await this.getDevices({ ...filters, page, page_size: 100 })
+      allDevices.push(...response.results)
+
+      // Si hay una siguiente página, continuar
+      hasMore = response.next !== null
+      page++
+    }
+
+    return allDevices
+  },
 }
 
 // Helper functions for UI
@@ -104,6 +125,7 @@ export function getDeviceTypeLabel(tipo: TipoEquipo): string {
     LAPTOP: "Laptop",
     TELEFONO: "Teléfono",
     TABLET: "Tablet",
+    TV: "TV",
     SIM: "SIM Card",
     ACCESORIO: "Accesorio",
   }
@@ -115,8 +137,25 @@ export function getDeviceTypeIcon(tipo: TipoEquipo): string {
     LAPTOP: "💻",
     TELEFONO: "📱",
     TABLET: "📱",
+    TV: "📺",
     SIM: "📶",
     ACCESORIO: "🔌",
   }
   return icons[tipo] || "📦"
+}
+
+export function formatCurrency(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "-"
+  return new Intl.NumberFormat('es-CL', {
+    style: 'currency',
+    currency: 'CLP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value)
+}
+
+export function formatEdadDispositivo(edad: string | number | null | undefined): string {
+  if (edad === null || edad === undefined) return "-"
+  if (edad === "5+") return "5+ años"
+  return `${edad} ${edad === 1 ? 'año' : 'años'}`
 }

@@ -138,19 +138,23 @@ export type EmployeeFormData = z.infer<typeof employeeSchema>
 // ============================================
 
 export const deviceSchema = z.object({
-  tipo_equipo: z.enum(["LAPTOP", "TELEFONO", "TABLET", "SIM", "ACCESORIO"]),
+  tipo_equipo: z.enum(["LAPTOP", "TELEFONO", "TABLET", "TV", "SIM", "ACCESORIO"]),
 
   marca: z.string()
     .min(2, "La marca debe tener al menos 2 caracteres")
     .max(50, "La marca no puede exceder 50 caracteres"),
 
   modelo: z.string()
-    .min(1, "El modelo es requerido")
-    .max(100, "El modelo no puede exceder 100 caracteres"),
+    .optional()
+    .or(z.literal("")),
 
-  serie_imei: z.string()
-    .min(5, "La serie/IMEI debe tener al menos 5 caracteres")
-    .max(100, "La serie/IMEI no puede exceder 100 caracteres"),
+  numero_serie: z.string()
+    .optional()
+    .or(z.literal("")),
+
+  imei: z.string()
+    .optional()
+    .or(z.literal("")),
 
   numero_telefono: z.string()
     .optional()
@@ -166,19 +170,58 @@ export const deviceSchema = z.object({
 
   fecha_ingreso: z.string()
     .min(1, "La fecha de ingreso es requerida"),
-}).refine(
-  (data) => {
-    // Si el tipo es TELEFONO o SIM, el número de teléfono es obligatorio
-    if (data.tipo_equipo === "TELEFONO" || data.tipo_equipo === "SIM") {
-      return data.numero_telefono && data.numero_telefono.length >= 8
+
+  // Nuevos campos de valor
+  valor_inicial: z.union([z.number(), z.string()])
+    .optional()
+    .transform(val => {
+      if (val === "" || val === null || val === undefined) return undefined
+      return typeof val === 'string' ? parseFloat(val) : val
+    }),
+
+  valor_depreciado: z.union([z.number(), z.string()])
+    .optional()
+    .transform(val => {
+      if (val === "" || val === null || val === undefined) return undefined
+      return typeof val === 'string' ? parseFloat(val) : val
+    }),
+
+  es_valor_manual: z.boolean().optional(),
+
+}).superRefine((data, ctx) => {
+  // VALIDACIÓN 1: numero_serie obligatorio para LAPTOP, TELEFONO, TABLET, TV
+  if (['LAPTOP', 'TELEFONO', 'TABLET', 'TV'].includes(data.tipo_equipo)) {
+    if (!data.numero_serie || data.numero_serie.trim() === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `El número de serie es obligatorio para ${data.tipo_equipo}`,
+        path: ['numero_serie'],
+      })
     }
-    return true
-  },
-  {
-    message: "El número de teléfono es obligatorio para teléfonos y SIM cards",
-    path: ["numero_telefono"],
   }
-)
+
+  // VALIDACIÓN 2: modelo obligatorio para LAPTOP, TELEFONO, TABLET
+  if (['LAPTOP', 'TELEFONO', 'TABLET'].includes(data.tipo_equipo)) {
+    if (!data.modelo || data.modelo.trim() === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `El modelo es obligatorio para ${data.tipo_equipo}`,
+        path: ['modelo'],
+      })
+    }
+  }
+
+  // VALIDACIÓN 3: numero_telefono obligatorio solo para SIM
+  if (data.tipo_equipo === 'SIM') {
+    if (!data.numero_telefono || data.numero_telefono.trim() === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'El número de teléfono es obligatorio para SIM cards',
+        path: ['numero_telefono'],
+      })
+    }
+  }
+})
 
 export type DeviceFormData = z.infer<typeof deviceSchema>
 

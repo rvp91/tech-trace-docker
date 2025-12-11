@@ -53,7 +53,7 @@ export interface EmployeeHistory {
   assignments: Assignment[]
 }
 
-export type TipoEquipo = "LAPTOP" | "TELEFONO" | "TABLET" | "SIM" | "ACCESORIO"
+export type TipoEquipo = "LAPTOP" | "TELEFONO" | "TABLET" | "TV" | "SIM" | "ACCESORIO"
 export type EstadoDispositivo = "DISPONIBLE" | "ASIGNADO" | "MANTENIMIENTO" | "BAJA" | "ROBO"
 
 export interface Device {
@@ -61,13 +61,27 @@ export interface Device {
   tipo_equipo: TipoEquipo
   marca: string
   modelo: string
-  serie_imei: string
+  numero_serie?: string
+  imei?: string
   numero_telefono?: string
   numero_factura?: string
   estado: EstadoDispositivo
   sucursal: number
   sucursal_detail?: Branch
   fecha_ingreso: string
+
+  // Campos de edad
+  edad_dispositivo?: number
+  edad_dispositivo_display?: string | number
+  puede_tener_edad?: boolean
+
+  // Campos de valor
+  valor_inicial?: number
+  valor_depreciado?: number
+  valor_depreciado_calculado?: number
+  es_valor_manual?: boolean
+  puede_tener_valor?: boolean
+
   created_at: string
   updated_at: string
   created_by?: number
@@ -80,7 +94,8 @@ export interface DeviceHistory {
     tipo_equipo: TipoEquipo
     marca: string
     modelo: string
-    serie_imei: string
+    numero_serie?: string
+    imei?: string
   }
   total_assignments: number
   active_assignments: number
