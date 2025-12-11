@@ -8,9 +8,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import { deviceService, type CreateDeviceData } from "@/lib/services/device-service"
+import { deviceService, type CreateDeviceData, formatCurrency } from "@/lib/services/device-service"
 import { branchService } from "@/lib/services/branch-service"
 import type { Branch, Device, TipoEquipo, EstadoDispositivo } from "@/lib/types"
+import { Info, DollarSign } from "lucide-react"
+import { z } from "zod"
+import { deviceSchema } from "@/lib/validations"
 
 interface DeviceModalProps {
   open: boolean
@@ -23,19 +26,56 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [branches, setBranches] = useState<Branch[]>([])
+  const [valorCalculadoSugerido, setValorCalculadoSugerido] = useState<number | null>(null)
+  const [mostrarInfoDepreciacion, setMostrarInfoDepreciacion] = useState(false)
   const [formData, setFormData] = useState<CreateDeviceData>({
     tipo_equipo: "LAPTOP",
     marca: "",
     modelo: "",
-    serie_imei: "",
+    numero_serie: "",
+    imei: "",
     numero_telefono: "",
     numero_factura: "",
     estado: "DISPONIBLE",
     sucursal: 0,
     fecha_ingreso: new Date().toISOString().split("T")[0],
+    valor_inicial: undefined,
+    valor_depreciado: undefined,
+    es_valor_manual: false,
   })
 
   const isEditMode = !!device
+
+  // Función para calcular depreciación (igual que en backend)
+  const calcularDepreciacion = (valorInicial: number, fechaIngreso: string): number => {
+    const fecha = new Date(fechaIngreso)
+    const hoy = new Date()
+    const diferenciaDias = (hoy.getTime() - fecha.getTime()) / (1000 * 60 * 60 * 24)
+    const mesesTranscurridos = diferenciaDias / 30.44
+    const periodos6Meses = Math.floor(mesesTranscurridos / 6)
+
+    if (periodos6Meses >= 10) return 0
+
+    const porcentajeDepreciacion = Math.min(periodos6Meses * 10, 100)
+    const valorDepreciado = valorInicial * (1 - porcentajeDepreciacion / 100)
+
+    return Math.round(valorDepreciado)
+  }
+
+  // Calcular valor depreciado sugerido cuando cambien valor_inicial o fecha_ingreso
+  useEffect(() => {
+    if (formData.valor_inicial && formData.fecha_ingreso) {
+      const valorCalculado = calcularDepreciacion(formData.valor_inicial, formData.fecha_ingreso)
+      setValorCalculadoSugerido(valorCalculado)
+
+      // Si no es manual, actualizar automáticamente
+      if (!formData.es_valor_manual) {
+        setFormData(prev => ({ ...prev, valor_depreciado: valorCalculado }))
+      }
+    } else {
+      setValorCalculadoSugerido(null)
+    }
+  }, [formData.valor_inicial, formData.fecha_ingreso, formData.es_valor_manual])
 
   // Cargar sucursales
   useEffect(() => {
@@ -58,13 +98,17 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
       setFormData({
         tipo_equipo: device.tipo_equipo,
         marca: device.marca,
-        modelo: device.modelo,
-        serie_imei: device.serie_imei,
+        modelo: device.modelo || "",
+        numero_serie: device.numero_serie || "",
+        imei: device.imei || "",
         numero_telefono: device.numero_telefono || "",
         numero_factura: device.numero_factura || "",
         estado: device.estado,
         sucursal: device.sucursal,
         fecha_ingreso: device.fecha_ingreso,
+        valor_inicial: device.valor_inicial,
+        valor_depreciado: device.valor_depreciado,
+        es_valor_manual: device.es_valor_manual || false,
       })
     } else if (!device && open) {
       // Reset form cuando se abre en modo creación
@@ -72,12 +116,16 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
         tipo_equipo: "LAPTOP",
         marca: "",
         modelo: "",
-        serie_imei: "",
+        numero_serie: "",
+        imei: "",
         numero_telefono: "",
         numero_factura: "",
         estado: "DISPONIBLE",
         sucursal: 0,
         fecha_ingreso: new Date().toISOString().split("T")[0],
+        valor_inicial: undefined,
+        valor_depreciado: undefined,
+        es_valor_manual: false,
       })
     }
   }, [device, open])
@@ -96,34 +144,43 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
       tipo_equipo: "LAPTOP",
       marca: "",
       modelo: "",
-      serie_imei: "",
+      numero_serie: "",
+      imei: "",
       numero_telefono: "",
       numero_factura: "",
       estado: "DISPONIBLE",
       sucursal: 0,
       fecha_ingreso: new Date().toISOString().split("T")[0],
+      valor_inicial: undefined,
+      valor_depreciado: undefined,
+      es_valor_manual: false,
     })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Validación: numero_telefono requerido para TELEFONO y SIM
-    if ((formData.tipo_equipo === "TELEFONO" || formData.tipo_equipo === "SIM") && !formData.numero_telefono) {
-      toast({
-        title: "Campo requerido",
-        description: "El número de teléfono es obligatorio para Teléfonos y SIM Cards.",
-        variant: "destructive",
-      })
-      return
+    // Validar con Zod
+    try {
+      deviceSchema.parse(formData)
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const firstError = error.errors[0]
+        toast({
+          title: "Error de validación",
+          description: firstError.message,
+          variant: "destructive",
+        })
+        return
+      }
     }
 
     try {
       setLoading(true)
 
       if (isEditMode && device) {
-        // Modo edición - excluir serie_imei ya que no es editable
-        const { serie_imei, ...updateData } = formData
+        // Modo edición - excluir numero_serie ya que no es editable
+        const { numero_serie, ...updateData } = formData
         await deviceService.updateDevice(device.id, updateData)
         toast({
           title: "Dispositivo actualizado",
@@ -152,8 +209,13 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
     }
   }
 
-  // Determinar si el campo numero_telefono es requerido
-  const isTelefonoRequired = formData.tipo_equipo === "TELEFONO" || formData.tipo_equipo === "SIM"
+  // Determinar si campos son requeridos u opcionales según tipo
+  const isNumeroSerieRequired = ['LAPTOP', 'TELEFONO', 'TABLET', 'TV'].includes(formData.tipo_equipo)
+  const isModeloRequired = ['LAPTOP', 'TELEFONO', 'TABLET'].includes(formData.tipo_equipo)
+  const isTelefonoRequired = formData.tipo_equipo === 'SIM'
+  const showEdadFields = ['LAPTOP', 'TELEFONO', 'TABLET'].includes(formData.tipo_equipo)
+  const showValorFields = ['LAPTOP', 'TELEFONO', 'TABLET'].includes(formData.tipo_equipo)
+  const showImeiField = ['TELEFONO', 'TABLET'].includes(formData.tipo_equipo)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -178,6 +240,7 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
                   <SelectItem value="LAPTOP">Laptop</SelectItem>
                   <SelectItem value="TELEFONO">Teléfono</SelectItem>
                   <SelectItem value="TABLET">Tablet</SelectItem>
+                  <SelectItem value="TV">TV</SelectItem>
                   <SelectItem value="SIM">SIM Card</SelectItem>
                   <SelectItem value="ACCESORIO">Accesorio</SelectItem>
                 </SelectContent>
@@ -199,36 +262,61 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
 
             {/* Modelo */}
             <div>
-              <Label htmlFor="modelo">Modelo *</Label>
+              <Label htmlFor="modelo">
+                Modelo {isModeloRequired ? "*" : ""}
+              </Label>
               <Input
                 id="modelo"
                 name="modelo"
                 value={formData.modelo}
                 onChange={handleInputChange}
                 placeholder="MacBook Pro, Galaxy S23, etc."
-                required
+                required={isModeloRequired}
               />
             </div>
 
-            {/* Serie/IMEI */}
+            {/* Número de Serie */}
             <div>
-              <Label htmlFor="serie_imei">Serie / IMEI *</Label>
+              <Label htmlFor="numero_serie">
+                Número de Serie {isNumeroSerieRequired ? "*" : ""}
+              </Label>
               <Input
-                id="serie_imei"
-                name="serie_imei"
-                value={formData.serie_imei}
+                id="numero_serie"
+                name="numero_serie"
+                value={formData.numero_serie}
                 onChange={handleInputChange}
-                placeholder="C02XYZ123ABC o 123456789012345"
-                required
+                placeholder="C02XYZ123ABC"
+                required={isNumeroSerieRequired}
                 disabled={isEditMode}
                 className={isEditMode ? "bg-muted cursor-not-allowed" : ""}
               />
               {isEditMode && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  La serie/IMEI no puede ser modificada
+                  El número de serie no puede ser modificado
                 </p>
               )}
             </div>
+
+            {/* IMEI (solo para TELEFONO y TABLET) */}
+            {showImeiField && (
+              <div>
+                <Label htmlFor="imei">IMEI</Label>
+                <Input
+                  id="imei"
+                  name="imei"
+                  value={formData.imei}
+                  onChange={handleInputChange}
+                  placeholder="123456789012345"
+                  disabled={isEditMode}
+                  className={isEditMode ? "bg-muted cursor-not-allowed" : ""}
+                />
+                {isEditMode && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    El IMEI no puede ser modificado
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Número de Teléfono */}
             <div>
@@ -245,7 +333,7 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
               />
               {isTelefonoRequired && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  Requerido para teléfonos y SIM cards
+                  Obligatorio para SIM cards
                 </p>
               )}
             </div>
@@ -317,6 +405,112 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
               />
             </div>
           </div>
+
+          {/* SECCIÓN DE VALOR (solo para LAPTOP, TELEFONO, TABLET) */}
+          {showValorFields && (
+            <div className="border rounded-lg p-4 space-y-4 bg-muted/50 mt-4">
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5" />
+                <h3 className="text-sm font-semibold">Información de Valor (Opcional)</h3>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {/* Valor Inicial */}
+                <div>
+                  <Label htmlFor="valor_inicial">Valor Inicial (CLP)</Label>
+                  <Input
+                    id="valor_inicial"
+                    name="valor_inicial"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={formData.valor_inicial || ""}
+                    onChange={(e) => {
+                      const value = e.target.value ? parseFloat(e.target.value) : undefined
+                      setFormData(prev => ({ ...prev, valor_inicial: value }))
+                    }}
+                    placeholder="Ej: 500000"
+                  />
+                </div>
+
+                {/* Valor Depreciado */}
+                <div>
+                  <Label htmlFor="valor_depreciado">Valor Depreciado (CLP)</Label>
+                  <div className="relative">
+                    <Input
+                      id="valor_depreciado"
+                      name="valor_depreciado"
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={formData.valor_depreciado || ""}
+                      onChange={(e) => {
+                        const value = e.target.value ? parseFloat(e.target.value) : undefined
+                        setFormData(prev => ({
+                          ...prev,
+                          valor_depreciado: value,
+                          es_valor_manual: value !== valorCalculadoSugerido
+                        }))
+                      }}
+                      placeholder={valorCalculadoSugerido ? `Sugerido: ${formatCurrency(valorCalculadoSugerido)}` : "Calculado automáticamente"}
+                      disabled={!formData.valor_inicial}
+                    />
+                    {formData.es_valor_manual && (
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                        Manual
+                      </span>
+                    )}
+                  </div>
+                  {valorCalculadoSugerido && formData.valor_depreciado !== valorCalculadoSugerido && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Valor calculado: {formatCurrency(valorCalculadoSugerido)}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Info de Depreciación */}
+              <div className="flex items-start gap-2 text-xs text-muted-foreground">
+                <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p>La depreciación se calcula automáticamente: 0% los primeros 6 meses, luego -10% cada 6 meses del valor original.</p>
+                  <button
+                    type="button"
+                    onClick={() => setMostrarInfoDepreciacion(!mostrarInfoDepreciacion)}
+                    className="text-primary underline mt-1"
+                  >
+                    {mostrarInfoDepreciacion ? "Ocultar" : "Ver"} tabla de depreciación
+                  </button>
+                </div>
+              </div>
+
+              {mostrarInfoDepreciacion && (
+                <div className="text-xs bg-background p-3 rounded border">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-1">Período</th>
+                        <th className="text-right py-1">% Valor</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr><td>0-6 meses</td><td className="text-right">100%</td></tr>
+                      <tr><td>6-12 meses</td><td className="text-right">90%</td></tr>
+                      <tr><td>12-18 meses</td><td className="text-right">80%</td></tr>
+                      <tr><td>18-24 meses</td><td className="text-right">70%</td></tr>
+                      <tr><td>24-30 meses</td><td className="text-right">60%</td></tr>
+                      <tr><td>30-36 meses</td><td className="text-right">50%</td></tr>
+                      <tr><td>36-42 meses</td><td className="text-right">40%</td></tr>
+                      <tr><td>42-48 meses</td><td className="text-right">30%</td></tr>
+                      <tr><td>48-54 meses</td><td className="text-right">20%</td></tr>
+                      <tr><td>54-60 meses</td><td className="text-right">10%</td></tr>
+                      <tr><td>60+ meses</td><td className="text-right">0%</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="flex gap-2 justify-end pt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
