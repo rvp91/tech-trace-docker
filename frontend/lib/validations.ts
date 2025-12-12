@@ -232,6 +232,10 @@ export type DeviceFormData = z.infer<typeof deviceSchema>
 export const requestSchema = z.object({
   empleado: z.number().positive("Debes seleccionar un empleado válido"),
 
+  sucursal: z.number().positive("Debes seleccionar una sucursal válida"),
+
+  motivo: z.enum(["CAMBIO", "NUEVA_ENTREGA", "ROBO", "PRACTICA"]),
+
   jefatura_solicitante: z.string()
     .min(3, "El nombre de la jefatura debe tener al menos 3 caracteres")
     .max(200, "El nombre de la jefatura no puede exceder 200 caracteres"),

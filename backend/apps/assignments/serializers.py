@@ -2,6 +2,7 @@ from rest_framework import serializers
 from .models import Request, Assignment, Return
 from apps.employees.serializers import EmployeeSerializer
 from apps.devices.serializers import DeviceSerializer
+from apps.branches.serializers import BranchSerializer
 
 
 class RequestSerializer(serializers.ModelSerializer):
@@ -10,8 +11,10 @@ class RequestSerializer(serializers.ModelSerializer):
     """
     # Campos de solo lectura con información anidada
     empleado_detail = EmployeeSerializer(source='empleado', read_only=True)
+    sucursal_detail = BranchSerializer(source='sucursal', read_only=True)
     created_by_username = serializers.CharField(source='created_by.username', read_only=True)
     estado_display = serializers.CharField(source='get_estado_display', read_only=True)
+    motivo_display = serializers.CharField(source='get_motivo_display', read_only=True)
 
     class Meta:
         model = Request
@@ -19,6 +22,10 @@ class RequestSerializer(serializers.ModelSerializer):
             'id',
             'empleado',
             'empleado_detail',
+            'sucursal',
+            'sucursal_detail',
+            'motivo',
+            'motivo_display',
             'jefatura_solicitante',
             'tipo_dispositivo',
             'justificacion',
@@ -37,8 +44,10 @@ class RequestSerializer(serializers.ModelSerializer):
             'updated_at',
             'created_by',
             'empleado_detail',
+            'sucursal_detail',
             'created_by_username',
             'estado_display',
+            'motivo_display',
         ]
 
 

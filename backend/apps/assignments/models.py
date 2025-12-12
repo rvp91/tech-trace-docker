@@ -13,7 +13,16 @@ class Request(models.Model):
         ('COMPLETADA', 'Completada'),
     ]
 
+    MOTIVO_CHOICES = [
+        ('CAMBIO', 'Cambio'),
+        ('NUEVA_ENTREGA', 'Nueva entrega'),
+        ('ROBO', 'Robo'),
+        ('PRACTICA', 'Práctica'),
+    ]
+
     empleado = models.ForeignKey('employees.Employee', on_delete=models.PROTECT, verbose_name='Empleado')
+    sucursal = models.ForeignKey('branches.Branch', on_delete=models.PROTECT, verbose_name='Sucursal', null=True, blank=True)
+    motivo = models.CharField(max_length=20, choices=MOTIVO_CHOICES, verbose_name='Motivo de solicitud', default='NUEVA_ENTREGA')
     jefatura_solicitante = models.CharField(max_length=200, verbose_name='Jefatura solicitante')
     tipo_dispositivo = models.CharField(max_length=20, verbose_name='Tipo de dispositivo')
     justificacion = models.TextField(blank=True, null=True, verbose_name='Justificación')

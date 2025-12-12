@@ -13,17 +13,12 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { EmployeeSearchCombobox } from "@/components/ui/employee-search-combobox"
 import { useToast } from "@/hooks/use-toast"
 import { requestService } from "@/lib/services/request-service"
-import { employeeService } from "@/lib/services/employee-service"
-import type { Request, Employee } from "@/lib/types"
+import { branchService } from "@/lib/services/branch-service"
+import type { Request, Branch } from "@/lib/types"
 
 interface RequestModalProps {
   open: boolean
@@ -40,11 +35,20 @@ const TIPOS_DISPOSITIVO = [
   { value: "ACCESORIO", label: "Accesorio" },
 ]
 
+const MOTIVOS_SOLICITUD = [
+  { value: "CAMBIO", label: "Cambio" },
+  { value: "NUEVA_ENTREGA", label: "Nueva entrega" },
+  { value: "ROBO", label: "Robo" },
+  { value: "PRACTICA", label: "Práctica" },
+]
+
 export function RequestModal({ open, onClose, onSuccess, request }: RequestModalProps) {
   const [loading, setLoading] = useState(false)
-  const [employees, setEmployees] = useState<Employee[]>([])
+  const [branches, setBranches] = useState<Branch[]>([])
   const [formData, setFormData] = useState({
     empleado: "",
+    sucursal: "",
+    motivo: "",
     jefatura_solicitante: "",
     tipo_dispositivo: "",
     justificacion: "",
@@ -52,11 +56,26 @@ export function RequestModal({ open, onClose, onSuccess, request }: RequestModal
   const { toast } = useToast()
 
   useEffect(() => {
+    const loadBranches = async () => {
+      try {
+        const response = await branchService.getBranches({ is_active: true, page_size: 100 })
+        setBranches(response.results)
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar las sucursales",
+          variant: "destructive",
+        })
+      }
+    }
+
     if (open) {
-      loadEmployees()
+      loadBranches()
       if (request) {
         setFormData({
           empleado: String(request.empleado),
+          sucursal: String(request.sucursal),
+          motivo: request.motivo,
           jefatura_solicitante: request.jefatura_solicitante,
           tipo_dispositivo: request.tipo_dispositivo,
           justificacion: request.justificacion || "",
@@ -64,31 +83,21 @@ export function RequestModal({ open, onClose, onSuccess, request }: RequestModal
       } else {
         setFormData({
           empleado: "",
+          sucursal: "",
+          motivo: "",
           jefatura_solicitante: "",
           tipo_dispositivo: "",
           justificacion: "",
         })
       }
     }
-  }, [open, request])
-
-  const loadEmployees = async () => {
-    try {
-      const response = await employeeService.getEmployees({ estado: "ACTIVO", page_size: 1000 })
-      setEmployees(response.results)
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los empleados",
-        variant: "destructive",
-      })
-    }
-  }
+  }, [open, request, toast])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.empleado || !formData.jefatura_solicitante || !formData.tipo_dispositivo) {
+    if (!formData.empleado || !formData.sucursal || !formData.motivo ||
+        !formData.jefatura_solicitante || !formData.tipo_dispositivo) {
       toast({
         title: "Error",
         description: "Por favor completa todos los campos requeridos",
@@ -101,6 +110,8 @@ export function RequestModal({ open, onClose, onSuccess, request }: RequestModal
       setLoading(true)
       const data = {
         empleado: Number(formData.empleado),
+        sucursal: Number(formData.sucursal),
+        motivo: formData.motivo,
         jefatura_solicitante: formData.jefatura_solicitante,
         tipo_dispositivo: formData.tipo_dispositivo,
         justificacion: formData.justificacion || undefined,
@@ -151,28 +162,61 @@ export function RequestModal({ open, onClose, onSuccess, request }: RequestModal
               <Label htmlFor="empleado">
                 Empleado <span className="text-red-500">*</span>
               </Label>
-              <Select
+              <EmployeeSearchCombobox
                 value={formData.empleado}
-                onValueChange={(value) =>
+                onChange={(value) =>
                   setFormData((prev) => ({ ...prev, empleado: value }))
+                }
+                disabled={!!request}
+                placeholder="Buscar empleado..."
+                filter={{ estado: "ACTIVO" }}
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="sucursal">
+                Sucursal <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={formData.sucursal}
+                onValueChange={(value) =>
+                  setFormData((prev) => ({ ...prev, sucursal: value }))
                 }
                 disabled={!!request}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecciona un empleado" />
+                  <SelectValue placeholder="Selecciona una sucursal" />
                 </SelectTrigger>
                 <SelectContent>
-                  {employees && employees.length > 0 ? (
-                    employees.map((employee) => (
-                      <SelectItem key={employee.id} value={String(employee.id)}>
-                        {employee.nombre_completo} - {employee.rut}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="none" disabled>
-                      Cargando empleados...
+                  {branches.map((branch) => (
+                    <SelectItem key={branch.id} value={String(branch.id)}>
+                      {branch.nombre} ({branch.codigo})
                     </SelectItem>
-                  )}
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="motivo">
+                Motivo de Solicitud <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={formData.motivo}
+                onValueChange={(value) =>
+                  setFormData((prev) => ({ ...prev, motivo: value }))
+                }
+                disabled={!!request}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona el motivo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MOTIVOS_SOLICITUD.map((motivo) => (
+                    <SelectItem key={motivo.value} value={motivo.value}>
+                      {motivo.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
