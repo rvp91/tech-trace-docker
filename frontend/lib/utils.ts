@@ -156,3 +156,59 @@ export function formatDateTime(dateString: string): string {
     minute: '2-digit'
   })
 }
+
+/**
+ * Formatea un número como moneda chilena (CLP)
+ * Ejemplo: 800000 -> "800.000"
+ * @param value - Valor numérico a formatear
+ * @returns String formateado con separadores de miles
+ */
+export function formatCurrency(value: number | string | undefined | null): string {
+  if (value === undefined || value === null || value === '') return ''
+  const numValue = typeof value === 'string' ? parseFloat(value) : value
+  if (isNaN(numValue)) return ''
+
+  // Formatear con separador de miles chileno (punto)
+  return Math.round(numValue).toLocaleString('es-CL', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  })
+}
+
+/**
+ * Parsea un string formateado como moneda a número
+ * Ejemplo: "800.000" -> 800000
+ * @param value - String formateado con separadores
+ * @returns Número sin formato
+ */
+export function parseCurrency(value: string): number {
+  if (!value) return 0
+  // Remover puntos (separadores de miles) y convertir a número
+  const cleanValue = value.replace(/\./g, '')
+  return parseFloat(cleanValue) || 0
+}
+
+/**
+ * Formatea un input mientras el usuario escribe
+ * Agrega automáticamente separadores de miles
+ * @param value - Valor actual del input
+ * @returns Valor formateado con separadores
+ */
+export function formatCurrencyInput(value: string): string {
+  // Remover todo excepto números
+  const numbers = value.replace(/\D/g, '')
+  if (!numbers) return ''
+
+  // Convertir a número y formatear
+  const numValue = parseInt(numbers, 10)
+  return formatCurrency(numValue)
+}
+
+/**
+ * Obtiene el identificador serial de un dispositivo (numero_serie o IMEI)
+ * @param device - Objeto dispositivo con campos numero_serie y/o imei
+ * @returns El numero_serie, imei o "N/A" si no tiene ninguno
+ */
+export function getDeviceSerial(device: { numero_serie?: string | null; imei?: string | null }): string {
+  return device.numero_serie || device.imei || "N/A"
+}

@@ -7,12 +7,13 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, Eye, Laptop, Smartphone, Tablet as TabletIcon, Download } from "lucide-react"
+import { TablePagination } from "@/components/ui/table-pagination"
+import { Search, Eye, Laptop, Smartphone, Tablet as TabletIcon, Download, Tv } from "lucide-react"
 import { CardSimIcon } from "@/components/ui/icons/lucide-card-sim"
 import { InventoryDetailsModal } from "@/components/modals/inventory-details-modal"
 import { deviceService, getDeviceStatusColor, getDeviceStatusLabel, getDeviceTypeLabel } from "@/lib/services/device-service"
 import { branchService } from "@/lib/services/branch-service"
-import { exportToCSV, formatDate } from "@/lib/utils"
+import { exportToCSV, formatDate, getDeviceSerial } from "@/lib/utils"
 import type { Device, Branch, TipoEquipo, EstadoDispositivo } from "@/lib/types"
 
 export default function InventoryPage() {
@@ -25,17 +26,19 @@ export default function InventoryPage() {
   const [filterSucursal, setFilterSucursal] = useState<number | "todos">("todos")
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize] = useState(20)
 
   // Cargar datos de la API
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true)
-        const [devicesResponse, branchesResponse] = await Promise.all([
-          deviceService.getDevices({ page_size: 1000 }),
+        const [devices, branchesResponse] = await Promise.all([
+          deviceService.getAllDevices(),
           branchService.getBranches({ page_size: 100 })
         ])
-        setDevices(devicesResponse.results)
+        setDevices(devices)
         setBranches(branchesResponse.results)
       } catch (error) {
         console.error("Error cargando datos:", error)
@@ -52,6 +55,7 @@ export default function InventoryPage() {
     const laptops = devices.filter((d) => d.tipo_equipo === "LAPTOP")
     const telefonos = devices.filter((d) => d.tipo_equipo === "TELEFONO")
     const tablets = devices.filter((d) => d.tipo_equipo === "TABLET")
+    const tvs = devices.filter((d) => d.tipo_equipo === "TV")
     const simCards = devices.filter((d) => d.tipo_equipo === "SIM")
 
     const countByStatus = (devicesList: Device[]) => ({
@@ -65,6 +69,7 @@ export default function InventoryPage() {
       laptops: countByStatus(laptops),
       telefonos: countByStatus(telefonos),
       tablets: countByStatus(tablets),
+      tvs: countByStatus(tvs),
       simCards: countByStatus(simCards),
     }
   }, [devices])
@@ -72,10 +77,12 @@ export default function InventoryPage() {
   // Filtrar dispositivos
   const filteredDevices = useMemo(() => {
     return devices.filter((device) => {
+      const searchLower = searchTerm.toLowerCase()
       const matchesSearch =
-        device.modelo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        device.serie_imei.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        device.marca.toLowerCase().includes(searchTerm.toLowerCase())
+        (device.modelo?.toLowerCase() || "").includes(searchLower) ||
+        (device.numero_serie?.toLowerCase() || "").includes(searchLower) ||
+        (device.imei?.toLowerCase() || "").includes(searchLower) ||
+        device.marca.toLowerCase().includes(searchLower)
 
       const matchesTipo = filterTipo === "todos" || device.tipo_equipo === filterTipo
       const matchesEstado = filterEstado === "todos" || device.estado === filterEstado
@@ -84,6 +91,25 @@ export default function InventoryPage() {
       return matchesSearch && matchesTipo && matchesEstado && matchesSucursal
     })
   }, [searchTerm, filterTipo, filterEstado, filterSucursal, devices])
+
+  // Paginar dispositivos filtrados
+  const paginatedData = useMemo(() => {
+    const totalPages = Math.ceil(filteredDevices.length / pageSize)
+    const startIndex = (currentPage - 1) * pageSize
+    const endIndex = startIndex + pageSize
+    const pageDevices = filteredDevices.slice(startIndex, endIndex)
+
+    return {
+      devices: pageDevices,
+      totalPages,
+      totalCount: filteredDevices.length
+    }
+  }, [filteredDevices, currentPage, pageSize])
+
+  // Resetear página cuando cambien los filtros
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, filterTipo, filterEstado, filterSucursal])
 
   const handleViewDetails = (device: Device) => {
     setSelectedDevice(device)
@@ -94,8 +120,8 @@ export default function InventoryPage() {
     const dataForExport = filteredDevices.map((device) => ({
       tipo: getDeviceTypeLabel(device.tipo_equipo),
       marca: device.marca,
-      modelo: device.modelo,
-      serie_imei: device.serie_imei,
+      modelo: device.modelo || "N/A",
+      serie_imei: getDeviceSerial(device),
       numero_telefono: device.numero_telefono || "N/A",
       estado: getDeviceStatusLabel(device.estado),
       sucursal: device.sucursal_detail?.nombre || `ID: ${device.sucursal}`,
@@ -143,7 +169,7 @@ export default function InventoryPage() {
       </div>
 
       {/* Tarjetas de Resumen */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -231,6 +257,34 @@ export default function InventoryPage() {
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
+              <CardTitle className="text-lg">TVs</CardTitle>
+              <Tv className="h-5 w-5 text-primary" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <div className="text-2xl font-bold">{summary.tvs.total}</div>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Asignados</span>
+                  <span className="font-semibold">{summary.tvs.asignados}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Disponibles</span>
+                  <span className="font-semibold">{summary.tvs.disponibles}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Mantenimiento</span>
+                  <span className="font-semibold">{summary.tvs.mantenimiento}</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
               <CardTitle className="text-lg">SIM Cards</CardTitle>
               <CardSimIcon size={20} className="text-primary" />
             </div>
@@ -261,66 +315,76 @@ export default function InventoryPage() {
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <CardTitle>Detalle de Inventario</CardTitle>
-              <div className="flex items-center gap-2 bg-input rounded-lg px-3 py-2 w-64">
-                <Search className="h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Buscar por modelo o serial..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="border-0 bg-transparent outline-none placeholder:text-muted-foreground"
-                />
-              </div>
-            </div>
-
+            <CardTitle>Detalle de Inventario</CardTitle>
+            
             {/* Filtros */}
-            <div className="flex flex-wrap gap-3">
-              <Select value={filterTipo} onValueChange={(value) => setFilterTipo(value as TipoEquipo | "todos")}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filtrar por tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos los tipos</SelectItem>
-                  <SelectItem value="LAPTOP">Laptops</SelectItem>
-                  <SelectItem value="TELEFONO">Teléfonos</SelectItem>
-                  <SelectItem value="TABLET">Tablets</SelectItem>
-                  <SelectItem value="SIM">SIM Cards</SelectItem>
-                  <SelectItem value="ACCESORIO">Accesorios</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="flex gap-4 items-end">
+              <div className="flex-1">
+                <label className="text-sm font-medium mb-2 block">Buscar</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por modelo o serial..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              <div className="w-[180px]">
+                <label className="text-sm font-medium mb-2 block">Tipo</label>
+                <Select value={filterTipo} onValueChange={(value) => setFilterTipo(value as TipoEquipo | "todos")}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos los tipos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos los tipos</SelectItem>
+                    <SelectItem value="LAPTOP">Laptops</SelectItem>
+                    <SelectItem value="TELEFONO">Teléfonos</SelectItem>
+                    <SelectItem value="TABLET">Tablets</SelectItem>
+                    <SelectItem value="TV">TVs</SelectItem>
+                    <SelectItem value="SIM">SIM Cards</SelectItem>
+                    <SelectItem value="ACCESORIO">Accesorios</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <Select value={filterEstado} onValueChange={(value) => setFilterEstado(value as EstadoDispositivo | "todos")}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filtrar por estado" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos los estados</SelectItem>
-                  <SelectItem value="DISPONIBLE">Disponible</SelectItem>
-                  <SelectItem value="ASIGNADO">Asignado</SelectItem>
-                  <SelectItem value="MANTENIMIENTO">Mantenimiento</SelectItem>
-                  <SelectItem value="BAJA">Baja</SelectItem>
-                  <SelectItem value="ROBO">Robo</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="w-[180px]">
+                <label className="text-sm font-medium mb-2 block">Estado</label>
+                <Select value={filterEstado} onValueChange={(value) => setFilterEstado(value as EstadoDispositivo | "todos")}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos los estados" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos los estados</SelectItem>
+                    <SelectItem value="DISPONIBLE">Disponible</SelectItem>
+                    <SelectItem value="ASIGNADO">Asignado</SelectItem>
+                    <SelectItem value="MANTENIMIENTO">Mantenimiento</SelectItem>
+                    <SelectItem value="BAJA">Baja</SelectItem>
+                    <SelectItem value="ROBO">Robo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <Select
-                value={filterSucursal === "todos" ? "todos" : String(filterSucursal)}
-                onValueChange={(value) => setFilterSucursal(value === "todos" ? "todos" : Number(value))}
-              >
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Filtrar por sucursal" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todas las sucursales</SelectItem>
-                  {branches.map((branch) => (
-                    <SelectItem key={branch.id} value={String(branch.id)}>
-                      {branch.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="w-[200px]">
+                <label className="text-sm font-medium mb-2 block">Sucursal</label>
+                <Select
+                  value={filterSucursal === "todos" ? "todos" : String(filterSucursal)}
+                  onValueChange={(value) => setFilterSucursal(value === "todos" ? "todos" : Number(value))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todas las sucursales" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todas las sucursales</SelectItem>
+                    {branches.map((branch) => (
+                      <SelectItem key={branch.id} value={String(branch.id)}>
+                        {branch.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -339,19 +403,19 @@ export default function InventoryPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredDevices.length === 0 ? (
+                {paginatedData.devices.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                       No se encontraron dispositivos con los filtros aplicados
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredDevices.map((device) => (
+                  paginatedData.devices.map((device) => (
                     <TableRow key={device.id}>
                       <TableCell className="font-medium">{getDeviceTypeLabel(device.tipo_equipo)}</TableCell>
                       <TableCell>{device.marca}</TableCell>
-                      <TableCell>{device.modelo}</TableCell>
-                      <TableCell className="font-mono text-sm">{device.serie_imei}</TableCell>
+                      <TableCell>{device.modelo || "N/A"}</TableCell>
+                      <TableCell className="font-mono text-sm">{getDeviceSerial(device)}</TableCell>
                       <TableCell>
                         <Badge className={getDeviceStatusColor(device.estado)}>
                           {getDeviceStatusLabel(device.estado)}
@@ -374,9 +438,15 @@ export default function InventoryPage() {
               </TableBody>
             </Table>
           </div>
-          <div className="mt-4 text-sm text-muted-foreground">
-            Mostrando {filteredDevices.length} de {devices.length} dispositivos
-          </div>
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={paginatedData.totalPages}
+            pageSize={pageSize}
+            totalCount={paginatedData.totalCount}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={() => {}}
+            pageSizeOptions={[]}
+          />
         </CardContent>
       </Card>
 

@@ -11,7 +11,7 @@ import { Download, Package, Building2, User } from "lucide-react"
 import { deviceService, getDeviceStatusColor, getDeviceStatusLabel, getDeviceTypeLabel } from "@/lib/services/device-service"
 import { branchService } from "@/lib/services/branch-service"
 import { employeeService } from "@/lib/services/employee-service"
-import { exportToCSV, formatDate } from "@/lib/utils"
+import { exportToCSV, formatDate, getDeviceSerial } from "@/lib/utils"
 import type { Device, Branch, Employee } from "@/lib/types"
 
 export default function ReportsPage() {
@@ -72,8 +72,8 @@ export default function ReportsPage() {
     const dataForExport = devices.map((device) => ({
       tipo: getDeviceTypeLabel(device.tipo_equipo),
       marca: device.marca,
-      modelo: device.modelo,
-      serie_imei: device.serie_imei,
+      modelo: device.modelo || "N/A",
+      serie_imei: getDeviceSerial(device),
       numero_telefono: device.numero_telefono || "N/A",
       estado: getDeviceStatusLabel(device.estado),
       sucursal: device.sucursal_detail?.nombre || `ID: ${device.sucursal}`,
@@ -98,8 +98,16 @@ export default function ReportsPage() {
 
   // SECCIÓN 2: INVENTARIO POR SUCURSAL
   const branchInventory = useMemo(() => {
+    const emptyStatus = {
+      DISPONIBLE: 0,
+      ASIGNADO: 0,
+      MANTENIMIENTO: 0,
+      BAJA: 0,
+      ROBO: 0,
+    }
+
     if (selectedBranch === "todos") {
-      return { devices: [], total: 0, byStatus: {} }
+      return { devices: [], total: 0, byStatus: emptyStatus }
     }
 
     const branchDevices = devices.filter(d => d.sucursal === selectedBranch)
@@ -124,8 +132,8 @@ export default function ReportsPage() {
     const dataForExport = branchInventory.devices.map((device) => ({
       tipo: getDeviceTypeLabel(device.tipo_equipo),
       marca: device.marca,
-      modelo: device.modelo,
-      serie_imei: device.serie_imei,
+      modelo: device.modelo || "N/A",
+      serie_imei: getDeviceSerial(device),
       numero_telefono: device.numero_telefono || "N/A",
       estado: getDeviceStatusLabel(device.estado),
       fecha_ingreso: formatDate(device.fecha_ingreso),
@@ -170,8 +178,8 @@ export default function ReportsPage() {
     const dataForExport = employeeInventory.devices.map((device) => ({
       tipo: getDeviceTypeLabel(device.tipo_equipo),
       marca: device.marca,
-      modelo: device.modelo,
-      serie_imei: device.serie_imei,
+      modelo: device.modelo || "N/A",
+      serie_imei: getDeviceSerial(device),
       numero_telefono: device.numero_telefono || "N/A",
       fecha_ingreso: formatDate(device.fecha_ingreso),
     }))
@@ -318,8 +326,8 @@ export default function ReportsPage() {
                       <TableRow key={device.id}>
                         <TableCell>{getDeviceTypeLabel(device.tipo_equipo)}</TableCell>
                         <TableCell>{device.marca}</TableCell>
-                        <TableCell>{device.modelo}</TableCell>
-                        <TableCell className="font-mono text-sm">{device.serie_imei}</TableCell>
+                        <TableCell>{device.modelo || "N/A"}</TableCell>
+                        <TableCell className="font-mono text-sm">{getDeviceSerial(device)}</TableCell>
                         <TableCell>
                           <Badge className={getDeviceStatusColor(device.estado)}>
                             {getDeviceStatusLabel(device.estado)}
@@ -458,8 +466,8 @@ export default function ReportsPage() {
                             <TableRow key={device.id}>
                               <TableCell>{getDeviceTypeLabel(device.tipo_equipo)}</TableCell>
                               <TableCell>{device.marca}</TableCell>
-                              <TableCell>{device.modelo}</TableCell>
-                              <TableCell className="font-mono text-sm">{device.serie_imei}</TableCell>
+                              <TableCell>{device.modelo || "N/A"}</TableCell>
+                              <TableCell className="font-mono text-sm">{getDeviceSerial(device)}</TableCell>
                               <TableCell>
                                 <Badge className={getDeviceStatusColor(device.estado)}>
                                   {getDeviceStatusLabel(device.estado)}
@@ -584,8 +592,8 @@ export default function ReportsPage() {
                             <TableRow key={device.id}>
                               <TableCell>{getDeviceTypeLabel(device.tipo_equipo)}</TableCell>
                               <TableCell>{device.marca}</TableCell>
-                              <TableCell>{device.modelo}</TableCell>
-                              <TableCell className="font-mono text-sm">{device.serie_imei}</TableCell>
+                              <TableCell>{device.modelo || "N/A"}</TableCell>
+                              <TableCell className="font-mono text-sm">{getDeviceSerial(device)}</TableCell>
                               <TableCell>{formatDate(device.fecha_ingreso)}</TableCell>
                             </TableRow>
                           ))

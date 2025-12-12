@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { assignmentService } from "@/lib/services/assignment-service"
+import { getDeviceSerial } from "@/lib/utils"
 import type { Assignment } from "@/lib/types"
 
 interface ReturnModalProps {
@@ -143,7 +144,7 @@ export function ReturnModal({ open, onClose, onSuccess, assignment }: ReturnModa
               </p>
               <p className="text-sm text-blue-800">
                 {assignment.dispositivo_detail
-                  ? `${assignment.dispositivo_detail.tipo_equipo} - ${assignment.dispositivo_detail.marca} ${assignment.dispositivo_detail.modelo} (${assignment.dispositivo_detail.serie_imei})`
+                  ? `${assignment.dispositivo_detail.tipo_equipo} - ${assignment.dispositivo_detail.marca} ${assignment.dispositivo_detail.modelo || "N/A"} (${getDeviceSerial(assignment.dispositivo_detail)})`
                   : `ID: ${assignment.dispositivo}`}
               </p>
             </div>

@@ -32,6 +32,7 @@ import {
   getAssignmentStatusLabel,
   getTipoEntregaLabel,
 } from "@/lib/services/assignment-service"
+import { getDeviceSerial } from "@/lib/utils"
 import type { Assignment } from "@/lib/types"
 import { AssignmentModal } from "@/components/modals/assignment-modal"
 
@@ -46,7 +47,7 @@ export default function AssignmentsPage() {
 
   // Estados de paginación
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
+  const pageSize = 20 // Tamaño fijo de página
   const [totalCount, setTotalCount] = useState(0)
 
   const loadAssignments = useCallback(async () => {
@@ -108,11 +109,6 @@ export default function AssignmentsPage() {
   // Handlers de paginación
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
-  }
-
-  const handlePageSizeChange = (newPageSize: number) => {
-    setPageSize(newPageSize)
-    setCurrentPage(1)
   }
 
   const totalPages = Math.ceil(totalCount / pageSize)
@@ -217,7 +213,7 @@ export default function AssignmentsPage() {
                       </TableCell>
                       <TableCell>
                         {assignment.dispositivo_detail
-                          ? `${assignment.dispositivo_detail.marca} ${assignment.dispositivo_detail.modelo} (${assignment.dispositivo_detail.serie_imei})`
+                          ? `${assignment.dispositivo_detail.marca} ${assignment.dispositivo_detail.modelo || "N/A"} (${getDeviceSerial(assignment.dispositivo_detail)})`
                           : `ID: ${assignment.dispositivo}`}
                       </TableCell>
                       <TableCell>{getTipoEntregaLabel(assignment.tipo_entrega)}</TableCell>
@@ -254,7 +250,8 @@ export default function AssignmentsPage() {
               pageSize={pageSize}
               totalCount={totalCount}
               onPageChange={handlePageChange}
-              onPageSizeChange={handlePageSizeChange}
+              onPageSizeChange={() => {}} // No-op: tamaño fijo
+              pageSizeOptions={[20]} // Solo mostrar 20 como opción
             />
           )}
         </CardContent>

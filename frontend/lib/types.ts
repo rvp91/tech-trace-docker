@@ -60,11 +60,11 @@ export interface Device {
   id: number
   tipo_equipo: TipoEquipo
   marca: string
-  modelo: string
-  numero_serie?: string
-  imei?: string
-  numero_telefono?: string
-  numero_factura?: string
+  modelo: string | null
+  numero_serie?: string | null
+  imei?: string | null
+  numero_telefono?: string | null
+  numero_factura?: string | null
   estado: EstadoDispositivo
   sucursal: number
   sucursal_detail?: Branch
@@ -104,11 +104,16 @@ export interface DeviceHistory {
 
 // Request (Solicitud) types
 export type EstadoSolicitud = "PENDIENTE" | "APROBADA" | "RECHAZADA" | "COMPLETADA"
+export type MotivoSolicitud = "CAMBIO" | "NUEVA_ENTREGA" | "ROBO" | "PRACTICA"
 
 export interface Request {
   id: number
   empleado: number
   empleado_detail?: Employee
+  sucursal: number
+  sucursal_detail?: Branch
+  motivo: MotivoSolicitud
+  motivo_display?: string
   jefatura_solicitante: string
   tipo_dispositivo: string
   justificacion?: string
@@ -175,6 +180,7 @@ export interface Branch {
     LAPTOP: number
     TELEFONO: number
     TABLET: number
+    TV: number
     SIM: number
     ACCESORIO: number
   }
