@@ -18,6 +18,15 @@ import {
 } from "@/lib/services/assignment-service"
 import type { Assignment, Return } from "@/lib/types"
 import { ReturnModal } from "@/components/modals/return-modal"
+import { formatDateLocal } from "@/lib/utils/date-helpers"
+import { formatDateTime } from "@/lib/utils/format"
+
+// Mapeo de estados de dispositivos en devoluciones
+const DEVICE_CONDITION_LABELS: Record<string, string> = {
+  OPTIMO: "Óptimo",
+  CON_DANOS: "Con Daños",
+  NO_FUNCIONAL: "No Funcional"
+}
 
 export default function AssignmentDetailPage() {
   const params = useParams()
@@ -182,14 +191,54 @@ export default function AssignmentDetailPage() {
                     {assignment.dispositivo_detail.marca} {assignment.dispositivo_detail.modelo}
                   </Link>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Serie/IMEI</p>
-                  <p className="font-medium">{assignment.dispositivo_detail.serie_imei}</p>
-                </div>
+                {assignment.dispositivo_detail.numero_serie && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Número de Serie</p>
+                    <p className="font-medium">{assignment.dispositivo_detail.numero_serie}</p>
+                  </div>
+                )}
+                {assignment.dispositivo_detail.imei && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">IMEI</p>
+                    <p className="font-medium">{assignment.dispositivo_detail.imei}</p>
+                  </div>
+                )}
                 <div>
                   <p className="text-sm text-muted-foreground">Estado</p>
                   <p className="font-medium">{assignment.dispositivo_detail.estado}</p>
                 </div>
+                {assignment.dispositivo_detail.puede_tener_edad &&
+                  assignment.dispositivo_detail.edad_dispositivo_display !== null &&
+                  assignment.dispositivo_detail.edad_dispositivo_display !== undefined && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Edad</p>
+                    <p className="font-medium">
+                      {assignment.dispositivo_detail.edad_dispositivo_display} año{assignment.dispositivo_detail.edad_dispositivo_display === "5+" || Number(assignment.dispositivo_detail.edad_dispositivo_display) !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                )}
+                {assignment.dispositivo_detail.puede_tener_valor &&
+                  assignment.dispositivo_detail.valor_inicial && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Valor Inicial</p>
+                    <p className="font-medium">
+                      ${Number(assignment.dispositivo_detail.valor_inicial).toLocaleString('es-CL')} CLP
+                    </p>
+                  </div>
+                )}
+                {assignment.dispositivo_detail.puede_tener_valor &&
+                  assignment.dispositivo_detail.valor_depreciado_calculado !== null &&
+                  assignment.dispositivo_detail.valor_depreciado_calculado !== undefined && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Valor Actual (Depreciado)</p>
+                    <p className="font-medium">
+                      ${Number(assignment.dispositivo_detail.valor_depreciado_calculado).toLocaleString('es-CL')} CLP
+                      {assignment.dispositivo_detail.es_valor_manual && (
+                        <Badge variant="outline" className="ml-2">Manual</Badge>
+                      )}
+                    </p>
+                  </div>
+                )}
               </>
             ) : (
               <p>ID del dispositivo: {assignment.dispositivo}</p>
@@ -215,7 +264,7 @@ export default function AssignmentDetailPage() {
             <div>
               <p className="text-sm text-muted-foreground">Fecha de Entrega</p>
               <p className="font-medium">
-                {new Date(assignment.fecha_entrega).toLocaleDateString()}
+                {formatDateLocal(assignment.fecha_entrega)}
               </p>
             </div>
             <div>
@@ -226,7 +275,7 @@ export default function AssignmentDetailPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Fecha de Devolución</p>
                 <p className="font-medium">
-                  {new Date(assignment.fecha_devolucion).toLocaleDateString()}
+                  {formatDateLocal(assignment.fecha_devolucion)}
                 </p>
               </div>
             )}
@@ -237,7 +286,7 @@ export default function AssignmentDetailPage() {
             <div>
               <p className="text-sm text-muted-foreground">Fecha de Creación</p>
               <p className="font-medium">
-                {new Date(assignment.created_at).toLocaleString()}
+                {formatDateTime(assignment.created_at)}
               </p>
             </div>
           </div>
@@ -267,12 +316,12 @@ export default function AssignmentDetailPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Fecha de Devolución</p>
                 <p className="font-medium">
-                  {new Date(returnData.fecha_devolucion).toLocaleDateString()}
+                  {formatDateLocal(returnData.fecha_devolucion)}
                 </p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Estado del Dispositivo</p>
-                <p className="font-medium">{returnData.estado_dispositivo}</p>
+                <p className="font-medium">{DEVICE_CONDITION_LABELS[returnData.estado_dispositivo] || returnData.estado_dispositivo}</p>
               </div>
               {returnData.observaciones && (
                 <div className="md:col-span-2">

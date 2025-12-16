@@ -67,7 +67,7 @@ export function EmployeeSearchCombobox({
   // Cargar empleado seleccionado por ID
   const loadSelectedEmployee = useCallback(async (employeeId: number) => {
     try {
-      const employee = await employeeService.getEmployeeById(employeeId)
+      const employee = await employeeService.getEmployee(employeeId)
       setSelectedEmployee(employee)
     } catch (error) {
       console.error("Error cargando empleado seleccionado:", error)
@@ -99,8 +99,8 @@ export function EmployeeSearchCombobox({
   }, [value, loadSelectedEmployee])
 
   const handleSelect = (employee: Employee) => {
-    onChange(String(employee.id))
     setSelectedEmployee(employee)
+    onChange(String(employee.id))
     setOpen(false)
   }
 

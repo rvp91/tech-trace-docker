@@ -24,6 +24,7 @@ import { useToast } from "@/hooks/use-toast"
 import { assignmentService } from "@/lib/services/assignment-service"
 import { getDeviceSerial } from "@/lib/utils"
 import type { Assignment } from "@/lib/types"
+import { formatDateLocal, getTodayLocal } from "@/lib/utils/date-helpers"
 
 interface ReturnModalProps {
   open: boolean
@@ -45,7 +46,7 @@ export function ReturnModal({ open, onClose, onSuccess, assignment }: ReturnModa
     if (open) {
       // Pre-llenar con la fecha actual
       setFormData({
-        fecha_devolucion: new Date().toISOString().split("T")[0],
+        fecha_devolucion: getTodayLocal(),
         estado_dispositivo: "",
         observaciones: "",
       })
@@ -160,11 +161,11 @@ export function ReturnModal({ open, onClose, onSuccess, assignment }: ReturnModa
                 onChange={(e) =>
                   setFormData((prev) => ({ ...prev, fecha_devolucion: e.target.value }))
                 }
-                max={new Date().toISOString().split("T")[0]}
+                max={getTodayLocal()}
                 min={assignment.fecha_entrega}
               />
               <p className="text-xs text-muted-foreground">
-                Fecha de entrega: {new Date(assignment.fecha_entrega).toLocaleDateString()}
+                Fecha de entrega: {formatDateLocal(assignment.fecha_entrega)}
               </p>
             </div>
 

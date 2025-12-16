@@ -1,7 +1,8 @@
 "use client"
 
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Menu, Bell, User } from "lucide-react"
+import { Menu, User } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,6 +15,9 @@ import { useAuthStore } from "@/lib/store/auth-store"
 import { authService } from "@/lib/services/auth-service"
 import { useRouter } from "next/navigation"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { EditProfileModal } from "@/components/modals/edit-profile-modal"
+import { ChangePasswordModal } from "@/components/modals/change-password-modal"
+import type { User as UserType } from "@/lib/types"
 
 interface HeaderProps {
   onSidebarToggle: () => void
@@ -21,7 +25,9 @@ interface HeaderProps {
 
 export function Header({ onSidebarToggle }: HeaderProps) {
   const router = useRouter()
-  const { user, refreshToken, clearAuth } = useAuthStore()
+  const { user, refreshToken, clearAuth, updateUser } = useAuthStore()
+  const [profileModalOpen, setProfileModalOpen] = useState(false)
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false)
 
   const handleLogout = async () => {
     try {
@@ -33,6 +39,11 @@ export function Header({ onSidebarToggle }: HeaderProps) {
       // Redirigir al login
       router.push("/login")
     }
+  }
+
+  const handleProfileUpdate = (updatedUser: UserType) => {
+    updateUser(updatedUser)
+    setProfileModalOpen(false)
   }
 
   return (
@@ -47,10 +58,6 @@ export function Header({ onSidebarToggle }: HeaderProps) {
 
         {/* Right Section */}
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon">
-            <Bell className="h-5 w-5" />
-          </Button>
-
           <ThemeToggle />
 
           <DropdownMenu>
@@ -62,13 +69,19 @@ export function Header({ onSidebarToggle }: HeaderProps) {
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>
                 <div className="flex flex-col">
-                  <span className="text-sm font-medium">{user?.username || "Usuario"}</span>
+                  <span className="text-sm font-medium">
+                    {user?.full_name || user?.first_name || user?.username || "Usuario"}
+                  </span>
                   <span className="text-xs text-muted-foreground">{user?.email || ""}</span>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Perfil</DropdownMenuItem>
-              <DropdownMenuItem>Configuración</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setProfileModalOpen(true)}>
+                Perfil
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setPasswordModalOpen(true)}>
+                Cambiar Contraseña
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive" onClick={handleLogout}>
                 Cerrar Sesión
@@ -77,6 +90,21 @@ export function Header({ onSidebarToggle }: HeaderProps) {
           </DropdownMenu>
         </div>
       </div>
+
+      {/* Modales */}
+      <EditProfileModal
+        open={profileModalOpen}
+        onOpenChange={setProfileModalOpen}
+        user={user}
+        onSuccess={handleProfileUpdate}
+      />
+
+      <ChangePasswordModal
+        open={passwordModalOpen}
+        onOpenChange={setPasswordModalOpen}
+        userId={user?.id || null}
+        onSuccess={() => setPasswordModalOpen(false)}
+      />
     </header>
   )
 }

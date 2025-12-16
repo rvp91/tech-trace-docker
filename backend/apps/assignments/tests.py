@@ -50,7 +50,7 @@ class AssignmentFlowTestCase(TestCase):
             tipo_equipo='LAPTOP',
             marca='HP',
             modelo='ProBook 450 G8',
-            serie_imei='TEST-SERIAL-001',
+            numero_serie='TEST-SERIAL-001',
             estado='DISPONIBLE',
             sucursal=self.branch,
             fecha_ingreso=date.today(),
@@ -306,13 +306,13 @@ class ValidationTestCase(TestCase):
 
         print("✅ Validación: RUT único funciona correctamente")
 
-    def test_serie_imei_unica(self):
-        """Verificar que serie/IMEI debe ser única"""
+    def test_numero_serie_unica(self):
+        """Verificar que numero_serie debe ser única"""
         Device.objects.create(
             tipo_equipo='TELEFONO',
             marca='Samsung',
             modelo='Galaxy S21',
-            serie_imei='123456789',
+            numero_serie='123456789',
             estado='DISPONIBLE',
             sucursal=self.branch,
             fecha_ingreso=date.today(),
@@ -326,14 +326,14 @@ class ValidationTestCase(TestCase):
                 tipo_equipo='TELEFONO',
                 marca='Apple',
                 modelo='iPhone 13',
-                serie_imei='123456789',
+                numero_serie='123456789',
                 estado='DISPONIBLE',
                 sucursal=self.branch,
                 fecha_ingreso=date.today(),
                 created_by=self.admin_user
             )
 
-        print("✅ Validación: Serie/IMEI única funciona correctamente")
+        print("✅ Validación: Número de serie única funciona correctamente")
 
     def test_fecha_devolucion_posterior_a_entrega(self):
         """Verificar que fecha de devolución no sea anterior a entrega"""
@@ -350,7 +350,7 @@ class ValidationTestCase(TestCase):
             tipo_equipo='LAPTOP',
             marca='Dell',
             modelo='Latitude',
-            serie_imei='DELL-001',
+            numero_serie='DELL-001',
             estado='DISPONIBLE',
             sucursal=self.branch,
             fecha_ingreso=date.today(),

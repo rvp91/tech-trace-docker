@@ -13,7 +13,8 @@ import { CardSimIcon } from "@/components/ui/icons/lucide-card-sim"
 import { InventoryDetailsModal } from "@/components/modals/inventory-details-modal"
 import { deviceService, getDeviceStatusColor, getDeviceStatusLabel, getDeviceTypeLabel } from "@/lib/services/device-service"
 import { branchService } from "@/lib/services/branch-service"
-import { exportToCSV, formatDate, getDeviceSerial } from "@/lib/utils"
+import { exportToCSV, getDeviceSerial } from "@/lib/utils"
+import { formatDateLocal } from "@/lib/utils/date-helpers"
 import type { Device, Branch, TipoEquipo, EstadoDispositivo } from "@/lib/types"
 
 export default function InventoryPage() {
@@ -125,7 +126,7 @@ export default function InventoryPage() {
       numero_telefono: device.numero_telefono || "N/A",
       estado: getDeviceStatusLabel(device.estado),
       sucursal: device.sucursal_detail?.nombre || `ID: ${device.sucursal}`,
-      fecha_ingreso: formatDate(device.fecha_ingreso),
+      fecha_ingreso: formatDateLocal(device.fecha_ingreso),
     }))
 
     exportToCSV(

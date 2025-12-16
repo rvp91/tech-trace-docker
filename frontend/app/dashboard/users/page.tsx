@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
@@ -30,6 +30,8 @@ import type { User } from "@/lib/types"
 import { UserModal } from "@/components/modals/user-modal"
 import { ChangePasswordModal } from "@/components/modals/change-password-modal"
 import { useAuthStore } from "@/lib/store/auth-store"
+import { TablePagination } from "@/components/ui/table-pagination"
+import { useRouter } from "next/navigation"
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([])
@@ -44,6 +46,12 @@ export default function UsersPage() {
   const [passwordUserId, setPasswordUserId] = useState<number | null>(null)
   const { toast } = useToast()
   const currentUser = useAuthStore((state) => state.user)
+  const router = useRouter()
+
+  // Estados de paginación
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 20 // Tamaño fijo de página
+  const [totalCount, setTotalCount] = useState(0)
 
   // Verificar que solo Admin puede acceder
   useEffect(() => {
@@ -53,14 +61,17 @@ export default function UsersPage() {
         description: "Solo los administradores pueden acceder a esta sección.",
         variant: "destructive",
       })
-      window.location.href = "/dashboard"
+      router.replace("/dashboard")
     }
-  }, [currentUser, toast])
+  }, [currentUser, toast, router])
 
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     try {
       setLoading(true)
-      const filters: any = { page_size: 100 }
+      const filters: any = {
+        page: currentPage,
+        page_size: pageSize,
+      }
 
       if (searchQuery) filters.search = searchQuery
       if (roleFilter !== "all") filters.role = roleFilter
@@ -68,6 +79,7 @@ export default function UsersPage() {
 
       const response = await userService.getUsers(filters)
       setUsers(response.results)
+      setTotalCount(response.count)
     } catch (error) {
       console.error("Error cargando usuarios:", error)
       toast({
@@ -78,11 +90,16 @@ export default function UsersPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [searchQuery, roleFilter, statusFilter, currentPage, pageSize, toast])
+
+  // Resetear a página 1 cuando cambien los filtros
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery, roleFilter, statusFilter])
 
   useEffect(() => {
     loadUsers()
-  }, [searchQuery, roleFilter, statusFilter])
+  }, [loadUsers])
 
   const handleCreateUser = () => {
     setSelectedUser(null)
@@ -158,6 +175,26 @@ export default function UsersPage() {
     setPasswordUserId(null)
   }
 
+  // Handlers de paginación
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
+
+  const totalPages = Math.ceil(totalCount / pageSize)
+
+  // No renderizar nada si el usuario no es admin
+  if (currentUser && currentUser.role !== "ADMIN") {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
+        <div className="text-center space-y-4">
+          <div className="text-6xl">🔒</div>
+          <h2 className="text-2xl font-bold">Acceso Denegado</h2>
+          <p className="text-muted-foreground">Solo los administradores pueden acceder a esta sección.</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -173,22 +210,28 @@ export default function UsersPage() {
 
       <Card>
         <CardHeader>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <CardTitle>Usuarios</CardTitle>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
-              <div className="flex items-center gap-2 bg-input rounded-lg px-3 py-2 w-full sm:w-64">
-                <Search className="h-4 w-4 text-muted-foreground" />
+          <CardTitle>Usuarios</CardTitle>
+          
+          {/* Filtros */}
+          <div className="flex gap-4 items-end">
+            <div className="flex-1">
+              <label className="text-sm font-medium mb-2 block">Buscar</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  type="search"
                   placeholder="Buscar por nombre o email..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="border-0 bg-transparent outline-none placeholder:text-muted-foreground"
+                  className="pl-10"
                 />
               </div>
+            </div>
+
+            <div className="w-[150px]">
+              <label className="text-sm font-medium mb-2 block">Rol</label>
               <Select value={roleFilter} onValueChange={setRoleFilter}>
-                <SelectTrigger className="w-full sm:w-[150px]">
-                  <SelectValue placeholder="Rol" />
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos los roles" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos los roles</SelectItem>
@@ -196,9 +239,13 @@ export default function UsersPage() {
                   <SelectItem value="OPERADOR">Operador</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="w-[150px]">
+              <label className="text-sm font-medium mb-2 block">Estado</label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full sm:w-[150px]">
-                  <SelectValue placeholder="Estado" />
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
@@ -302,6 +349,19 @@ export default function UsersPage() {
                 </TableBody>
               </Table>
             </div>
+          )}
+
+          {/* Paginación */}
+          {!loading && totalCount > 0 && (
+            <TablePagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              totalCount={totalCount}
+              onPageChange={handlePageChange}
+              onPageSizeChange={() => {}} // No-op: tamaño fijo
+              pageSizeOptions={[20]} // Solo mostrar 20 como opción
+            />
           )}
         </CardContent>
       </Card>

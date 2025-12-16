@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuthStore } from "@/lib/store/auth-store"
 import { authService } from "@/lib/services/auth-service"
@@ -17,8 +17,27 @@ export default function LoginPage() {
 
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
+  const [rememberUsername, setRememberUsername] = useState(false)
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+
+  // Cargar username recordado al montar el componente
+  useEffect(() => {
+    const savedUsername = localStorage.getItem('rememberedUsername')
+    if (savedUsername) {
+      setUsername(savedUsername)
+      setRememberUsername(true)
+    }
+  }, [])
+
+  // Guardar o eliminar username del localStorage
+  useEffect(() => {
+    if (rememberUsername && username) {
+      localStorage.setItem('rememberedUsername', username)
+    } else if (!rememberUsername) {
+      localStorage.removeItem('rememberedUsername')
+    }
+  }, [rememberUsername, username])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -88,10 +107,24 @@ export default function LoginPage() {
                 autoComplete="current-password"
               />
             </div>
+
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="remember"
+                checked={rememberUsername}
+                onChange={(e) => setRememberUsername(e.target.checked)}
+                className="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                disabled={isLoading}
+              />
+              <Label htmlFor="remember" className="text-sm text-muted-foreground">
+                Recordarme
+              </Label>
+            </div>
           </CardContent>
 
-          <CardFooter className="flex flex-col space-y-4">
-            <Button type="submit" className="w-full" disabled={isLoading}>
+          <CardFooter className="flex flex-col space-y-4 pt-2">
+            <Button type="submit" className="w-full mt-2 mb-2" disabled={isLoading}>
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -102,10 +135,14 @@ export default function LoginPage() {
               )}
             </Button>
 
-            <div className="text-sm text-center text-muted-foreground">
-              <p>Credenciales por defecto:</p>
-              <p className="font-mono text-xs mt-1">admin / admin123</p>
-            </div>
+            {(() => {
+              const year = new Date().getFullYear()
+              return (
+                <p className="mt-[50px] text-xs text-muted-foreground text-center">
+                  © {year} TechTrace.
+                </p>
+              )
+            })()}
           </CardFooter>
         </form>
       </Card>

@@ -5,7 +5,13 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from .views import CustomTokenObtainPairView, LogoutView, CurrentUserView, UserViewSet
+from .views import (
+    CustomTokenObtainPairView,
+    LogoutView,
+    CurrentUserView,
+    CurrentUserChangePasswordView,
+    UserViewSet,
+)
 
 # Router para el ViewSet de usuarios
 router = DefaultRouter()
@@ -19,6 +25,7 @@ urlpatterns = [
 
     # Usuario actual
     path('me/', CurrentUserView.as_view(), name='current_user'),
+    path('me/change_password/', CurrentUserChangePasswordView.as_view(), name='current_user_change_password'),
 
     # Gestión de usuarios (incluye el router)
     path('', include(router.urls)),

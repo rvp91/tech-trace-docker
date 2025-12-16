@@ -8,12 +8,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import { deviceService, type CreateDeviceData, formatCurrency } from "@/lib/services/device-service"
+import { deviceService, type CreateDeviceData } from "@/lib/services/device-service"
 import { branchService } from "@/lib/services/branch-service"
 import type { Branch, Device, TipoEquipo, EstadoDispositivo } from "@/lib/types"
 import { Info, DollarSign } from "lucide-react"
 import { z } from "zod"
 import { deviceSchema } from "@/lib/validations"
+import { formatCurrency, formatCurrencyInput, parseCurrency } from "@/lib/utils"
+import { getTodayLocal } from "@/lib/utils/date-helpers"
 
 interface DeviceModalProps {
   open: boolean
@@ -38,7 +40,7 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
     numero_factura: "",
     estado: "DISPONIBLE",
     sucursal: 0,
-    fecha_ingreso: new Date().toISOString().split("T")[0],
+    fecha_ingreso: getTodayLocal(),
     valor_inicial: undefined,
     valor_depreciado: undefined,
     es_valor_manual: false,
@@ -122,7 +124,7 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
         numero_factura: "",
         estado: "DISPONIBLE",
         sucursal: 0,
-        fecha_ingreso: new Date().toISOString().split("T")[0],
+        fecha_ingreso: getTodayLocal(),
         valor_inicial: undefined,
         valor_depreciado: undefined,
         es_valor_manual: false,
@@ -150,7 +152,7 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
       numero_factura: "",
       estado: "DISPONIBLE",
       sucursal: 0,
-      fecha_ingreso: new Date().toISOString().split("T")[0],
+      fecha_ingreso: getTodayLocal(),
       valor_inicial: undefined,
       valor_depreciado: undefined,
       es_valor_manual: false,
@@ -179,12 +181,12 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
       setLoading(true)
 
       if (isEditMode && device) {
-        // Modo edición - excluir numero_serie ya que no es editable
-        const { numero_serie, ...updateData } = formData
+        // Modo edición - excluir numero_serie e imei ya que no son editables
+        const { numero_serie, imei, ...updateData } = formData
         await deviceService.updateDevice(device.id, updateData)
         toast({
           title: "Dispositivo actualizado",
-          description: `${formData.marca} ${formData.modelo} ha sido actualizado exitosamente.`,
+          description: `${formData.marca} ${formData.modelo || formData.tipo_equipo} ha sido actualizado exitosamente.`,
         })
       } else {
         // Modo creación
@@ -216,6 +218,7 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
   const showEdadFields = ['LAPTOP', 'TELEFONO', 'TABLET'].includes(formData.tipo_equipo)
   const showValorFields = ['LAPTOP', 'TELEFONO', 'TABLET'].includes(formData.tipo_equipo)
   const showImeiField = ['TELEFONO', 'TABLET'].includes(formData.tipo_equipo)
+  const showTelefonoField = ['TELEFONO', 'SIM'].includes(formData.tipo_equipo)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -318,25 +321,27 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
               </div>
             )}
 
-            {/* Número de Teléfono */}
-            <div>
-              <Label htmlFor="numero_telefono">
-                Número de Teléfono {isTelefonoRequired ? "*" : ""}
-              </Label>
-              <Input
-                id="numero_telefono"
-                name="numero_telefono"
-                value={formData.numero_telefono}
-                onChange={handleInputChange}
-                placeholder="+56 9 1234 5678"
-                required={isTelefonoRequired}
-              />
-              {isTelefonoRequired && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Obligatorio para SIM cards
-                </p>
-              )}
-            </div>
+            {/* Número de Teléfono (solo para TELEFONO y SIM) */}
+            {showTelefonoField && (
+              <div>
+                <Label htmlFor="numero_telefono">
+                  Número de Teléfono {isTelefonoRequired ? "*" : ""}
+                </Label>
+                <Input
+                  id="numero_telefono"
+                  name="numero_telefono"
+                  value={formData.numero_telefono}
+                  onChange={handleInputChange}
+                  placeholder="+56 9 1234 5678"
+                  required={isTelefonoRequired}
+                />
+                {isTelefonoRequired && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Obligatorio para SIM cards
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Número de Factura */}
             <div>
@@ -421,15 +426,17 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
                   <Input
                     id="valor_inicial"
                     name="valor_inicial"
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={formData.valor_inicial || ""}
+                    type="text"
+                    value={formData.valor_inicial ? formatCurrency(formData.valor_inicial) : ""}
                     onChange={(e) => {
-                      const value = e.target.value ? parseFloat(e.target.value) : undefined
-                      setFormData(prev => ({ ...prev, valor_inicial: value }))
+                      const formatted = formatCurrencyInput(e.target.value)
+                      const numericValue = parseCurrency(formatted)
+                      setFormData(prev => ({
+                        ...prev,
+                        valor_inicial: numericValue || undefined
+                      }))
                     }}
-                    placeholder="Ej: 500000"
+                    placeholder="800.000"
                   />
                 </div>
 
@@ -440,19 +447,18 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
                     <Input
                       id="valor_depreciado"
                       name="valor_depreciado"
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={formData.valor_depreciado || ""}
+                      type="text"
+                      value={formData.valor_depreciado ? formatCurrency(formData.valor_depreciado) : ""}
                       onChange={(e) => {
-                        const value = e.target.value ? parseFloat(e.target.value) : undefined
+                        const formatted = formatCurrencyInput(e.target.value)
+                        const numericValue = parseCurrency(formatted)
                         setFormData(prev => ({
                           ...prev,
-                          valor_depreciado: value,
-                          es_valor_manual: value !== valorCalculadoSugerido
+                          valor_depreciado: numericValue || undefined,
+                          es_valor_manual: numericValue !== valorCalculadoSugerido
                         }))
                       }}
-                      placeholder={valorCalculadoSugerido ? `Sugerido: ${formatCurrency(valorCalculadoSugerido)}` : "Calculado automáticamente"}
+                      placeholder={valorCalculadoSugerido ? formatCurrency(valorCalculadoSugerido) : "Calculado automáticamente"}
                       disabled={!formData.valor_inicial}
                     />
                     {formData.es_valor_manual && (

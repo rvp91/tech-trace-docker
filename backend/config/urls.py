@@ -22,6 +22,7 @@ urlpatterns = [
     # API REST endpoints
     path('api/auth/', include('apps.users.urls')),
     path('api/branches/', include('apps.branches.urls')),
+    path('api/business-units/', include('apps.employees.urls_business_units')),
     path('api/employees/', include('apps.employees.urls')),
     path('api/devices/', include('apps.devices.urls')),
     path('api/assignments/', include('apps.assignments.urls')),

@@ -20,7 +20,7 @@ class RequestAdmin(admin.ModelAdmin):
 class AssignmentAdmin(admin.ModelAdmin):
     list_display = ('id', 'empleado', 'dispositivo', 'fecha_entrega', 'estado_asignacion', 'tipo_entrega')
     list_filter = ('estado_asignacion', 'tipo_entrega', 'estado_carta', 'fecha_entrega')
-    search_fields = ('empleado__nombre_completo', 'dispositivo__serie_imei')
+    search_fields = ('empleado__nombre_completo', 'dispositivo__numero_serie', 'dispositivo__imei')
     readonly_fields = ('created_at', 'updated_at', 'created_by')
     autocomplete_fields = ['empleado', 'dispositivo', 'solicitud']
 
@@ -34,7 +34,7 @@ class AssignmentAdmin(admin.ModelAdmin):
 class ReturnAdmin(admin.ModelAdmin):
     list_display = ('id', 'asignacion', 'fecha_devolucion', 'estado_dispositivo', 'created_at')
     list_filter = ('estado_dispositivo', 'fecha_devolucion')
-    search_fields = ('asignacion__empleado__nombre_completo', 'asignacion__dispositivo__serie_imei')
+    search_fields = ('asignacion__empleado__nombre_completo', 'asignacion__dispositivo__numero_serie', 'asignacion__dispositivo__imei')
     readonly_fields = ('created_at', 'created_by')
     autocomplete_fields = ['asignacion']
 

@@ -2,8 +2,18 @@ from rest_framework import viewsets, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import Employee
-from .serializers import EmployeeSerializer
+from django.db.models import Count, Q
+from .models import Employee, BusinessUnit
+from .serializers import EmployeeSerializer, BusinessUnitSerializer
+
+
+class BusinessUnitViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet de solo lectura para unidades de negocio.
+    Solo permite listar y ver detalles, la gestión se hace desde el admin.
+    """
+    queryset = BusinessUnit.objects.filter(is_active=True).order_by('nombre')
+    serializer_class = BusinessUnitSerializer
 
 
 class EmployeeViewSet(viewsets.ModelViewSet):
@@ -11,7 +21,13 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     ViewSet para gestionar los empleados.
     Proporciona operaciones CRUD completas con filtros y búsqueda.
     """
-    queryset = Employee.objects.select_related('sucursal', 'created_by').all()
+    queryset = Employee.objects.select_related('sucursal', 'unidad_negocio', 'created_by').annotate(
+        dispositivos_asignados=Count(
+            'assignment',
+            filter=Q(assignment__estado_asignacion='ACTIVA'),
+            distinct=True
+        )
+    ).all()
     serializer_class = EmployeeSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['estado', 'sucursal', 'unidad_negocio']

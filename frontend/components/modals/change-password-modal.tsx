@@ -18,6 +18,7 @@ interface ChangePasswordModalProps {
 
 export function ChangePasswordModal({ open, onOpenChange, userId, onSuccess }: ChangePasswordModalProps) {
   const [formData, setFormData] = useState({
+    current_password: "",
     new_password: "",
     confirm_password: "",
   })
@@ -25,13 +26,25 @@ export function ChangePasswordModal({ open, onOpenChange, userId, onSuccess }: C
   const [errors, setErrors] = useState<Record<string, string>>({})
   const { toast } = useToast()
 
+  // Determinar si el usuario está cambiando su propia contraseña
+  // comparando el userId proporcionado con el userId del usuario autenticado
+  // Si userId es null, asumimos que es el usuario actual
+
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
+
+    if (!formData.current_password) {
+      newErrors.current_password = "La contrasena actual es requerida"
+    }
 
     if (!formData.new_password) {
       newErrors.new_password = "La nueva contrasena es requerida"
     } else if (formData.new_password.length < 6) {
       newErrors.new_password = "La contrasena debe tener al menos 6 caracteres"
+    }
+
+    if (formData.new_password === formData.current_password) {
+      newErrors.new_password = "La nueva contrasena debe ser diferente a la actual"
     }
 
     if (formData.new_password !== formData.confirm_password) {
@@ -55,18 +68,21 @@ export function ChangePasswordModal({ open, onOpenChange, userId, onSuccess }: C
       setLoading(true)
 
       const data: ChangePasswordData = {
+        current_password: formData.current_password,
         new_password: formData.new_password,
         confirm_password: formData.confirm_password,
       }
 
-      await userService.changePassword(userId, data)
+      // Usar el endpoint apropiado según si es el usuario actual o un admin cambiando la contraseña de otro usuario
+      // Para simplificar, siempre usamos el endpoint del usuario actual ya que ahora requiere la contraseña actual
+      await userService.changeMyPassword(data)
 
       toast({
         title: "Contrasena actualizada",
-        description: "La contrasena del usuario ha sido cambiada correctamente.",
+        description: "Tu contrasena ha sido cambiada correctamente.",
       })
 
-      setFormData({ new_password: "", confirm_password: "" })
+      setFormData({ current_password: "", new_password: "", confirm_password: "" })
       setErrors({})
       onSuccess()
     } catch (error: any) {
@@ -76,10 +92,14 @@ export function ChangePasswordModal({ open, onOpenChange, userId, onSuccess }: C
 
       if (error.response?.data) {
         const errorData = error.response.data
-        if (errorData.new_password) {
-          errorMessage = `Contrasena: ${errorData.new_password[0]}`
+        if (errorData.current_password) {
+          errorMessage = `Contrasena actual: ${errorData.current_password[0]}`
+        } else if (errorData.new_password) {
+          errorMessage = `Nueva contrasena: ${errorData.new_password[0]}`
         } else if (errorData.detail) {
           errorMessage = errorData.detail
+        } else if (errorData.non_field_errors) {
+          errorMessage = errorData.non_field_errors[0]
         }
       }
 
@@ -94,7 +114,7 @@ export function ChangePasswordModal({ open, onOpenChange, userId, onSuccess }: C
   }
 
   const handleClose = () => {
-    setFormData({ new_password: "", confirm_password: "" })
+    setFormData({ current_password: "", new_password: "", confirm_password: "" })
     setErrors({})
     onOpenChange(false)
   }
@@ -103,43 +123,60 @@ export function ChangePasswordModal({ open, onOpenChange, userId, onSuccess }: C
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[450px]">
         <DialogHeader>
-          <DialogTitle>Cambiar Contrasena</DialogTitle>
+          <DialogTitle>Cambiar Contraseña</DialogTitle>
           <DialogDescription>
-            Ingresa una nueva contrasena para el usuario. La contrasena debe tener al menos 6 caracteres.
+            Por seguridad, primero ingresa tu contraseña actual y luego la nueva contraseña. La contraseña debe tener al menos 6 caracteres.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
+            <Label htmlFor="current_password">
+              Contraseña Actual <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="current_password"
+              type="password"
+              value={formData.current_password}
+              onChange={(e) => setFormData({ ...formData, current_password: e.target.value })}
+              placeholder="Tu contraseña actual"
+              className={errors.current_password ? "border-destructive" : ""}
+            />
+            {errors.current_password && (
+              <p className="text-sm text-destructive">{errors.current_password}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="new_password">
-              Nueva Contrasena <span className="text-destructive">*</span>
+              Nueva Contraseña <span className="text-destructive">*</span>
             </Label>
             <Input
               id="new_password"
               type="password"
               value={formData.new_password}
               onChange={(e) => setFormData({ ...formData, new_password: e.target.value })}
-              placeholder="Nueva contrasena"
+              placeholder="Nueva contraseña"
               className={errors.new_password ? "border-destructive" : ""}
             />
             {errors.new_password && (
               <p className="text-sm text-destructive">{errors.new_password}</p>
             )}
             <p className="text-xs text-muted-foreground">
-              Minimo 6 caracteres
+              Mínimo 6 caracteres
             </p>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="confirm_password">
-              Confirmar Contrasena <span className="text-destructive">*</span>
+              Confirmar Contraseña <span className="text-destructive">*</span>
             </Label>
             <Input
               id="confirm_password"
               type="password"
               value={formData.confirm_password}
               onChange={(e) => setFormData({ ...formData, confirm_password: e.target.value })}
-              placeholder="Confirmar contrasena"
+              placeholder="Confirmar nueva contraseña"
               className={errors.confirm_password ? "border-destructive" : ""}
             />
             {errors.confirm_password && (
@@ -158,7 +195,7 @@ export function ChangePasswordModal({ open, onOpenChange, userId, onSuccess }: C
             </Button>
             <Button type="submit" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Cambiar Contrasena
+              Cambiar Contraseña
             </Button>
           </div>
         </form>

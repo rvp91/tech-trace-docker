@@ -3,6 +3,27 @@ from django.conf import settings
 from .validators import validate_rut
 
 
+class BusinessUnit(models.Model):
+    """
+    Modelo para gestionar las unidades de negocio de la empresa.
+    """
+    nombre = models.CharField(max_length=100, unique=True, verbose_name='Nombre')
+    codigo = models.CharField(max_length=20, unique=True, verbose_name='Código',
+                            help_text='Código corto identificador (ej: TEC, OPS, VEN)')
+    descripcion = models.TextField(blank=True, null=True, verbose_name='Descripción')
+    is_active = models.BooleanField(default=True, verbose_name='Activo')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Fecha de creación')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='Última actualización')
+
+    class Meta:
+        verbose_name = 'Unidad de Negocio'
+        verbose_name_plural = 'Unidades de Negocio'
+        ordering = ['nombre']
+
+    def __str__(self):
+        return f"{self.codigo} - {self.nombre}"
+
+
 class Employee(models.Model):
     """
     Modelo para gestionar los empleados de la empresa.
@@ -25,7 +46,14 @@ class Employee(models.Model):
     gmail_personal = models.EmailField(blank=True, null=True, verbose_name='Gmail personal')
     telefono = models.CharField(max_length=20, blank=True, null=True, verbose_name='Teléfono')
     sucursal = models.ForeignKey('branches.Branch', on_delete=models.PROTECT, verbose_name='Sucursal')
-    unidad_negocio = models.CharField(max_length=100, blank=True, null=True, verbose_name='Unidad de negocio')
+    unidad_negocio = models.ForeignKey(
+        'BusinessUnit',
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        verbose_name='Unidad de negocio',
+        limit_choices_to={'is_active': True}
+    )
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='ACTIVO', verbose_name='Estado')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Fecha de creación')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Última actualización')

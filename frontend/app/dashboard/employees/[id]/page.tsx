@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast"
 import { employeeService } from "@/lib/services/employee-service"
 import type { Employee, EmployeeHistory } from "@/lib/types"
 import { CreateEmployeeModal } from "@/components/modals/create-employee-modal"
+import { formatDateLocal } from "@/lib/utils/date-helpers"
 
 export default function EmployeeDetailPage() {
   const params = useParams()
@@ -160,7 +161,7 @@ export default function EmployeeDetailPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Unidad de Negocio</p>
-                <p className="font-medium">{employee.unidad_negocio || "No asignada"}</p>
+                <p className="font-medium">{employee.unidad_negocio_detail?.nombre || "No asignada"}</p>
               </div>
             </div>
 
@@ -282,26 +283,46 @@ export default function EmployeeDetailPage() {
                   {history.assignments.map((assignment) => (
                     <TableRow key={assignment.id}>
                       <TableCell className="font-medium">
-                        {/* TODO: Mostrar detalles del dispositivo cuando esté disponible */}
-                        Dispositivo #{assignment.dispositivo}
+                        {assignment.dispositivo_detail ? (
+                          <div className="space-y-1">
+                            <div className="font-medium">
+                              {assignment.dispositivo_detail.marca} {assignment.dispositivo_detail.modelo || ""}
+                            </div>
+                            {assignment.dispositivo_detail.numero_serie && (
+                              <div className="text-xs text-muted-foreground">
+                                S/N: {assignment.dispositivo_detail.numero_serie}
+                              </div>
+                            )}
+                            {assignment.dispositivo_detail.imei && (
+                              <div className="text-xs text-muted-foreground">
+                                IMEI: {assignment.dispositivo_detail.imei}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">Dispositivo #{assignment.dispositivo}</span>
+                        )}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">
-                          {/* TODO: Mostrar tipo de dispositivo */}
-                          -
+                        {assignment.dispositivo_detail ? (
+                          <Badge variant="outline">
+                            {assignment.dispositivo_detail.tipo_equipo}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline">-</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {formatDateLocal(assignment.fecha_entrega)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={assignment.tipo_entrega === "PERMANENTE" ? "default" : "secondary"}>
+                          {assignment.tipo_entrega}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {new Date(assignment.fechaEntrega).toLocaleDateString("es-CL")}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={assignment.tipoEntrega === "permanente" ? "default" : "secondary"}>
-                          {assignment.tipoEntrega}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={assignment.estado === "activa" ? "default" : "secondary"}>
-                          {assignment.estado}
+                        <Badge variant={assignment.estado_asignacion === "ACTIVA" ? "default" : "secondary"}>
+                          {assignment.estado_asignacion}
                         </Badge>
                       </TableCell>
                       <TableCell>

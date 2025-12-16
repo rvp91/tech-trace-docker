@@ -28,6 +28,7 @@ import { requestService, getRequestStatusColor, getRequestStatusLabel } from "@/
 import type { Request } from "@/lib/types"
 import { RequestModal } from "@/components/modals/request-modal"
 import { AssignmentModal } from "@/components/modals/assignment-modal"
+import { formatDateTime } from "@/lib/utils/format"
 
 export default function RequestsPage() {
   const router = useRouter()
@@ -85,35 +86,22 @@ export default function RequestsPage() {
     setIsModalOpen(true)
   }
 
-  const handleApprove = async (id: number) => {
-    try {
-      await requestService.approveRequest(id)
-      toast({
-        title: "Solicitud aprobada",
-        description: "La solicitud ha sido aprobada exitosamente",
-      })
-      loadRequests()
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo aprobar la solicitud",
-        variant: "destructive",
-      })
+  const handleDelete = async (id: number) => {
+    if (!confirm("¿Estás seguro de eliminar esta solicitud? Esta acción no se puede deshacer.")) {
+      return
     }
-  }
 
-  const handleReject = async (id: number) => {
     try {
-      await requestService.rejectRequest(id)
+      await requestService.deleteRequest(id)
       toast({
-        title: "Solicitud rechazada",
-        description: "La solicitud ha sido rechazada",
+        title: "Solicitud eliminada",
+        description: "La solicitud ha sido eliminada exitosamente",
       })
       loadRequests()
     } catch (error) {
       toast({
         title: "Error",
-        description: "No se pudo rechazar la solicitud",
+        description: "No se pudo eliminar la solicitud",
         variant: "destructive",
       })
     }
@@ -130,24 +118,13 @@ export default function RequestsPage() {
     setIsAssignmentModalOpen(true)
   }
 
-  const handleAssignmentSuccess = async () => {
+  const handleAssignmentSuccess = () => {
     setIsAssignmentModalOpen(false)
-
-    // Marcar la solicitud como completada
-    if (requestToAssign) {
-      try {
-        await requestService.updateRequest(requestToAssign.id, { estado: "COMPLETADA" })
-        toast({
-          title: "Asignación completada",
-          description: "La solicitud ha sido marcada como completada",
-        })
-      } catch (error) {
-        // Solo un warning, la asignación ya fue creada
-        console.error("Error al actualizar solicitud:", error)
-      }
-    }
-
     setRequestToAssign(null)
+    toast({
+      title: "Asignación completada",
+      description: "La solicitud ha sido completada automáticamente",
+    })
     loadRequests()
   }
 
@@ -197,8 +174,6 @@ export default function RequestsPage() {
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="PENDIENTE">Pendiente</SelectItem>
-              <SelectItem value="APROBADA">Aprobada</SelectItem>
-              <SelectItem value="RECHAZADA">Rechazada</SelectItem>
               <SelectItem value="COMPLETADA">Completada</SelectItem>
             </SelectContent>
           </Select>
@@ -249,7 +224,7 @@ export default function RequestsPage() {
                   <TableCell>{request.tipo_dispositivo}</TableCell>
                   <TableCell>{request.jefatura_solicitante}</TableCell>
                   <TableCell>
-                    {new Date(request.fecha_solicitud).toLocaleDateString()}
+                    {formatDateTime(request.fecha_solicitud)}
                   </TableCell>
                   <TableCell>
                     <Badge className={getRequestStatusColor(request.estado)}>
@@ -262,30 +237,20 @@ export default function RequestsPage() {
                         <>
                           <Button
                             size="sm"
-                            variant="outline"
-                            className="text-green-600 border-green-600 hover:bg-green-50"
-                            onClick={() => handleApprove(request.id)}
+                            className="bg-blue-600 hover:bg-blue-700"
+                            onClick={() => handleAssign(request)}
                           >
-                            Aprobar
+                            Asignar
                           </Button>
                           <Button
                             size="sm"
                             variant="outline"
                             className="text-red-600 border-red-600 hover:bg-red-50"
-                            onClick={() => handleReject(request.id)}
+                            onClick={() => handleDelete(request.id)}
                           >
-                            Rechazar
+                            Eliminar
                           </Button>
                         </>
-                      )}
-                      {(request.estado === "PENDIENTE" || request.estado === "APROBADA") && (
-                        <Button
-                          size="sm"
-                          className="bg-blue-600 hover:bg-blue-700"
-                          onClick={() => handleAssign(request)}
-                        >
-                          Asignar
-                        </Button>
                       )}
                       <Button
                         size="sm"

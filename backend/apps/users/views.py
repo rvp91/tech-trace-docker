@@ -107,6 +107,35 @@ class CurrentUserView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+class CurrentUserChangePasswordView(APIView):
+    """
+    Vista para que el usuario autenticado cambie su propia contraseña.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        """
+        Permite al usuario cambiar su propia contraseña.
+        Requiere la contraseña actual para validar la identidad.
+        """
+        serializer = ChangePasswordSerializer(
+            data=request.data,
+            context={'user': request.user}
+        )
+
+        if serializer.is_valid():
+            # Cambiar la contraseña
+            request.user.set_password(serializer.validated_data['new_password'])
+            request.user.save()
+
+            return Response(
+                {'message': 'Contraseña actualizada correctamente.'},
+                status=status.HTTP_200_OK
+            )
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 class UserViewSet(viewsets.ModelViewSet):
     """
     ViewSet para gestión de usuarios (solo Admin).

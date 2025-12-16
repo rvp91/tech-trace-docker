@@ -35,6 +35,7 @@ import {
 import { getDeviceSerial } from "@/lib/utils"
 import type { Assignment } from "@/lib/types"
 import { AssignmentModal } from "@/components/modals/assignment-modal"
+import { formatDateLocal } from "@/lib/utils/date-helpers"
 
 export default function AssignmentsPage() {
   const router = useRouter()
@@ -218,7 +219,7 @@ export default function AssignmentsPage() {
                       </TableCell>
                       <TableCell>{getTipoEntregaLabel(assignment.tipo_entrega)}</TableCell>
                       <TableCell>
-                        {new Date(assignment.fecha_entrega).toLocaleDateString()}
+                        {formatDateLocal(assignment.fecha_entrega)}
                       </TableCell>
                       <TableCell>
                         <Badge className={getAssignmentStatusColor(assignment.estado_asignacion)}>

@@ -7,7 +7,7 @@ export interface EmployeeFilters {
   search?: string
   estado?: "ACTIVO" | "INACTIVO" | ""
   sucursal?: number
-  unidad_negocio?: string
+  unidad_negocio?: number
   page?: number
   page_size?: number
   ordering?: string
@@ -21,7 +21,7 @@ export interface CreateEmployeeData {
   correo_corporativo?: string
   gmail_personal?: string
   telefono?: string
-  unidad_negocio?: string
+  unidad_negocio?: number
   estado: "ACTIVO" | "INACTIVO"
 }
 

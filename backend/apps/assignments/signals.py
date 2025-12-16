@@ -15,6 +15,7 @@ def assignment_post_save(sender, instance, created, **kwargs):
 
     Acciones:
     - Al crear una asignación ACTIVA: cambiar dispositivo a ASIGNADO
+    - Si tiene solicitud vinculada: marcar solicitud como COMPLETADA
     - Al finalizar una asignación: no hace nada (se maneja en Return)
     """
     # Solo ejecutar si es una asignación ACTIVA
@@ -26,6 +27,13 @@ def assignment_post_save(sender, instance, created, **kwargs):
             # Obtener el usuario que creó la asignación para la auditoría
             user = instance.created_by if hasattr(instance, 'created_by') else None
             dispositivo.change_status('ASIGNADO', user=user)
+
+        # Auto-completar solicitud vinculada (solo al crear la asignación)
+        if created and instance.solicitud:
+            solicitud = instance.solicitud
+            if solicitud.estado == 'PENDIENTE':
+                solicitud.estado = 'COMPLETADA'
+                solicitud.save(update_fields=['estado', 'updated_at'])
 
 
 @receiver(post_save, sender=Return)

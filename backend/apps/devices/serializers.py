@@ -64,10 +64,17 @@ class DeviceSerializer(serializers.ModelSerializer):
             'puede_tener_valor',
         ]
 
+    def validate_modelo(self, value):
+        """Convertir cadena vacía a None para campos opcionales"""
+        if value == "" or value is None:
+            return None
+        return value
+
     def validate_numero_serie(self, value):
         """Validar que el número de serie sea único si se proporciona"""
-        if not value:  # Permitir null/blank
-            return value
+        # Convertir cadena vacía a None para evitar conflictos de unicidad
+        if value == "" or value is None:
+            return None
 
         if self.instance:
             # Si estamos actualizando, excluir el registro actual
@@ -82,8 +89,9 @@ class DeviceSerializer(serializers.ModelSerializer):
 
     def validate_imei(self, value):
         """Validar que el IMEI sea único si se proporciona"""
-        if not value:  # Permitir null/blank
-            return value
+        # Convertir cadena vacía a None para evitar conflictos de unicidad
+        if value == "" or value is None:
+            return None
 
         if self.instance:
             # Si estamos actualizando, excluir el registro actual
@@ -123,17 +131,32 @@ class DeviceSerializer(serializers.ModelSerializer):
 
         # VALIDACIÓN 1: numero_serie obligatorio para LAPTOP, TELEFONO, TABLET, TV
         if tipo_equipo in ['LAPTOP', 'TELEFONO', 'TABLET', 'TV']:
-            if not data.get('numero_serie'):
+            # En PATCH, si no viene en data, verificar que exista en instance
+            numero_serie = data.get('numero_serie')
+            if numero_serie is None and self.instance:
+                numero_serie = self.instance.numero_serie
+
+            if not numero_serie:
                 errors['numero_serie'] = f'El número de serie es obligatorio para {tipo_equipo}'
 
         # VALIDACIÓN 2: modelo obligatorio para LAPTOP, TELEFONO, TABLET
         if tipo_equipo in ['LAPTOP', 'TELEFONO', 'TABLET']:
-            if not data.get('modelo'):
+            # En PATCH, si no viene en data, verificar que exista en instance
+            modelo = data.get('modelo')
+            if modelo is None and self.instance:
+                modelo = self.instance.modelo
+
+            if not modelo:
                 errors['modelo'] = f'El modelo es obligatorio para {tipo_equipo}'
 
         # VALIDACIÓN 3: numero_telefono obligatorio solo para SIM
         if tipo_equipo == 'SIM':
-            if not data.get('numero_telefono'):
+            # En PATCH, si no viene en data, verificar que exista en instance
+            numero_telefono = data.get('numero_telefono')
+            if numero_telefono is None and self.instance:
+                numero_telefono = self.instance.numero_telefono
+
+            if not numero_telefono:
                 errors['numero_telefono'] = 'El número de teléfono es obligatorio para SIM cards'
 
         if errors:

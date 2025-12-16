@@ -3,9 +3,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Package, Users, CheckCircle, Activity, Loader2 } from "lucide-react"
 import { useDashboardStats } from "@/lib/hooks/use-swr-data"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, PieLabel } from "recharts"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
+import { formatDateLocal } from "@/lib/utils/date-helpers"
 
 // Colores para los gráficos
 const COLORS = {
@@ -39,6 +40,13 @@ const STATUS_LABELS: Record<string, string> = {
   MANTENIMIENTO: "Mantenimiento",
   BAJA: "De Baja",
   ROBO: "Robo/Pérdida"
+}
+
+// Mapeo de estados de dispositivos en devoluciones
+const DEVICE_CONDITION_LABELS: Record<string, string> = {
+  OPTIMO: "Óptimo",
+  CON_DANOS: "Con Daños",
+  NO_FUNCIONAL: "No Funcional"
 }
 
 export default function DashboardPage() {
@@ -79,10 +87,7 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Panel de Control</h1>
-          <p className="text-muted-foreground mt-1">
-            Última actualización: {new Date().toLocaleTimeString("es-CL")}
-          </p>
+          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
         </div>
       </div>
 
@@ -146,27 +151,55 @@ export default function DashboardPage() {
         {/* Gráfico de Dispositivos por Tipo */}
         <Card>
           <CardHeader>
-            <CardTitle>Dispositivos por Tipo</CardTitle>
+            <CardTitle>Distribución de Dispositivos por Tipo</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={deviceTypeData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar
+              <PieChart>
+                <Pie
+                  data={deviceTypeData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({
+                    cx,
+                    cy,
+                    midAngle,
+                    innerRadius,
+                    outerRadius,
+                    percent,
+                    index
+                  }: any) => {
+                    const RADIAN = Math.PI / 180;
+                    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+                    return (
+                      <text
+                        x={x}
+                        y={y}
+                        fill="white"
+                        textAnchor={x > cx ? 'start' : 'end'}
+                        dominantBaseline="central"
+                        fontSize={12}
+                        fontWeight="bold"
+                      >
+                        {`${(percent * 100).toFixed(0)}%`}
+                      </text>
+                    );
+                  }}
+                  outerRadius={100}
+                  fill="#8884d8"
                   dataKey="cantidad"
-                  fill="#3b82f6"
-                  name="Cantidad"
-                  radius={[8, 8, 0, 0]}
                 >
                   {deviceTypeData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[entry.tipo as keyof typeof COLORS] || "#3b82f6"} />
+                    <Cell key={`cell-${index}`} fill={COLORS[entry.tipo as keyof typeof COLORS] || "#8884d8"} />
                   ))}
-                </Bar>
-              </BarChart>
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
@@ -184,7 +217,34 @@ export default function DashboardPage() {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  label={({
+                    cx,
+                    cy,
+                    midAngle,
+                    innerRadius,
+                    outerRadius,
+                    percent,
+                    index
+                  }: any) => {
+                    const RADIAN = Math.PI / 180;
+                    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+                    return (
+                      <text
+                        x={x}
+                        y={y}
+                        fill="white"
+                        textAnchor={x > cx ? 'start' : 'end'}
+                        dominantBaseline="central"
+                        fontSize={12}
+                        fontWeight="bold"
+                      >
+                        {`${(percent * 100).toFixed(0)}%`}
+                      </text>
+                    );
+                  }}
                   outerRadius={100}
                   fill="#8884d8"
                   dataKey="cantidad"
@@ -199,27 +259,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Dispositivos por Sucursal */}
-      {stats.devices_by_branch.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Dispositivos por Sucursal</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={stats.devices_by_branch}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="sucursal__codigo" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="total" fill="#8b5cf6" name="Dispositivos" radius={[8, 8, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Últimas Asignaciones y Devoluciones */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -256,7 +295,7 @@ export default function DashboardPage() {
                         {assignment.dispositivo_detail?.tipo_equipo} - {assignment.dispositivo_detail?.marca} {assignment.dispositivo_detail?.modelo}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {new Date(assignment.fecha_entrega).toLocaleDateString("es-CL")}
+                        {formatDateLocal(assignment.fecha_entrega)}
                       </p>
                     </div>
                     <Link
@@ -304,14 +343,14 @@ export default function DashboardPage() {
                             "destructive"
                           }
                         >
-                          {returnItem.estado_dispositivo}
+                          {DEVICE_CONDITION_LABELS[returnItem.estado_dispositivo] || returnItem.estado_dispositivo}
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">
                         {returnItem.asignacion_detail?.dispositivo_detail?.tipo_equipo} - {returnItem.asignacion_detail?.dispositivo_detail?.marca} {returnItem.asignacion_detail?.dispositivo_detail?.modelo}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Devuelto: {new Date(returnItem.fecha_devolucion).toLocaleDateString("es-CL")}
+                        Devuelto: {formatDateLocal(returnItem.fecha_devolucion)}
                       </p>
                     </div>
                     <Link

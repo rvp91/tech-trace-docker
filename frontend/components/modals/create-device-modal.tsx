@@ -2,14 +2,15 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus } from "lucide-react"
-import { BRANCHES } from "@/lib/mock-data"
+import { branchService } from "@/lib/services/branch-service"
+import type { Branch } from "@/lib/types"
 
 interface CreateDeviceModalProps {
   onSubmit?: (data: any) => void
@@ -17,12 +18,32 @@ interface CreateDeviceModalProps {
 
 export function CreateDeviceModal({ onSubmit }: CreateDeviceModalProps) {
   const [open, setOpen] = useState(false)
+  const [branches, setBranches] = useState<Branch[]>([])
+  const [isLoadingBranches, setIsLoadingBranches] = useState(false)
   const [formData, setFormData] = useState({
     modelo: "",
     serial: "",
     tipo: "",
     sucursal: "",
   })
+
+  useEffect(() => {
+    if (open) {
+      loadBranches()
+    }
+  }, [open])
+
+  const loadBranches = async () => {
+    setIsLoadingBranches(true)
+    try {
+      const activeBranches = await branchService.getActiveBranches()
+      setBranches(activeBranches)
+    } catch (error) {
+      console.error("Error loading branches:", error)
+    } finally {
+      setIsLoadingBranches(false)
+    }
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -92,13 +113,13 @@ export function CreateDeviceModal({ onSubmit }: CreateDeviceModalProps) {
           </div>
           <div>
             <Label htmlFor="sucursal">Sucursal</Label>
-            <Select value={formData.sucursal} onValueChange={(value) => handleSelectChange("sucursal", value)}>
+            <Select value={formData.sucursal} onValueChange={(value) => handleSelectChange("sucursal", value)} disabled={isLoadingBranches}>
               <SelectTrigger>
-                <SelectValue placeholder="Seleccionar sucursal" />
+                <SelectValue placeholder={isLoadingBranches ? "Cargando..." : "Seleccionar sucursal"} />
               </SelectTrigger>
               <SelectContent>
-                {BRANCHES.map((branch) => (
-                  <SelectItem key={branch.id} value={branch.nombre}>
+                {branches.map((branch) => (
+                  <SelectItem key={branch.id} value={String(branch.id)}>
                     {branch.nombre}
                   </SelectItem>
                 ))}

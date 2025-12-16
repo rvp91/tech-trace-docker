@@ -2,13 +2,15 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus } from "lucide-react"
-import { EMPLOYEES, DEVICES } from "@/lib/mock-data"
+import { employeeService } from "@/lib/services/employee-service"
+import { deviceService } from "@/lib/services/device-service"
+import type { Employee, Device } from "@/lib/types"
 
 interface CreateAssignmentModalProps {
   onSubmit?: (data: any) => void
@@ -16,10 +18,49 @@ interface CreateAssignmentModalProps {
 
 export function CreateAssignmentModal({ onSubmit }: CreateAssignmentModalProps) {
   const [open, setOpen] = useState(false)
+  const [employees, setEmployees] = useState<Employee[]>([])
+  const [devices, setDevices] = useState<Device[]>([])
+  const [isLoadingEmployees, setIsLoadingEmployees] = useState(false)
+  const [isLoadingDevices, setIsLoadingDevices] = useState(false)
   const [formData, setFormData] = useState({
     empleado: "",
     dispositivo: "",
   })
+
+  useEffect(() => {
+    if (open) {
+      loadData()
+    }
+  }, [open])
+
+  const loadData = async () => {
+    // Cargar empleados y dispositivos en paralelo
+    await Promise.all([loadEmployees(), loadDevices()])
+  }
+
+  const loadEmployees = async () => {
+    setIsLoadingEmployees(true)
+    try {
+      const activeEmployees = await employeeService.getActiveEmployees()
+      setEmployees(activeEmployees)
+    } catch (error) {
+      console.error("Error loading employees:", error)
+    } finally {
+      setIsLoadingEmployees(false)
+    }
+  }
+
+  const loadDevices = async () => {
+    setIsLoadingDevices(true)
+    try {
+      const availableDevices = await deviceService.getAvailableDevices()
+      setDevices(availableDevices)
+    } catch (error) {
+      console.error("Error loading devices:", error)
+    } finally {
+      setIsLoadingDevices(false)
+    }
+  }
 
   const handleSelectChange = (name: string, value: string) => {
     setFormData((prev) => ({ ...prev, [name]: value }))
@@ -48,14 +89,14 @@ export function CreateAssignmentModal({ onSubmit }: CreateAssignmentModalProps) 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="empleado">Empleado</Label>
-            <Select value={formData.empleado} onValueChange={(value) => handleSelectChange("empleado", value)}>
+            <Select value={formData.empleado} onValueChange={(value) => handleSelectChange("empleado", value)} disabled={isLoadingEmployees}>
               <SelectTrigger>
-                <SelectValue placeholder="Seleccionar empleado" />
+                <SelectValue placeholder={isLoadingEmployees ? "Cargando..." : "Seleccionar empleado"} />
               </SelectTrigger>
               <SelectContent>
-                {EMPLOYEES.map((emp) => (
-                  <SelectItem key={emp.id} value={emp.nombre}>
-                    {emp.nombre}
+                {employees.map((emp) => (
+                  <SelectItem key={emp.id} value={String(emp.id)}>
+                    {emp.nombre_completo}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -63,14 +104,14 @@ export function CreateAssignmentModal({ onSubmit }: CreateAssignmentModalProps) 
           </div>
           <div>
             <Label htmlFor="dispositivo">Dispositivo</Label>
-            <Select value={formData.dispositivo} onValueChange={(value) => handleSelectChange("dispositivo", value)}>
+            <Select value={formData.dispositivo} onValueChange={(value) => handleSelectChange("dispositivo", value)} disabled={isLoadingDevices}>
               <SelectTrigger>
-                <SelectValue placeholder="Seleccionar dispositivo" />
+                <SelectValue placeholder={isLoadingDevices ? "Cargando..." : "Seleccionar dispositivo"} />
               </SelectTrigger>
               <SelectContent>
-                {DEVICES.map((device) => (
-                  <SelectItem key={device.id} value={device.modelo}>
-                    {device.modelo} ({device.serial})
+                {devices.map((device) => (
+                  <SelectItem key={device.id} value={String(device.id)}>
+                    {device.marca} {device.modelo} ({device.numero_serie})
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -15,7 +15,7 @@ django.setup()
 
 from django.contrib.auth import get_user_model
 from apps.branches.models import Branch
-from apps.employees.models import Employee
+from apps.employees.models import Employee, BusinessUnit
 from apps.devices.models import Device
 from apps.assignments.models import Request, Assignment
 
@@ -97,7 +97,10 @@ def create_test_data():
         'Coordinador de Proyectos'
     ]
 
-    unidades = ['Tecnología', 'Operaciones', 'Administración', 'Ventas', 'Marketing']
+    # Obtener unidades de negocio activas
+    unidades = list(BusinessUnit.objects.filter(is_active=True))
+    if not unidades:
+        print("⚠️  No hay unidades de negocio activas. Algunas asignaciones no tendrán unidad de negocio.")
 
     employees = []
     existing_count = Employee.objects.count()
@@ -117,7 +120,7 @@ def create_test_data():
                     gmail_personal=f"empleado{i+1}@gmail.com",
                     telefono=f"+569{random.randint(10000000, 99999999)}",
                     sucursal=random.choice(branches),
-                    unidad_negocio=random.choice(unidades),
+                    unidad_negocio=random.choice(unidades) if unidades else None,
                     estado='ACTIVO',
                     created_by=admin_user
                 )
@@ -201,7 +204,7 @@ def create_test_data():
                         tipo_equipo=tipo,
                         marca=marca,
                         modelo=modelo,
-                        serie_imei=serie,
+                        numero_serie=serie,
                         numero_telefono=numero_tel,
                         numero_factura=f"FAC-{device_count:05d}",
                         estado=estado,

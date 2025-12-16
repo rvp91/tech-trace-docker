@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Edit2, Trash2, Building2, MapPin, Laptop, Smartphone, Tablet, Users, Search, Plus } from "lucide-react"
+import { Edit2, Trash2, Building2, MapPin, Laptop, Smartphone, Tablet, Tv, Users, Search, Plus } from "lucide-react"
 import { CardSimIcon } from "@/components/ui/icons/lucide-card-sim"
 import { branchService } from "@/lib/services/branch-service"
 import { BranchModal } from "@/components/modals/branch-modal"
@@ -260,6 +260,15 @@ export default function BranchesPage() {
                       </span>
                       <span className="font-semibold">
                         {branch.dispositivos_por_tipo?.SIM || 0}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2 text-muted-foreground">
+                        <Tv className="h-4 w-4" />
+                        TVs
+                      </span>
+                      <span className="font-semibold">
+                        {branch.dispositivos_por_tipo?.TV || 0}
                       </span>
                     </div>
                   </div>

@@ -26,7 +26,7 @@ class Device(models.Model):
 
     tipo_equipo = models.CharField(max_length=20, choices=TIPO_CHOICES, verbose_name='Tipo de equipo')
     marca = models.CharField(max_length=50, verbose_name='Marca')
-    modelo = models.CharField(max_length=100, verbose_name='Modelo')
+    modelo = models.CharField(max_length=100, blank=True, null=True, verbose_name='Modelo')
     numero_serie = models.CharField(max_length=100, unique=True, blank=True, null=True, verbose_name='Número de Serie')
     imei = models.CharField(max_length=100, unique=True, blank=True, null=True, verbose_name='IMEI')
     numero_telefono = models.CharField(max_length=20, blank=True, null=True, verbose_name='Número de teléfono')
@@ -50,6 +50,11 @@ class Device(models.Model):
     def __str__(self):
         identificador = self.numero_serie or self.imei or 'S/N'
         return f"{self.get_tipo_equipo_display()} - {self.marca} {self.modelo} ({identificador})"
+
+    @property
+    def serial_identifier(self):
+        """Retorna numero_serie o imei como identificador del dispositivo"""
+        return self.numero_serie or self.imei or 'S/N'
 
     @property
     def edad_calculada(self):

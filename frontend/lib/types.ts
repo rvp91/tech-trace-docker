@@ -23,6 +23,14 @@ export interface AuthState {
   isAuthenticated: boolean
 }
 
+export interface BusinessUnit {
+  id: number
+  nombre: string
+  codigo: string
+  descripcion?: string
+  is_active: boolean
+}
+
 export interface Employee {
   id: number
   rut: string
@@ -33,8 +41,10 @@ export interface Employee {
   telefono?: string
   sucursal: number
   sucursal_detail?: Branch
-  unidad_negocio?: string
+  unidad_negocio?: number
+  unidad_negocio_detail?: BusinessUnit
   estado: "ACTIVO" | "INACTIVO"
+  dispositivos_asignados: number
   created_at: string
   updated_at: string
   created_by?: number
@@ -103,7 +113,7 @@ export interface DeviceHistory {
 }
 
 // Request (Solicitud) types
-export type EstadoSolicitud = "PENDIENTE" | "APROBADA" | "RECHAZADA" | "COMPLETADA"
+export type EstadoSolicitud = "PENDIENTE" | "COMPLETADA"
 export type MotivoSolicitud = "CAMBIO" | "NUEVA_ENTREGA" | "ROBO" | "PRACTICA"
 
 export interface Request {
@@ -186,33 +196,6 @@ export interface Branch {
   }
 }
 
-export interface DashboardMetrics {
-  totalDispositivos: number
-  disponibles: number
-  asignados: number
-  enMantenimiento: number
-  dispositivosPorTipo: {
-    tipo: string
-    cantidad: number
-  }[]
-  dispositivosPorEstado: {
-    estado: string
-    cantidad: number
-  }[]
-  ultimasAsignaciones: Assignment[]
-  ultimasDevoluciones: Assignment[]
-}
-
-export interface InventoryReport {
-  sucursalId?: string
-  empleadoId?: string
-  dispositivos: Device[]
-  totales: {
-    total: number
-    porTipo: Record<string, number>
-    porEstado: Record<string, number>
-  }
-}
 
 export interface PaginatedResponse<T> {
   data: T[]

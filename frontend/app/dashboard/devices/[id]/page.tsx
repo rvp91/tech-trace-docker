@@ -28,6 +28,7 @@ import { useToast } from "@/hooks/use-toast"
 import { deviceService, getDeviceStatusColor, getDeviceStatusLabel, getDeviceTypeLabel } from "@/lib/services/device-service"
 import type { Device, DeviceHistory, EstadoDispositivo } from "@/lib/types"
 import { DeviceModal } from "@/components/modals/device-modal"
+import { formatDateLocal } from "@/lib/utils/date-helpers"
 
 export default function DeviceDetailPage() {
   const params = useParams()
@@ -181,15 +182,29 @@ export default function DeviceDetailPage() {
               </div>
             </div>
 
-            <div className="flex items-start gap-3">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Hash className="h-5 w-5 text-primary" />
+{device.numero_serie && (
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Hash className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Número de Serie</p>
+                  <p className="font-medium font-mono">{device.numero_serie}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Serie / IMEI</p>
-                <p className="font-medium font-mono">{device.serie_imei}</p>
+            )}
+
+            {device.imei && (
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Smartphone className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">IMEI</p>
+                  <p className="font-medium font-mono">{device.imei}</p>
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="flex items-start gap-3">
               <div className="p-2 bg-primary/10 rounded-lg">
@@ -254,7 +269,7 @@ export default function DeviceDetailPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Fecha de Ingreso</p>
                 <p className="font-medium">
-                  {new Date(device.fecha_ingreso).toLocaleDateString("es-CL")}
+                  {formatDateLocal(device.fecha_ingreso)}
                 </p>
               </div>
             </div>
@@ -270,6 +285,55 @@ export default function DeviceDetailPage() {
                 </Badge>
               </div>
             </div>
+
+            {device.puede_tener_edad &&
+              device.edad_dispositivo_display !== null &&
+              device.edad_dispositivo_display !== undefined && (
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Calendar className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Edad del Dispositivo</p>
+                  <p className="font-medium">
+                    {device.edad_dispositivo_display} año{device.edad_dispositivo_display === "5+" || Number(device.edad_dispositivo_display) !== 1 ? "s" : ""}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {device.puede_tener_valor && device.valor_inicial && (
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Hash className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Valor Inicial</p>
+                  <p className="font-medium">
+                    ${Number(device.valor_inicial).toLocaleString('es-CL')} CLP
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {device.puede_tener_valor &&
+              device.valor_depreciado_calculado !== null &&
+              device.valor_depreciado_calculado !== undefined && (
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Hash className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Valor Actual (Depreciado)</p>
+                  <p className="font-medium">
+                    ${Number(device.valor_depreciado_calculado).toLocaleString('es-CL')} CLP
+                    {device.es_valor_manual && (
+                      <Badge variant="outline" className="ml-2 text-xs">Manual</Badge>
+                    )}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -346,11 +410,11 @@ export default function DeviceDetailPage() {
                           : `Empleado #${assignment.empleado}`}
                       </TableCell>
                       <TableCell>
-                        {new Date(assignment.fecha_entrega).toLocaleDateString("es-CL")}
+                        {formatDateLocal(assignment.fecha_entrega)}
                       </TableCell>
                       <TableCell>
                         {assignment.fecha_devolucion
-                          ? new Date(assignment.fecha_devolucion).toLocaleDateString("es-CL")
+                          ? formatDateLocal(assignment.fecha_devolucion)
                           : "-"}
                       </TableCell>
                       <TableCell>

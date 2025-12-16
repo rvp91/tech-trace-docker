@@ -41,7 +41,8 @@ class AssignmentViewSet(viewsets.ModelViewSet):
     search_fields = [
         'empleado__nombre_completo',
         'empleado__rut',
-        'dispositivo__serie_imei',
+        'dispositivo__numero_serie',
+        'dispositivo__imei',
         'dispositivo__marca',
         'dispositivo__modelo',
         'observaciones'
@@ -67,7 +68,8 @@ class ReturnViewSet(viewsets.ModelViewSet):
     filterset_fields = ['estado_dispositivo', 'asignacion']
     search_fields = [
         'asignacion__empleado__nombre_completo',
-        'asignacion__dispositivo__serie_imei',
+        'asignacion__dispositivo__numero_serie',
+        'asignacion__dispositivo__imei',
         'observaciones'
     ]
     ordering_fields = ['fecha_devolucion', 'created_at']

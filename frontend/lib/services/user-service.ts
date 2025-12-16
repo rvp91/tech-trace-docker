@@ -21,6 +21,7 @@ export interface UpdateUserData {
 }
 
 export interface ChangePasswordData {
+  current_password: string
   new_password: string
   confirm_password: string
 }
@@ -42,6 +43,27 @@ export interface UserFilters {
 }
 
 export const userService = {
+  /**
+   * Obtiene el perfil del usuario actual autenticado
+   */
+  async getCurrentUser(): Promise<User> {
+    return apiClient.get<User>("/auth/me/")
+  },
+
+  /**
+   * Actualiza el perfil del usuario actual autenticado
+   */
+  async updateProfile(data: UpdateUserData): Promise<User> {
+    return apiClient.patch<User>("/auth/me/", data)
+  },
+
+  /**
+   * Cambia la contraseña del usuario actual autenticado
+   */
+  async changeMyPassword(data: ChangePasswordData): Promise<void> {
+    return apiClient.post<void>("/auth/me/change_password/", data)
+  },
+
   /**
    * Obtiene la lista de usuarios con filtros opcionales
    */

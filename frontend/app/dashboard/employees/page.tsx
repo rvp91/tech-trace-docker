@@ -50,7 +50,7 @@ export default function EmployeesPage() {
 
   // Estados de paginación
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
+  const pageSize = 20 // Tamaño fijo de página
   const [totalCount, setTotalCount] = useState(0)
 
   // Cargar empleados con filtros
@@ -107,11 +107,6 @@ export default function EmployeesPage() {
   // Handlers de paginación
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
-  }
-
-  const handlePageSizeChange = (newPageSize: number) => {
-    setPageSize(newPageSize)
-    setCurrentPage(1)
   }
 
   const totalPages = Math.ceil(totalCount / pageSize)
@@ -220,6 +215,7 @@ export default function EmployeesPage() {
                   <TableHead>Cargo</TableHead>
                   <TableHead>Sucursal</TableHead>
                   <TableHead>Unidad de Negocio</TableHead>
+                  <TableHead>Dispositivos Asignados</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="w-32">Acciones</TableHead>
                 </TableRow>
@@ -234,13 +230,14 @@ export default function EmployeesPage() {
                       <TableCell><Skeleton className="h-4 w-28" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-12" /></TableCell>
                       <TableCell><Skeleton className="h-6 w-16" /></TableCell>
                       <TableCell><Skeleton className="h-8 w-20" /></TableCell>
                     </TableRow>
                   ))
                 ) : employees.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       No se encontraron empleados
                     </TableCell>
                   </TableRow>
@@ -254,7 +251,10 @@ export default function EmployeesPage() {
                         {employee.sucursal_detail ? employee.sucursal_detail.nombre : `ID: ${employee.sucursal}`}
                       </TableCell>
                       <TableCell>
-                        {employee.unidad_negocio || "-"}
+                        {employee.unidad_negocio_detail?.nombre || "-"}
+                      </TableCell>
+                      <TableCell className="text-center font-medium">
+                        {employee.dispositivos_asignados}
                       </TableCell>
                       <TableCell>
                         <Badge variant={employee.estado === "ACTIVO" ? "default" : "secondary"}>
@@ -311,7 +311,8 @@ export default function EmployeesPage() {
               pageSize={pageSize}
               totalCount={totalCount}
               onPageChange={handlePageChange}
-              onPageSizeChange={handlePageSizeChange}
+              onPageSizeChange={() => {}} // No-op: tamaño fijo
+              pageSizeOptions={[20]} // Solo mostrar 20 como opción
             />
           )}
         </CardContent>

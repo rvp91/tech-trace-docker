@@ -18,7 +18,6 @@ Actualmente, la empresa gestiona aproximadamente 1000 dispositivos distribuidos 
 - Dificultad para generar inventarios actualizados
 - Riesgo de pérdida de información
 - Procesos lentos de asignación y control
-- Imposibilidad de generar reportes consolidados
 
 ### 1.3 Objetivos del Producto
 - Centralizar la gestión de todos los dispositivos en una plataforma única
@@ -44,15 +43,12 @@ Actualmente, la empresa gestiona aproximadamente 1000 dispositivos distribuidos 
 
 ### 2.2 Fuera de Alcance (Versión 1.0)
 - Sistema de notificaciones automáticas
-- Generación de reportes avanzados (planificado para v2.0)
 - Control de garantías
 - Firma digital de cartas de responsabilidad
 
 ### 2.3 Futuras Versiones
 **Versión 2.0:**
-- Sistema completo de reportes personalizables
 - Dashboards con métricas y KPIs
-- Exportación a múltiples formatos (PDF, Excel, CSV)
 - Análisis de tendencias y uso de dispositivos
 
 ---
@@ -476,7 +472,6 @@ tech-trace/
 │   │       ├── employees/      # Gestión de empleados
 │   │       ├── branches/       # Gestión de sucursales
 │   │       ├── assignments/    # Gestión de asignaciones
-│   │       ├── reports/        # Reportes
 │   │       └── users/          # Gestión de usuarios
 │   │
 │   ├── components/             # Componentes React

@@ -11,7 +11,8 @@ import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
 import { employeeService, type CreateEmployeeData } from "@/lib/services/employee-service"
 import { branchService } from "@/lib/services/branch-service"
-import type { Branch, Employee } from "@/lib/types"
+import { businessUnitService } from "@/lib/services/business-unit-service"
+import type { Branch, Employee, BusinessUnit } from "@/lib/types"
 
 interface CreateEmployeeModalProps {
   employee?: Employee
@@ -24,6 +25,7 @@ export function CreateEmployeeModal({ employee, children, onSuccess }: CreateEmp
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [branches, setBranches] = useState<Branch[]>([])
+  const [businessUnits, setBusinessUnits] = useState<BusinessUnit[]>([])
   const [formData, setFormData] = useState<CreateEmployeeData>({
     rut: "",
     nombre_completo: "",
@@ -32,24 +34,28 @@ export function CreateEmployeeModal({ employee, children, onSuccess }: CreateEmp
     correo_corporativo: "",
     gmail_personal: "",
     telefono: "",
-    unidad_negocio: "",
+    unidad_negocio: undefined,
     estado: "ACTIVO",
   })
 
   const isEditMode = !!employee
 
-  // Cargar sucursales
+  // Cargar sucursales y unidades de negocio
   useEffect(() => {
-    const loadBranches = async () => {
+    const loadData = async () => {
       try {
-        const response = await branchService.getBranches({ page_size: 100 })
-        setBranches(response.results)
+        const [branchesResponse, businessUnitsData] = await Promise.all([
+          branchService.getBranches({ page_size: 100 }),
+          businessUnitService.getBusinessUnits()
+        ])
+        setBranches(branchesResponse.results)
+        setBusinessUnits(businessUnitsData)
       } catch (error) {
-        console.error("Error al cargar sucursales:", error)
+        console.error("Error al cargar datos:", error)
       }
     }
     if (open) {
-      loadBranches()
+      loadData()
     }
   }, [open])
 
@@ -64,7 +70,7 @@ export function CreateEmployeeModal({ employee, children, onSuccess }: CreateEmp
         correo_corporativo: employee.correo_corporativo || "",
         gmail_personal: employee.gmail_personal || "",
         telefono: employee.telefono || "",
-        unidad_negocio: employee.unidad_negocio || "",
+        unidad_negocio: employee.unidad_negocio || undefined,
         estado: employee.estado,
       })
     }
@@ -88,7 +94,7 @@ export function CreateEmployeeModal({ employee, children, onSuccess }: CreateEmp
       correo_corporativo: "",
       gmail_personal: "",
       telefono: "",
-      unidad_negocio: "",
+      unidad_negocio: undefined,
       estado: "ACTIVO",
     })
   }
@@ -245,22 +251,19 @@ export function CreateEmployeeModal({ employee, children, onSuccess }: CreateEmp
             <div>
               <Label htmlFor="unidad_negocio">Unidad de Negocio</Label>
               <Select
-                value={formData.unidad_negocio || "none"}
-                onValueChange={(value) => handleSelectChange("unidad_negocio", value === "none" ? "" : value)}
+                value={formData.unidad_negocio ? String(formData.unidad_negocio) : "none"}
+                onValueChange={(value) => handleSelectChange("unidad_negocio", value === "none" ? undefined : Number(value))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar unidad" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Sin asignar</SelectItem>
-                  <SelectItem value="Operaciones">Operaciones</SelectItem>
-                  <SelectItem value="Tecnología">Tecnología</SelectItem>
-                  <SelectItem value="Soporte Técnico">Soporte Técnico</SelectItem>
-                  <SelectItem value="Logística">Logística</SelectItem>
-                  <SelectItem value="Administración">Administración</SelectItem>
-                  <SelectItem value="Recursos Humanos">Recursos Humanos</SelectItem>
-                  <SelectItem value="Ventas">Ventas</SelectItem>
-                  <SelectItem value="Marketing">Marketing</SelectItem>
+                  {businessUnits.map((unit) => (
+                    <SelectItem key={unit.id} value={String(unit.id)}>
+                      {unit.nombre}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

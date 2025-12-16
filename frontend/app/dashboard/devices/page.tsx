@@ -28,10 +28,11 @@ import { TablePagination } from "@/components/ui/table-pagination"
 import { Search, Edit2, Trash2, Eye, Plus } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
-import { deviceService, getDeviceStatusColor, getDeviceStatusLabel, getDeviceTypeLabel, formatCurrency, formatEdadDispositivo } from "@/lib/services/device-service"
+import { deviceService, getDeviceStatusColor, getDeviceStatusLabel, getDeviceTypeLabel } from "@/lib/services/device-service"
 import { branchService } from "@/lib/services/branch-service"
 import type { Device, Branch, TipoEquipo, EstadoDispositivo } from "@/lib/types"
 import { DeviceModal } from "@/components/modals/device-modal"
+import { formatDateLocal } from "@/lib/utils/date-helpers"
 
 export default function DevicesPage() {
   const router = useRouter()
@@ -248,10 +249,8 @@ export default function DevicesPage() {
                   <TableHead>Tipo</TableHead>
                   <TableHead>Marca</TableHead>
                   <TableHead>Modelo</TableHead>
-                  <TableHead>N° Serie</TableHead>
-                  <TableHead>IMEI</TableHead>
-                  <TableHead>Edad</TableHead>
-                  <TableHead>Valor</TableHead>
+                  <TableHead>Número de Serie</TableHead>
+                  <TableHead>Fecha de Ingreso</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Sucursal</TableHead>
                   <TableHead className="w-32">Acciones</TableHead>
@@ -265,10 +264,8 @@ export default function DevicesPage() {
                       <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                       <TableCell><Skeleton className="h-6 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                       <TableCell><Skeleton className="h-8 w-20" /></TableCell>
@@ -276,7 +273,7 @@ export default function DevicesPage() {
                   ))
                 ) : devices.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       No se encontraron dispositivos
                     </TableCell>
                   </TableRow>
@@ -286,24 +283,9 @@ export default function DevicesPage() {
                       <TableCell className="font-medium">{getDeviceTypeLabel(device.tipo_equipo)}</TableCell>
                       <TableCell>{device.marca}</TableCell>
                       <TableCell>{device.modelo || "-"}</TableCell>
-                      <TableCell className="font-mono text-sm">{device.numero_serie || "-"}</TableCell>
-                      <TableCell className="font-mono text-sm">{device.imei || "-"}</TableCell>
+                      <TableCell>{device.numero_serie || "-"}</TableCell>
                       <TableCell>
-                        {device.puede_tener_edad
-                          ? formatEdadDispositivo(device.edad_dispositivo_display)
-                          : "-"}
-                      </TableCell>
-                      <TableCell>
-                        {device.puede_tener_valor && device.valor_depreciado_calculado
-                          ? (
-                            <div className="flex flex-col">
-                              <span className="font-medium">{formatCurrency(device.valor_depreciado_calculado)}</span>
-                              {device.es_valor_manual && (
-                                <span className="text-xs text-blue-600">Manual</span>
-                              )}
-                            </div>
-                          )
-                          : "-"}
+                        {formatDateLocal(device.fecha_ingreso)}
                       </TableCell>
                       <TableCell>
                         <Badge className={getDeviceStatusColor(device.estado)}>

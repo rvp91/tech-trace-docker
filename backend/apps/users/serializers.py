@@ -72,16 +72,31 @@ class CreateUserSerializer(serializers.ModelSerializer):
 class ChangePasswordSerializer(serializers.Serializer):
     """
     Serializer para cambiar la contraseña de un usuario.
+    Requiere la contraseña actual para validar la identidad del usuario.
     """
-    new_password = serializers.CharField(required=True, min_length=6)
-    confirm_password = serializers.CharField(required=True, min_length=6)
+    current_password = serializers.CharField(required=True, write_only=True)
+    new_password = serializers.CharField(required=True, min_length=6, write_only=True)
+    confirm_password = serializers.CharField(required=True, min_length=6, write_only=True)
+
+    def validate_current_password(self, value):
+        """Valida que la contraseña actual sea correcta."""
+        user = self.context.get('user')
+        if user and not user.check_password(value):
+            raise serializers.ValidationError('La contraseña actual es incorrecta.')
+        return value
 
     def validate(self, data):
-        """Valida que las contraseñas coincidan."""
+        """Valida que las contraseñas coincidan y sean diferentes."""
         if data['new_password'] != data['confirm_password']:
             raise serializers.ValidationError({
                 'confirm_password': 'Las contraseñas no coinciden.'
             })
+
+        if data['current_password'] == data['new_password']:
+            raise serializers.ValidationError({
+                'new_password': 'La nueva contraseña debe ser diferente a la actual.'
+            })
+
         return data
 
 

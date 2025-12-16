@@ -20,11 +20,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { EmployeeSearchCombobox } from "@/components/ui/employee-search-combobox"
+import { DeviceSearchCombobox } from "@/components/ui/device-search-combobox"
 import { useToast } from "@/hooks/use-toast"
 import { assignmentService } from "@/lib/services/assignment-service"
-import { employeeService } from "@/lib/services/employee-service"
-import { deviceService } from "@/lib/services/device-service"
-import type { Assignment, Employee, Device, Request } from "@/lib/types"
+import type { Assignment, Request } from "@/lib/types"
+import { getTodayLocal } from "@/lib/utils/date-helpers"
 
 interface AssignmentModalProps {
   open: boolean
@@ -44,8 +45,6 @@ export function AssignmentModal({
   preSelectedRequest,
 }: AssignmentModalProps) {
   const [loading, setLoading] = useState(false)
-  const [employees, setEmployees] = useState<Employee[]>([])
-  const [devices, setDevices] = useState<Device[]>([])
   const [formData, setFormData] = useState({
     empleado: "",
     dispositivo: "",
@@ -58,9 +57,6 @@ export function AssignmentModal({
 
   useEffect(() => {
     if (open) {
-      loadEmployees()
-      loadAvailableDevices()
-
       if (assignment) {
         setFormData({
           empleado: String(assignment.empleado),
@@ -80,45 +76,13 @@ export function AssignmentModal({
           empleado: empleadoId,
           dispositivo: "",
           tipo_entrega: "PERMANENTE",
-          fecha_entrega: new Date().toISOString().split("T")[0],
+          fecha_entrega: getTodayLocal(),
           estado_carta: "PENDIENTE",
           observaciones: "",
         })
       }
     }
   }, [open, assignment, preSelectedEmployee])
-
-  const loadEmployees = async () => {
-    try {
-      const response = await employeeService.getEmployees({
-        estado: "ACTIVO",
-        page_size: 1000,
-      })
-      setEmployees(response.results)
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los empleados",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const loadAvailableDevices = async () => {
-    try {
-      const response = await deviceService.getDevices({
-        estado: "DISPONIBLE",
-        page_size: 1000,
-      })
-      setDevices(response.results)
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los dispositivos disponibles",
-        variant: "destructive",
-      })
-    }
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -199,65 +163,30 @@ export function AssignmentModal({
               <Label htmlFor="empleado">
                 Empleado <span className="text-red-500">*</span>
               </Label>
-              <Select
+              <EmployeeSearchCombobox
                 value={formData.empleado}
-                onValueChange={(value) =>
+                onChange={(value) =>
                   setFormData((prev) => ({ ...prev, empleado: value }))
                 }
                 disabled={!!assignment || !!preSelectedEmployee}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona un empleado" />
-                </SelectTrigger>
-                <SelectContent>
-                  {employees && employees.length > 0 ? (
-                    employees.map((employee) => (
-                      <SelectItem key={employee.id} value={String(employee.id)}>
-                        {employee.nombre_completo} - {employee.rut}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="none" disabled>
-                      Cargando empleados...
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
+                placeholder="Buscar empleado..."
+                filter={{ estado: "ACTIVO" }}
+              />
             </div>
 
             <div className="grid gap-2">
               <Label htmlFor="dispositivo">
                 Dispositivo <span className="text-red-500">*</span>
               </Label>
-              <Select
+              <DeviceSearchCombobox
                 value={formData.dispositivo}
-                onValueChange={(value) =>
+                onChange={(value) =>
                   setFormData((prev) => ({ ...prev, dispositivo: value }))
                 }
                 disabled={!!assignment}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona un dispositivo" />
-                </SelectTrigger>
-                <SelectContent>
-                  {!devices || devices.length === 0 ? (
-                    <SelectItem value="none" disabled>
-                      {devices === undefined ? "Cargando dispositivos..." : "No hay dispositivos disponibles"}
-                    </SelectItem>
-                  ) : (
-                    devices.map((device) => (
-                      <SelectItem key={device.id} value={String(device.id)}>
-                        {device.tipo_equipo} - {device.marca} {device.modelo} ({device.serie_imei})
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-              {devices && devices.length === 0 && (
-                <p className="text-sm text-amber-600">
-                  ⚠️ No hay dispositivos disponibles para asignar
-                </p>
-              )}
+                placeholder="Buscar dispositivo..."
+                filter={{ estado: "DISPONIBLE" }}
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -329,21 +258,13 @@ export function AssignmentModal({
                 rows={3}
               />
             </div>
-
-            {preSelectedRequest && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <p className="text-sm text-blue-800">
-                  ℹ️ Esta asignación se vinculará con la solicitud #{preSelectedRequest.id}
-                </p>
-              </div>
-            )}
           </div>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading || !devices || devices.length === 0}>
+            <Button type="submit" disabled={loading}>
               {loading ? "Guardando..." : assignment ? "Actualizar" : "Crear Asignación"}
             </Button>
           </DialogFooter>

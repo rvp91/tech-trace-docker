@@ -2,6 +2,7 @@ import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import { toast } from '@/components/ui/use-toast'
 import { ApiError } from './api-client'
+import { getTodayLocal, formatDateLocal } from './utils/date-helpers'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -117,7 +118,7 @@ export function exportToCSV<T extends Record<string, any>>(
   const url = URL.createObjectURL(blob)
 
   // Agregar fecha al nombre del archivo
-  const date = new Date().toISOString().split('T')[0]
+  const date = getTodayLocal()
   const fullFilename = `${filename}_${date}.csv`
 
   link.setAttribute('href', url)
@@ -130,16 +131,11 @@ export function exportToCSV<T extends Record<string, any>>(
 }
 
 /**
- * Formatea una fecha ISO a formato DD/MM/YYYY
+ * Formatea una fecha ISO a formato DD-MM-YYYY
+ * @deprecated Use formatDateLocal from date-helpers instead
  */
 export function formatDate(dateString: string): string {
-  if (!dateString) return ''
-  const date = new Date(dateString)
-  return date.toLocaleDateString('es-CL', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  })
+  return formatDateLocal(dateString)
 }
 
 /**

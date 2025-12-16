@@ -1,11 +1,10 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, Package, Tablet, Zap, Building2, BarChart3, Settings, LogOut } from "lucide-react"
+import { LayoutDashboard, Users, Package, Tablet, Zap, Building2, Settings, LogOut } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { NAVIGATION } from "@/lib/mock-data"
 import { useAuthStore } from "@/lib/store/auth-store"
 import { authService } from "@/lib/services/auth-service"
 
@@ -21,14 +20,23 @@ const ICON_MAP = {
   Tablet,
   Zap,
   Building2,
-  BarChart3,
   Settings,
 }
+
+const NAVIGATION = [
+  { name: "Dashboard", href: "/dashboard", icon: "LayoutDashboard" },
+  { name: "Empleados", href: "/dashboard/employees", icon: "Users" },
+  { name: "Dispositivos", href: "/dashboard/devices", icon: "Tablet" },
+  { name: "Asignaciones", href: "/dashboard/assignments", icon: "Zap" },
+  { name: "Inventario", href: "/dashboard/inventory", icon: "Package" },
+  { name: "Sucursales", href: "/dashboard/branches", icon: "Building2" },
+  { name: "Usuarios", href: "/dashboard/users", icon: "Settings" },
+]
 
 export function Sidebar({ open, onOpenChange }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const { refreshToken, clearAuth } = useAuthStore()
+  const { user, refreshToken, clearAuth } = useAuthStore()
 
   const handleLogout = async () => {
     try {
@@ -41,6 +49,15 @@ export function Sidebar({ open, onOpenChange }: SidebarProps) {
       router.push("/login")
     }
   }
+
+  // Filtrar navegación según el rol del usuario
+  const filteredNavigation = NAVIGATION.filter((item) => {
+    // Si el usuario es operador, ocultar el módulo de usuarios
+    if (user?.role === "OPERADOR" && item.href === "/dashboard/users") {
+      return false
+    }
+    return true
+  })
 
   return (
     <>
@@ -63,19 +80,17 @@ export function Sidebar({ open, onOpenChange }: SidebarProps) {
           </div>
 
           <nav className="flex-1 overflow-auto p-4 space-y-1">
-            {NAVIGATION.map((item) => {
+            {filteredNavigation.map((item: any) => {
               const Icon = ICON_MAP[item.icon as keyof typeof ICON_MAP]
-              const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
+              const isActive = pathname === item.href
 
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-sm font-medium",
-                    isActive
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                    "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                    isActive && "bg-sidebar-primary text-sidebar-primary-foreground"
                   )}
                 >
                   <Icon className="h-5 w-5" />
@@ -85,11 +100,7 @@ export function Sidebar({ open, onOpenChange }: SidebarProps) {
             })}
           </nav>
 
-          <div className="p-4 border-t border-sidebar-border space-y-2">
-            <Button variant="outline" className="w-full justify-start bg-transparent" size="sm">
-              <Settings className="h-4 w-4 mr-2" />
-              Configuración
-            </Button>
+          <div className="p-4 border-t border-sidebar-border">
             <Button
               variant="ghost"
               className="w-full justify-start text-destructive hover:text-destructive"

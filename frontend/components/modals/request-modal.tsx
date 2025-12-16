@@ -96,6 +96,16 @@ export function RequestModal({ open, onClose, onSuccess, request }: RequestModal
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    // Bloquear edición si la solicitud está COMPLETADA
+    if (request && request.estado === "COMPLETADA") {
+      toast({
+        title: "Error",
+        description: "No se pueden editar solicitudes completadas",
+        variant: "destructive",
+      })
+      return
+    }
+
     if (!formData.empleado || !formData.sucursal || !formData.motivo ||
         !formData.jefatura_solicitante || !formData.tipo_dispositivo) {
       toast({
@@ -167,7 +177,7 @@ export function RequestModal({ open, onClose, onSuccess, request }: RequestModal
                 onChange={(value) =>
                   setFormData((prev) => ({ ...prev, empleado: value }))
                 }
-                disabled={!!request}
+                disabled={!!request && request.estado === "COMPLETADA"}
                 placeholder="Buscar empleado..."
                 filter={{ estado: "ACTIVO" }}
               />
@@ -182,7 +192,7 @@ export function RequestModal({ open, onClose, onSuccess, request }: RequestModal
                 onValueChange={(value) =>
                   setFormData((prev) => ({ ...prev, sucursal: value }))
                 }
-                disabled={!!request}
+                disabled={!!request && request.estado === "COMPLETADA"}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecciona una sucursal" />
@@ -206,7 +216,7 @@ export function RequestModal({ open, onClose, onSuccess, request }: RequestModal
                 onValueChange={(value) =>
                   setFormData((prev) => ({ ...prev, motivo: value }))
                 }
-                disabled={!!request}
+                disabled={!!request && request.estado === "COMPLETADA"}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecciona el motivo" />
@@ -235,7 +245,7 @@ export function RequestModal({ open, onClose, onSuccess, request }: RequestModal
                   }))
                 }
                 placeholder="Nombre de la jefatura"
-                disabled={!!request}
+                disabled={!!request && request.estado === "COMPLETADA"}
               />
             </div>
 
@@ -248,7 +258,7 @@ export function RequestModal({ open, onClose, onSuccess, request }: RequestModal
                 onValueChange={(value) =>
                   setFormData((prev) => ({ ...prev, tipo_dispositivo: value }))
                 }
-                disabled={!!request}
+                disabled={!!request && request.estado === "COMPLETADA"}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecciona el tipo" />
@@ -273,7 +283,7 @@ export function RequestModal({ open, onClose, onSuccess, request }: RequestModal
                 }
                 placeholder="Ingresa la justificación de la solicitud..."
                 rows={4}
-                disabled={!!request}
+                disabled={!!request && request.estado === "COMPLETADA"}
               />
             </div>
 
@@ -289,11 +299,16 @@ export function RequestModal({ open, onClose, onSuccess, request }: RequestModal
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
-              {request ? "Cerrar" : "Cancelar"}
+              Cerrar
             </Button>
             {!request && (
               <Button type="submit" disabled={loading}>
                 {loading ? "Creando..." : "Crear Solicitud"}
+              </Button>
+            )}
+            {request && request.estado === "PENDIENTE" && (
+              <Button type="submit" disabled={loading}>
+                {loading ? "Actualizando..." : "Actualizar Solicitud"}
               </Button>
             )}
           </DialogFooter>

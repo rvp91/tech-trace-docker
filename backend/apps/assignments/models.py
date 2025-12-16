@@ -8,8 +8,6 @@ class Request(models.Model):
     """
     ESTADO_CHOICES = [
         ('PENDIENTE', 'Pendiente'),
-        ('APROBADA', 'Aprobada'),
-        ('RECHAZADA', 'Rechazada'),
         ('COMPLETADA', 'Completada'),
     ]
 
@@ -80,7 +78,7 @@ class Assignment(models.Model):
         ordering = ['-fecha_entrega']
 
     def __str__(self):
-        return f"Asignación #{self.id} - {self.empleado.nombre_completo} - {self.dispositivo.serie_imei}"
+        return f"Asignación #{self.id} - {self.empleado.nombre_completo} - {self.dispositivo.serial_identifier}"
 
 
 class Return(models.Model):
