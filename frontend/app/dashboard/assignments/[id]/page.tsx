@@ -18,6 +18,8 @@ import {
 } from "@/lib/services/assignment-service"
 import type { Assignment, Return } from "@/lib/types"
 import { ReturnModal } from "@/components/modals/return-modal"
+import { ResponsibilityLetterModal } from "@/components/modals/responsibility-letter-modal"
+import { DiscountLetterModal } from "@/components/modals/discount-letter-modal"
 import { formatDateLocal } from "@/lib/utils/date-helpers"
 import { formatDateTime } from "@/lib/utils/format"
 
@@ -35,6 +37,8 @@ export default function AssignmentDetailPage() {
   const [returnData, setReturnData] = useState<Return | null>(null)
   const [loading, setLoading] = useState(true)
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false)
+  const [isResponsibilityModalOpen, setIsResponsibilityModalOpen] = useState(false)
+  const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false)
   const { toast } = useToast()
 
   const assignmentId = Number(params.id)
@@ -105,10 +109,27 @@ export default function AssignmentDetailPage() {
         </div>
         <div className="flex gap-2">
           {assignment.estado_asignacion === "ACTIVA" && (
-            <Button onClick={() => setIsReturnModalOpen(true)}>
-              <CheckCircle2 className="mr-2 h-4 w-4" />
-              Registrar Devolución
-            </Button>
+            <>
+              {/* Carta de Responsabilidad - solo LAPTOP o TELEFONO */}
+              {(assignment.dispositivo_detail?.tipo_equipo === "LAPTOP" ||
+                assignment.dispositivo_detail?.tipo_equipo === "TELEFONO") && (
+                <Button variant="outline" onClick={() => setIsResponsibilityModalOpen(true)}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  Carta de Responsabilidad
+                </Button>
+              )}
+
+              {/* Carta de Descuento */}
+              <Button variant="outline" onClick={() => setIsDiscountModalOpen(true)}>
+                <FileText className="mr-2 h-4 w-4" />
+                Carta de Descuento
+              </Button>
+
+              <Button onClick={() => setIsReturnModalOpen(true)}>
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                Registrar Devolución
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -340,6 +361,19 @@ export default function AssignmentDetailPage() {
         open={isReturnModalOpen}
         onClose={() => setIsReturnModalOpen(false)}
         onSuccess={handleReturnSuccess}
+        assignment={assignment}
+      />
+
+      <ResponsibilityLetterModal
+        open={isResponsibilityModalOpen}
+        onClose={() => setIsResponsibilityModalOpen(false)}
+        assignment={assignment}
+      />
+
+      <DiscountLetterModal
+        open={isDiscountModalOpen}
+        onClose={() => setIsDiscountModalOpen(false)}
+        onSuccess={loadAssignment}
         assignment={assignment}
       />
     </div>

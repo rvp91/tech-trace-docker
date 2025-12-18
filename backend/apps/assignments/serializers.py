@@ -190,3 +190,54 @@ class ReturnSerializer(serializers.ModelSerializer):
                 })
 
         return data
+
+
+class ResponsibilityLetterSerializer(serializers.Serializer):
+    """
+    Serializer para datos de carta de responsabilidad (LAPTOP o TELÉFONO).
+    """
+    # Selección de empresa
+    company_key = serializers.ChoiceField(
+        choices=['pompeyo_carrasco', 'pompeyo_automoviles'],
+        default='pompeyo_carrasco'
+    )
+
+    # Campos comunes
+    jefatura_nombre = serializers.CharField(max_length=200, required=False, allow_blank=True)
+
+    # Campos para LAPTOP
+    procesador = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    disco_duro = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    memoria_ram = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    tiene_dvd = serializers.BooleanField(default=False)
+    tiene_cargador = serializers.BooleanField(default=True)
+    tiene_bateria = serializers.BooleanField(default=True)
+    tiene_mouse = serializers.BooleanField(default=False)
+    tiene_candado = serializers.BooleanField(default=False)
+
+    # Campos para TELÉFONO
+    plan_telefono = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    minutos_disponibles = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    tiene_audifonos = serializers.BooleanField(default=False)
+
+
+class DiscountLetterSerializer(serializers.Serializer):
+    """
+    Serializer para datos de carta de descuento.
+    """
+    # Selección de empresa
+    company_key = serializers.ChoiceField(
+        choices=['pompeyo_carrasco', 'pompeyo_automoviles'],
+        default='pompeyo_carrasco'
+    )
+
+    monto_total = serializers.DecimalField(max_digits=10, decimal_places=0, min_value=1)
+    numero_cuotas = serializers.IntegerField(min_value=1, max_value=24)
+    mes_primera_cuota = serializers.CharField(max_length=20)
+
+    def validate_mes_primera_cuota(self, value):
+        meses_validos = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                         'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+        if value not in meses_validos:
+            raise serializers.ValidationError('Mes inválido')
+        return value

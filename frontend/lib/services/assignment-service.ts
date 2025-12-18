@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api-client"
-import type { Assignment, Return, PaginatedResponse } from "@/lib/types"
+import type { Assignment, Return, PaginatedResponse, ResponsibilityLetterData, DiscountLetterData } from "@/lib/types"
 
 interface GetAssignmentsParams {
   page?: number
@@ -108,6 +108,34 @@ export const assignmentService = {
     } catch (error) {
       return null
     }
+  },
+
+  /**
+   * Generar carta de responsabilidad (LAPTOP o TELÉFONO)
+   */
+  async generateResponsibilityLetter(
+    assignmentId: number,
+    letterData: ResponsibilityLetterData
+  ): Promise<void> {
+    await apiClient.downloadBlob(
+      `/assignments/assignments/${assignmentId}/generate-responsibility-letter/`,
+      letterData,
+      `carta_responsabilidad_${assignmentId}.pdf`
+    )
+  },
+
+  /**
+   * Generar carta de descuento
+   */
+  async generateDiscountLetter(
+    assignmentId: number,
+    data: DiscountLetterData
+  ): Promise<void> {
+    await apiClient.downloadBlob(
+      `/assignments/assignments/${assignmentId}/generate-discount-letter/`,
+      data,
+      `carta_descuento_${assignmentId}.pdf`
+    )
   },
 }
 

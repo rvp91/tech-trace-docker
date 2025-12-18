@@ -1,7 +1,17 @@
-from rest_framework import viewsets, filters
+from rest_framework import viewsets, filters, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import Request, Assignment, Return
-from .serializers import RequestSerializer, AssignmentSerializer, ReturnSerializer
+from .serializers import (
+    RequestSerializer,
+    AssignmentSerializer,
+    ReturnSerializer,
+    ResponsibilityLetterSerializer,
+    DiscountLetterSerializer
+)
+from .pdf_generator import PDFLetterGenerator
 
 
 class RequestViewSet(viewsets.ModelViewSet):
@@ -55,6 +65,143 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         Asignar automáticamente el usuario actual como created_by al crear una asignación.
         """
         serializer.save(created_by=self.request.user)
+
+    @action(detail=True, methods=['post'], url_path='generate-responsibility-letter')
+    def generate_responsibility_letter(self, request, pk=None):
+        """
+        Genera una carta de responsabilidad (LAPTOP o TELÉFONO) en formato PDF.
+
+        POST /api/assignments/assignments/{id}/generate-responsibility-letter/
+        Body: ResponsibilityLetterSerializer data (campos del formulario)
+        Returns: PDF como blob (application/pdf)
+        """
+        assignment = self.get_object()
+
+        # Validar que la asignación esté activa
+        if assignment.estado_asignacion != 'ACTIVA':
+            return Response(
+                {'error': 'Solo se pueden generar cartas para asignaciones activas'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validar que el empleado esté activo
+        if assignment.empleado.estado != 'ACTIVO':
+            return Response(
+                {'error': 'El empleado debe estar activo para generar la carta'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validar tipo de dispositivo
+        dispositivo = assignment.dispositivo
+        if dispositivo.tipo_equipo not in ['LAPTOP', 'TELEFONO']:
+            return Response(
+                {'error': 'Solo se pueden generar cartas de responsabilidad para laptops y teléfonos'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validar datos del formulario
+        serializer = ResponsibilityLetterSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        # Extraer company_key y extra_data
+        validated_data = serializer.validated_data
+        company_key = validated_data.pop('company_key', 'pompeyo_carrasco')
+        extra_data = validated_data
+
+        try:
+            # Obtener asignación con relaciones necesarias
+            assignment = Assignment.objects.select_related(
+                'empleado',
+                'empleado__sucursal',
+                'dispositivo'
+            ).get(pk=pk)
+
+            # Crear generador de PDF con la empresa seleccionada
+            generator = PDFLetterGenerator(company_key=company_key)
+
+            # Generar PDF según el tipo de dispositivo
+            if dispositivo.tipo_equipo == 'LAPTOP':
+                pdf_buffer = generator.generate_laptop_responsibility_letter(assignment, extra_data)
+                filename = f'carta_responsabilidad_laptop_{assignment.id}.pdf'
+            else:  # TELEFONO
+                pdf_buffer = generator.generate_phone_responsibility_letter(assignment, extra_data)
+                filename = f'carta_responsabilidad_telefono_{assignment.id}.pdf'
+
+            # Retornar PDF
+            response = HttpResponse(pdf_buffer.read(), content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
+
+        except Exception as e:
+            return Response(
+                {'error': f'Error al generar la carta: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=['post'], url_path='generate-discount-letter')
+    def generate_discount_letter(self, request, pk=None):
+        """
+        Genera una carta de descuento en formato PDF y cambia el estado del dispositivo a ROBO.
+
+        POST /api/assignments/assignments/{id}/generate-discount-letter/
+        Body: DiscountLetterSerializer data (monto_total, numero_cuotas, mes_primera_cuota, company_key)
+        Returns: PDF como blob (application/pdf)
+        Side Effect: Cambia device.estado a 'ROBO'
+        """
+        assignment = self.get_object()
+
+        # Validar que la asignación esté activa
+        if assignment.estado_asignacion != 'ACTIVA':
+            return Response(
+                {'error': 'Solo se pueden generar cartas de descuento para asignaciones activas'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validar que el dispositivo no esté ya en estado ROBO
+        if assignment.dispositivo.estado == 'ROBO':
+            return Response(
+                {'error': 'El dispositivo ya está marcado como robado'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validar datos del formulario
+        serializer = DiscountLetterSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        # Extraer company_key y discount_data
+        validated_data = serializer.validated_data
+        company_key = validated_data.pop('company_key', 'pompeyo_carrasco')
+        discount_data = validated_data
+
+        try:
+            # Obtener asignación con relaciones necesarias
+            assignment = Assignment.objects.select_related(
+                'empleado',
+                'dispositivo'
+            ).get(pk=pk)
+
+            # Crear generador de PDF con la empresa seleccionada
+            generator = PDFLetterGenerator(company_key=company_key)
+
+            # Generar PDF
+            pdf_buffer = generator.generate_discount_letter(assignment, discount_data)
+            filename = f'carta_descuento_{assignment.id}.pdf'
+
+            # Cambiar estado del dispositivo a ROBO
+            assignment.dispositivo.change_status('ROBO', user=request.user)
+
+            # Retornar PDF
+            response = HttpResponse(pdf_buffer.read(), content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
+
+        except Exception as e:
+            return Response(
+                {'error': f'Error al generar la carta: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class ReturnViewSet(viewsets.ModelViewSet):

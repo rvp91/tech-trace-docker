@@ -210,3 +210,45 @@ export interface ApiError {
   code?: string
   details?: unknown
 }
+
+// Tipos para sistema de cartas PDF
+
+export type CompanyKey = 'pompeyo_carrasco' | 'pompeyo_automoviles'
+
+export interface CompanyOption {
+  value: CompanyKey
+  label: string
+  rut: string
+}
+
+export interface ResponsibilityLetterData {
+  // Selección de empresa
+  company_key: CompanyKey
+
+  // Campos comunes
+  jefatura_nombre?: string
+
+  // Campos para LAPTOP
+  procesador?: string
+  disco_duro?: string
+  memoria_ram?: string
+  tiene_dvd?: boolean
+  tiene_cargador?: boolean
+  tiene_bateria?: boolean
+  tiene_mouse?: boolean
+  tiene_candado?: boolean
+
+  // Campos para TELÉFONO
+  plan_telefono?: string
+  minutos_disponibles?: string
+  tiene_audifonos?: boolean
+}
+
+export interface DiscountLetterData {
+  // Selección de empresa
+  company_key: CompanyKey
+
+  monto_total: number
+  numero_cuotas: number
+  mes_primera_cuota: string
+}

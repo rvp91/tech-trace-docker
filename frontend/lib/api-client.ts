@@ -230,6 +230,88 @@ export class ApiClient {
   async delete<T>(endpoint: string): Promise<T> {
     return this.request<T>(endpoint, { method: "DELETE" })
   }
+
+  async downloadBlob(endpoint: string, data?: unknown, filename?: string): Promise<void> {
+    /**
+     * Descarga un blob (PDF u otro archivo binario) desde el servidor.
+     *
+     * @param endpoint - Endpoint de la API
+     * @param data - Datos a enviar en el body (opcional)
+     * @param filename - Nombre del archivo sugerido (opcional)
+     */
+    try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      }
+
+      if (this.token) {
+        headers["Authorization"] = `Bearer ${this.token}`
+      }
+
+      const url = `${this.baseUrl}${endpoint}`
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers,
+        body: data ? JSON.stringify(data) : undefined,
+      })
+
+      if (!response.ok) {
+        // Intentar parsear el error
+        let errorData: any
+        try {
+          errorData = await response.json()
+        } catch {
+          errorData = { message: `Error HTTP ${response.status}` }
+        }
+        this.handleError(response.status, errorData)
+      }
+
+      // Obtener el blob
+      const blob = await response.blob()
+
+      // Extraer filename del header Content-Disposition si está disponible
+      let downloadFilename = filename
+      const contentDisposition = response.headers.get("Content-Disposition")
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/)
+        if (filenameMatch) {
+          downloadFilename = filenameMatch[1]
+        }
+      }
+
+      // Si no hay filename, usar uno genérico
+      if (!downloadFilename) {
+        downloadFilename = `download_${Date.now()}.pdf`
+      }
+
+      // Crear URL temporal y disparar descarga
+      const blobUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = blobUrl
+      link.download = downloadFilename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+
+      // Limpiar recursos
+      window.URL.revokeObjectURL(blobUrl)
+    } catch (error) {
+      // Si es un error de red
+      if (error instanceof TypeError && error.message.includes("fetch")) {
+        const networkError: ApiError = {
+          message: "Error de conexión. Verifica tu conexión a internet.",
+          status: 0,
+        }
+        const err = new Error(networkError.message) as Error & { apiError: ApiError }
+        err.apiError = networkError
+        throw err
+      }
+
+      // Re-lanzar otros errores
+      throw error
+    }
+  }
 }
 
 export const apiClient = new ApiClient()
