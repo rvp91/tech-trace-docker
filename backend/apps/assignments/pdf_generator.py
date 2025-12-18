@@ -187,7 +187,7 @@ class PDFLetterGenerator:
         equipo_marca_modelo = f"{dispositivo.marca} {dispositivo.modelo}"
         specs = [
             ("Equipo Entregado", equipo_marca_modelo),
-            ("N/S", dispositivo.numero_serie or "N/A"),
+            ("N/S", (dispositivo.numero_serie or "N/A").upper()),
             ("Procesador", extra_data.get('procesador', '') or 'N/A'),
             ("Disco Duro", extra_data.get('disco_duro', '') or 'N/A'),
             ("Memoria", extra_data.get('memoria_ram', '') or 'N/A'),
@@ -298,7 +298,7 @@ class PDFLetterGenerator:
         c.setFont("Helvetica", 11)
         intro_text = (
             f"En Santiago {self._format_date_spanish(fecha)}, entre la Empresa {self.company_name}. "
-            f"Rut Nº{self.company_rut} y don(a) {empleado.nombre_completo} Rut {empleado.rut} "
+            f"Rut {self.company_rut} y don(a) {empleado.nombre_completo} Rut {empleado.rut} "
             f'en adelante denominado "el (la) trabajador(a)", se ha convenido la siguiente carta de responsabilidad:'
         )
 
@@ -359,7 +359,7 @@ class PDFLetterGenerator:
         row_h = 0.22 * inch
 
         rows = [
-            ("Equipo Entregado:", equipo_marca_modelo, "N/S:", dispositivo.numero_serie or 'N/A'),
+            ("Equipo Entregado:", equipo_marca_modelo, "N/S:", dispositivo.numero_serie or 'N/A'.upper()),
             ("Plan:", extra_data.get('plan_telefono', 'N/A'), "Minutos Disponibles:", extra_data.get('minutos_disponibles', 'N/A')),
             ("Cargador:", "SI" if extra_data.get('tiene_cargador', True) else "NO", "Audífonos:", "SI" if extra_data.get('tiene_audifonos', False) else "NO"),
             ("N ° de Teléfono:", dispositivo.numero_telefono or 'N/A', "IMEI:", dispositivo.imei or 'N/A'),
@@ -483,7 +483,7 @@ class PDFLetterGenerator:
         c.drawCentredString(width/2, y_position, "Acuerdo / Autorización de Descuento")
         y_position -= 0.5*inch
 
-        # Párrafo 1
+        # Párrafo 1 - Justificado
         c.setFont("Helvetica", 11)
         para1 = (
             f"Por la presente, autorizo expresamente a mi empleador {self.company_name}. "
@@ -491,27 +491,22 @@ class PDFLetterGenerator:
             f"detallarán más abajo, y en el caso de terminar mi relación laboral, autorizo se descuente el saldo "
             f"del total adeudado con la empresa, con los valores que resulten de los emolumentos de mi finiquito."
         )
-        wrapped_para1 = self._wrap_text(para1, 90)
-        for line in wrapped_para1:
-            c.drawString(0.75*inch, y_position, line)
-            y_position -= 0.18*inch
+        y_position = self._draw_justified_text(c, para1, 0.75*inch, y_position, width - 1.5*inch)
 
         y_position -= 0.2*inch
 
-        # Párrafo 2 - Concepto
+        # Párrafo 2 - Concepto (justificado)
         tipo_concepto = f"{dispositivo.tipo_equipo} {dispositivo.marca} {dispositivo.modelo}"
+        numero_serie = (dispositivo.numero_serie or 'N/A').upper()
         monto_formatted = self._format_currency(discount_data['monto_total'])
 
-        para2 = f"El monto total de la deuda es de {monto_formatted}, por el concepto {tipo_concepto}:"
-        c.drawString(0.75*inch, y_position, para2)
+        para2 = f"El monto total de la deuda es de {monto_formatted}, por el concepto {tipo_concepto}, N/S: {numero_serie}."
+        y_position = self._draw_justified_text(c, para2, 0.75*inch, y_position, width - 1.5*inch)
         y_position -= 0.4*inch
 
-        # Párrafo 3
+        # Párrafo 3 - Justificado
         para3 = "El monto antes indicado, se dividirá en una cantidad de cuotas autorizadas, la(s) cual(es) se detalla (rán) a continuación."
-        wrapped_para3 = self._wrap_text(para3, 90)
-        for line in wrapped_para3:
-            c.drawString(0.75*inch, y_position, line)
-            y_position -= 0.18*inch
+        y_position = self._draw_justified_text(c, para3, 0.75*inch, y_position, width - 1.5*inch)
 
         y_position -= 0.3*inch
 
@@ -547,7 +542,7 @@ class PDFLetterGenerator:
         c.line(line_x_start, y_position, line_x_end, y_position)
         y_position -= 0.2*inch
         c.setFont("Helvetica", 10)
-        c.drawCentredString(width/2, y_position, "FIRMA DEL TRABAJADOR")
+        c.drawCentredString(width/2, y_position, "Nombre Firma Rut del Trabajador")
 
     def _draw_justified_text(self, c, text, x, y, max_width, line_height=0.18):
         """
