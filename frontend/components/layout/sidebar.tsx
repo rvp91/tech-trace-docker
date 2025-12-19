@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils"
 import { LayoutDashboard, Users, Package, Tablet, Zap, Building2, Settings, LogOut } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { useAuthStore } from "@/lib/store/auth-store"
 import { authService } from "@/lib/services/auth-service"
@@ -72,11 +73,15 @@ export function Sidebar({ open, onOpenChange }: SidebarProps) {
         )}
       >
         <div className="flex flex-col h-full">
-          <div className="h-16 flex items-center justify-center px-6 border-b border-border">
-            <div>
-              <h1 className="text-xl font-bold text-sidebar-foreground">TechTrace</h1>
-              <p className="text-xs text-sidebar-foreground/60 mt-1">Gestión de Inventario</p>
-            </div>
+          <div className="h-20 flex items-center justify-center px-6 py-4">
+            <Image
+              src="/logo.png"
+              alt="Pompeyo Carrasco"
+              width={200}
+              height={60}
+              priority
+              className="object-contain px-2"
+            />
           </div>
 
           <nav className="flex-1 overflow-auto p-4 space-y-1">

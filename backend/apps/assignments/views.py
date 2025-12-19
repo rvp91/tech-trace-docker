@@ -93,9 +93,9 @@ class AssignmentViewSet(viewsets.ModelViewSet):
 
         # Validar tipo de dispositivo
         dispositivo = assignment.dispositivo
-        if dispositivo.tipo_equipo not in ['LAPTOP', 'TELEFONO']:
+        if dispositivo.tipo_equipo not in ['LAPTOP', 'DESKTOP', 'TELEFONO']:
             return Response(
-                {'error': 'Solo se pueden generar cartas de responsabilidad para laptops y teléfonos'},
+                {'error': 'Solo se pueden generar cartas de responsabilidad para laptops, desktops y teléfonos'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -121,9 +121,9 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             generator = PDFLetterGenerator(company_key=company_key)
 
             # Generar PDF según el tipo de dispositivo
-            if dispositivo.tipo_equipo == 'LAPTOP':
+            if dispositivo.tipo_equipo in ['LAPTOP', 'DESKTOP']:
                 pdf_buffer = generator.generate_laptop_responsibility_letter(assignment, extra_data)
-                filename = f'carta_responsabilidad_laptop_{assignment.id}.pdf'
+                filename = f'carta_responsabilidad_{dispositivo.tipo_equipo.lower()}_{assignment.id}.pdf'
             else:  # TELEFONO
                 pdf_buffer = generator.generate_phone_responsibility_letter(assignment, extra_data)
                 filename = f'carta_responsabilidad_telefono_{assignment.id}.pdf'

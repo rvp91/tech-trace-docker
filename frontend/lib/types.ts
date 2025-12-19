@@ -63,7 +63,7 @@ export interface EmployeeHistory {
   assignments: Assignment[]
 }
 
-export type TipoEquipo = "LAPTOP" | "TELEFONO" | "TABLET" | "TV" | "SIM" | "ACCESORIO"
+export type TipoEquipo = "LAPTOP" | "DESKTOP" | "TELEFONO" | "TABLET" | "TV" | "SIM" | "ACCESORIO"
 export type EstadoDispositivo = "DISPONIBLE" | "ASIGNADO" | "MANTENIMIENTO" | "BAJA" | "ROBO"
 
 export interface Device {
@@ -179,8 +179,6 @@ export interface Branch {
   id: number
   nombre: string
   codigo: string
-  direccion?: string
-  ciudad: string
   is_active: boolean
   created_at: string
   updated_at: string
@@ -188,6 +186,7 @@ export interface Branch {
   total_empleados?: number
   dispositivos_por_tipo?: {
     LAPTOP: number
+    DESKTOP: number
     TELEFONO: number
     TABLET: number
     TV: number

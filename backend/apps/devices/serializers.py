@@ -112,6 +112,7 @@ class DeviceSerializer(serializers.ModelSerializer):
         | Tipo     | numero_serie | imei     | modelo      | numero_telefono | edad | valor |
         |----------|--------------|----------|-------------|-----------------|------|-------|
         | LAPTOP   | Obligatorio  | -        | Obligatorio | -               | Sí   | Sí    |
+        | DESKTOP  | Obligatorio  | -        | Obligatorio | -               | Sí   | Sí    |
         | TELEFONO | Obligatorio  | Opcional | Obligatorio | Opcional        | Sí   | Sí    |
         | TABLET   | Obligatorio  | Opcional | Obligatorio | -               | Sí   | Sí    |
         | TV       | Obligatorio  | -        | Opcional    | -               | No   | No    |
@@ -129,8 +130,8 @@ class DeviceSerializer(serializers.ModelSerializer):
 
         errors = {}
 
-        # VALIDACIÓN 1: numero_serie obligatorio para LAPTOP, TELEFONO, TABLET, TV
-        if tipo_equipo in ['LAPTOP', 'TELEFONO', 'TABLET', 'TV']:
+        # VALIDACIÓN 1: numero_serie obligatorio para LAPTOP, DESKTOP, TELEFONO, TABLET, TV
+        if tipo_equipo in ['LAPTOP', 'DESKTOP', 'TELEFONO', 'TABLET', 'TV']:
             # En PATCH, si no viene en data, verificar que exista en instance
             numero_serie = data.get('numero_serie')
             if numero_serie is None and self.instance:
@@ -139,8 +140,8 @@ class DeviceSerializer(serializers.ModelSerializer):
             if not numero_serie:
                 errors['numero_serie'] = f'El número de serie es obligatorio para {tipo_equipo}'
 
-        # VALIDACIÓN 2: modelo obligatorio para LAPTOP, TELEFONO, TABLET
-        if tipo_equipo in ['LAPTOP', 'TELEFONO', 'TABLET']:
+        # VALIDACIÓN 2: modelo obligatorio para LAPTOP, DESKTOP, TELEFONO, TABLET
+        if tipo_equipo in ['LAPTOP', 'DESKTOP', 'TELEFONO', 'TABLET']:
             # En PATCH, si no viene en data, verificar que exista en instance
             modelo = data.get('modelo')
             if modelo is None and self.instance:

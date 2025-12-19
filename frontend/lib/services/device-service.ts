@@ -123,6 +123,7 @@ export function getDeviceStatusLabel(estado: EstadoDispositivo): string {
 export function getDeviceTypeLabel(tipo: TipoEquipo): string {
   const labels: Record<TipoEquipo, string> = {
     LAPTOP: "Laptop",
+    DESKTOP: "Computadora de Escritorio",
     TELEFONO: "Teléfono",
     TABLET: "Tablet",
     TV: "TV",
@@ -135,6 +136,7 @@ export function getDeviceTypeLabel(tipo: TipoEquipo): string {
 export function getDeviceTypeIcon(tipo: TipoEquipo): string {
   const icons: Record<TipoEquipo, string> = {
     LAPTOP: "💻",
+    DESKTOP: "🖥️",
     TELEFONO: "📱",
     TABLET: "📱",
     TV: "📺",

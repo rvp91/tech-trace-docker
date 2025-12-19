@@ -193,6 +193,7 @@ export default function DevicesPage() {
             <SelectContent>
               <SelectItem value="all">Todos los tipos</SelectItem>
               <SelectItem value="LAPTOP">Laptop</SelectItem>
+              <SelectItem value="DESKTOP">Computadora de Escritorio</SelectItem>
               <SelectItem value="TELEFONO">Teléfono</SelectItem>
               <SelectItem value="TABLET">Tablet</SelectItem>
               <SelectItem value="TV">TV</SelectItem>

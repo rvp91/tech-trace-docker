@@ -212,11 +212,11 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
   }
 
   // Determinar si campos son requeridos u opcionales según tipo
-  const isNumeroSerieRequired = ['LAPTOP', 'TELEFONO', 'TABLET', 'TV'].includes(formData.tipo_equipo)
-  const isModeloRequired = ['LAPTOP', 'TELEFONO', 'TABLET'].includes(formData.tipo_equipo)
+  const isNumeroSerieRequired = ['LAPTOP', 'DESKTOP', 'TELEFONO', 'TABLET', 'TV'].includes(formData.tipo_equipo)
+  const isModeloRequired = ['LAPTOP', 'DESKTOP', 'TELEFONO', 'TABLET'].includes(formData.tipo_equipo)
   const isTelefonoRequired = formData.tipo_equipo === 'SIM'
-  const showEdadFields = ['LAPTOP', 'TELEFONO', 'TABLET'].includes(formData.tipo_equipo)
-  const showValorFields = ['LAPTOP', 'TELEFONO', 'TABLET'].includes(formData.tipo_equipo)
+  const showEdadFields = ['LAPTOP', 'DESKTOP', 'TELEFONO', 'TABLET'].includes(formData.tipo_equipo)
+  const showValorFields = ['LAPTOP', 'DESKTOP', 'TELEFONO', 'TABLET'].includes(formData.tipo_equipo)
   const showImeiField = ['TELEFONO', 'TABLET'].includes(formData.tipo_equipo)
   const showTelefonoField = ['TELEFONO', 'SIM'].includes(formData.tipo_equipo)
 
@@ -241,6 +241,7 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="LAPTOP">Laptop</SelectItem>
+                  <SelectItem value="DESKTOP">Computadora de Escritorio</SelectItem>
                   <SelectItem value="TELEFONO">Teléfono</SelectItem>
                   <SelectItem value="TABLET">Tablet</SelectItem>
                   <SelectItem value="TV">TV</SelectItem>

@@ -6,16 +6,12 @@ import type { Branch } from "../types"
 export interface CreateBranchData {
   nombre: string
   codigo: string
-  direccion?: string
-  ciudad: string
   is_active?: boolean
 }
 
 export interface UpdateBranchData {
   nombre?: string
   codigo?: string
-  direccion?: string
-  ciudad?: string
   is_active?: boolean
 }
 
@@ -28,6 +24,7 @@ export interface BranchListResponse {
 
 export interface BranchFilters {
   is_active?: boolean
+  search?: string
   page?: number
   page_size?: number
 }

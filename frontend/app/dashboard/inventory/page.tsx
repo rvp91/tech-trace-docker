@@ -54,6 +54,7 @@ export default function InventoryPage() {
   // Calcular totales por tipo y estado
   const summary = useMemo(() => {
     const laptops = devices.filter((d) => d.tipo_equipo === "LAPTOP")
+    const desktops = devices.filter((d) => d.tipo_equipo === "DESKTOP")
     const telefonos = devices.filter((d) => d.tipo_equipo === "TELEFONO")
     const tablets = devices.filter((d) => d.tipo_equipo === "TABLET")
     const tvs = devices.filter((d) => d.tipo_equipo === "TV")
@@ -68,6 +69,7 @@ export default function InventoryPage() {
 
     return {
       laptops: countByStatus(laptops),
+      desktops: countByStatus(desktops),
       telefonos: countByStatus(telefonos),
       tablets: countByStatus(tablets),
       tvs: countByStatus(tvs),
@@ -170,7 +172,7 @@ export default function InventoryPage() {
       </div>
 
       {/* Tarjetas de Resumen */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -193,6 +195,34 @@ export default function InventoryPage() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Mantenimiento</span>
                   <span className="font-semibold">{summary.laptops.mantenimiento}</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg">Desktops</CardTitle>
+              <Laptop className="h-5 w-5 text-primary" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <div className="text-2xl font-bold">{summary.desktops.total}</div>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Asignados</span>
+                  <span className="font-semibold">{summary.desktops.asignados}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Disponibles</span>
+                  <span className="font-semibold">{summary.desktops.disponibles}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Mantenimiento</span>
+                  <span className="font-semibold">{summary.desktops.mantenimiento}</span>
                 </div>
               </div>
             </div>
@@ -341,6 +371,7 @@ export default function InventoryPage() {
                   <SelectContent>
                     <SelectItem value="todos">Todos los tipos</SelectItem>
                     <SelectItem value="LAPTOP">Laptops</SelectItem>
+                    <SelectItem value="DESKTOP">Desktops</SelectItem>
                     <SelectItem value="TELEFONO">Teléfonos</SelectItem>
                     <SelectItem value="TABLET">Tablets</SelectItem>
                     <SelectItem value="TV">TVs</SelectItem>

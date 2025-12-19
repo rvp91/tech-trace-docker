@@ -11,6 +11,7 @@ import { formatDateLocal } from "@/lib/utils/date-helpers"
 // Colores para los gráficos
 const COLORS = {
   LAPTOP: "#3b82f6",    // blue
+  DESKTOP: "#f97316",   // orange
   TELEFONO: "#10b981",  // green
   TABLET: "#f59e0b",    // amber
   SIM: "#8b5cf6",       // purple
@@ -28,6 +29,7 @@ const STATUS_COLORS = {
 // Mapeo de labels en español
 const DEVICE_TYPE_LABELS: Record<string, string> = {
   LAPTOP: "Laptops",
+  DESKTOP: "Desktops",
   TELEFONO: "Teléfonos",
   TABLET: "Tablets",
   SIM: "SIM Cards",

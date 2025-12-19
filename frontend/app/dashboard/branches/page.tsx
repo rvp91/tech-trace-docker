@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Edit2, Trash2, Building2, MapPin, Laptop, Smartphone, Tablet, Tv, Users, Search, Plus } from "lucide-react"
+import { Edit2, Trash2, Building2, Laptop, Smartphone, Tablet, Tv, Users, Search, Plus, Monitor } from "lucide-react"
 import { CardSimIcon } from "@/components/ui/icons/lucide-card-sim"
 import { branchService } from "@/lib/services/branch-service"
 import { BranchModal } from "@/components/modals/branch-modal"
@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast"
+import { TablePagination } from "@/components/ui/table-pagination"
 
 export default function BranchesPage() {
   const [branches, setBranches] = useState<Branch[]>([])
@@ -29,14 +30,23 @@ export default function BranchesPage() {
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null)
   const [deletingBranch, setDeletingBranch] = useState<Branch | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [pageSize, setPageSize] = useState(8)
   const { toast } = useToast()
 
-  const loadBranches = async () => {
+  const loadBranches = async (page: number = 1) => {
     try {
       setLoading(true)
-      const data = await branchService.getBranches()
+      const data = await branchService.getBranches({
+        page,
+        page_size: pageSize,
+        search: searchQuery || undefined
+      })
       setBranches(data.results)
       setFilteredBranches(data.results)
+      setTotalCount(data.count)
+      setCurrentPage(page)
     } catch (error) {
       console.error("Error loading branches:", error)
       toast({
@@ -49,23 +59,18 @@ export default function BranchesPage() {
     }
   }
 
+  // Resetear a página 1 cuando cambie la búsqueda
   useEffect(() => {
-    loadBranches()
-  }, [])
+    setCurrentPage(1)
+  }, [searchQuery])
 
+  // Cargar sucursales con debounce
   useEffect(() => {
-    // Filtrar sucursales basado en la búsqueda
-    if (searchQuery.trim() === "") {
-      setFilteredBranches(branches)
-    } else {
-      const filtered = branches.filter(branch =>
-        branch.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        branch.ciudad.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        branch.codigo.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-      setFilteredBranches(filtered)
-    }
-  }, [searchQuery, branches])
+    const timer = setTimeout(() => {
+      loadBranches(currentPage)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery, currentPage, pageSize])
 
   const handleEdit = (branch: Branch) => {
     setEditingBranch(branch)
@@ -100,9 +105,20 @@ export default function BranchesPage() {
   }
 
   const handleSuccess = () => {
-    loadBranches()
+    loadBranches(currentPage)
     handleModalClose()
   }
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
+
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize)
+    setCurrentPage(1) // Resetear a la primera página cuando cambia el tamaño
+  }
+
+  const totalPages = Math.ceil(totalCount / pageSize)
 
   if (loading) {
     return (
@@ -154,7 +170,7 @@ export default function BranchesPage() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por nombre, ciudad o código..."
+              placeholder="Buscar por nombre o código..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
@@ -191,10 +207,6 @@ export default function BranchesPage() {
                 <div className="flex items-start justify-between">
                   <div>
                     <CardTitle className="text-lg">{branch.nombre}</CardTitle>
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                      <MapPin className="h-3 w-3" />
-                      <span>{branch.ciudad}</span>
-                    </div>
                   </div>
                   <div className="flex gap-1">
                     <Button
@@ -233,6 +245,15 @@ export default function BranchesPage() {
                       </span>
                       <span className="font-semibold">
                         {branch.dispositivos_por_tipo?.LAPTOP || 0}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2 text-muted-foreground">
+                        <Monitor className="h-4 w-4" />
+                        Desktops
+                      </span>
+                      <span className="font-semibold">
+                        {branch.dispositivos_por_tipo?.DESKTOP || 0}
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
@@ -286,6 +307,19 @@ export default function BranchesPage() {
             </Card>
           ))}
         </div>
+      )}
+
+      {/* Paginación */}
+      {!loading && totalCount > 0 && (
+        <TablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          totalCount={totalCount}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+          pageSizeOptions={[8, 16, 24, 32]}
+        />
       )}
 
       <BranchModal

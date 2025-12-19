@@ -110,8 +110,9 @@ export default function AssignmentDetailPage() {
         <div className="flex gap-2">
           {assignment.estado_asignacion === "ACTIVA" && (
             <>
-              {/* Carta de Responsabilidad - solo LAPTOP o TELEFONO */}
+              {/* Carta de Responsabilidad - solo LAPTOP, DESKTOP o TELEFONO */}
               {(assignment.dispositivo_detail?.tipo_equipo === "LAPTOP" ||
+                assignment.dispositivo_detail?.tipo_equipo === "DESKTOP" ||
                 assignment.dispositivo_detail?.tipo_equipo === "TELEFONO") && (
                 <Button variant="outline" onClick={() => setIsResponsibilityModalOpen(true)}>
                   <FileText className="mr-2 h-4 w-4" />

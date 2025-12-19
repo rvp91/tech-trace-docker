@@ -56,11 +56,11 @@ def create_test_data():
 
     # 3. Verificar/crear sucursales
     branches_data = [
-        {'nombre': 'Sucursal Santiago Centro', 'codigo': 'SCL-01', 'ciudad': 'Santiago'},
-        {'nombre': 'Sucursal Valparaíso', 'codigo': 'VAL-01', 'ciudad': 'Valparaíso'},
-        {'nombre': 'Sucursal Concepción', 'codigo': 'CON-01', 'ciudad': 'Concepción'},
-        {'nombre': 'Sucursal La Serena', 'codigo': 'LSR-01', 'ciudad': 'La Serena'},
-        {'nombre': 'Sucursal Temuco', 'codigo': 'TMC-01', 'ciudad': 'Temuco'},
+        {'nombre': 'Sucursal Centro', 'codigo': 'SCL-01'},
+        {'nombre': 'Sucursal Norte', 'codigo': 'VAL-01'},
+        {'nombre': 'Sucursal Sur', 'codigo': 'CON-01'},
+        {'nombre': 'Sucursal Este', 'codigo': 'LSR-01'},
+        {'nombre': 'Sucursal Oeste', 'codigo': 'TMC-01'},
     ]
 
     branches = []
@@ -69,7 +69,6 @@ def create_test_data():
             codigo=branch_data['codigo'],
             defaults={
                 'nombre': branch_data['nombre'],
-                'ciudad': branch_data['ciudad'],
                 'is_active': True
             }
         )

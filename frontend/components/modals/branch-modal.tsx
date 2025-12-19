@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Plus, Loader2 } from "lucide-react"
 import { branchService, type CreateBranchData } from "@/lib/services/branch-service"
@@ -38,8 +37,6 @@ export function BranchModal({ branch, open, onOpenChange, onSuccess }: BranchMod
   const [formData, setFormData] = useState<CreateBranchData>({
     nombre: "",
     codigo: "",
-    direccion: "",
-    ciudad: "",
     is_active: true,
   })
 
@@ -50,16 +47,12 @@ export function BranchModal({ branch, open, onOpenChange, onSuccess }: BranchMod
       setFormData({
         nombre: branch.nombre,
         codigo: branch.codigo,
-        direccion: branch.direccion || "",
-        ciudad: branch.ciudad,
         is_active: branch.is_active,
       })
     } else {
       setFormData({
         nombre: "",
         codigo: "",
-        direccion: "",
-        ciudad: "",
         is_active: true,
       })
     }
@@ -77,10 +70,6 @@ export function BranchModal({ branch, open, onOpenChange, onSuccess }: BranchMod
       newErrors.codigo = "El código es requerido"
     } else if (!/^[A-Z0-9-]+$/.test(formData.codigo)) {
       newErrors.codigo = "El código debe contener solo letras mayúsculas, números y guiones"
-    }
-
-    if (!formData.ciudad.trim()) {
-      newErrors.ciudad = "La ciudad es requerida"
     }
 
     setErrors(newErrors)
@@ -147,8 +136,6 @@ export function BranchModal({ branch, open, onOpenChange, onSuccess }: BranchMod
     setFormData({
       nombre: "",
       codigo: "",
-      direccion: "",
-      ciudad: "",
       is_active: true,
     })
     setErrors({})
@@ -174,7 +161,7 @@ export function BranchModal({ branch, open, onOpenChange, onSuccess }: BranchMod
             name="nombre"
             value={formData.nombre}
             onChange={handleInputChange}
-            placeholder="Centro, Norte, Sur..."
+            placeholder="Sucursal Centro, Sucursal Norte, Área TI..."
             disabled={loading}
           />
           {errors.nombre && <p className="text-sm text-destructive mt-1">{errors.nombre}</p>}
@@ -199,34 +186,6 @@ export function BranchModal({ branch, open, onOpenChange, onSuccess }: BranchMod
               El código no puede ser modificado
             </p>
           )}
-        </div>
-
-        <div>
-          <Label htmlFor="ciudad">
-            Ciudad <span className="text-destructive">*</span>
-          </Label>
-          <Input
-            id="ciudad"
-            name="ciudad"
-            value={formData.ciudad}
-            onChange={handleInputChange}
-            placeholder="Santiago, Valparaíso, Concepción..."
-            disabled={loading}
-          />
-          {errors.ciudad && <p className="text-sm text-destructive mt-1">{errors.ciudad}</p>}
-        </div>
-
-        <div>
-          <Label htmlFor="direccion">Dirección</Label>
-          <Textarea
-            id="direccion"
-            name="direccion"
-            value={formData.direccion}
-            onChange={handleInputChange}
-            placeholder="Av. Principal 123, Piso 4..."
-            disabled={loading}
-            rows={3}
-          />
         </div>
 
         <div className="flex items-center justify-between space-x-2 py-2">

@@ -9,6 +9,7 @@ class Device(models.Model):
     """
     TIPO_CHOICES = [
         ('LAPTOP', 'Laptop'),
+        ('DESKTOP', 'Computadora de Escritorio'),
         ('TELEFONO', 'Teléfono Móvil'),
         ('TABLET', 'Tablet'),
         ('TV', 'TV'),
@@ -118,11 +119,11 @@ class Device(models.Model):
 
     def debe_calcular_edad(self):
         """Retorna True si el tipo de dispositivo debe tener edad"""
-        return self.tipo_equipo in ['LAPTOP', 'TELEFONO', 'TABLET']
+        return self.tipo_equipo in ['LAPTOP', 'DESKTOP', 'TELEFONO', 'TABLET']
 
     def debe_calcular_valor(self):
         """Retorna True si el tipo de dispositivo debe tener valor"""
-        return self.tipo_equipo in ['LAPTOP', 'TELEFONO', 'TABLET']
+        return self.tipo_equipo in ['LAPTOP', 'DESKTOP', 'TELEFONO', 'TABLET']
 
     def change_status(self, new_status, user=None):
         """Cambia el estado del dispositivo y registra en auditoría"""

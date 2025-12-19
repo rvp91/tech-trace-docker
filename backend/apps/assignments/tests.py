@@ -31,7 +31,6 @@ class AssignmentFlowTestCase(TestCase):
         self.branch = Branch.objects.create(
             nombre='Sucursal Test',
             codigo='TST-01',
-            ciudad='Santiago',
             is_active=True
         )
 

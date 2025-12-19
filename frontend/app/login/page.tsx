@@ -2,14 +2,15 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 import { useAuthStore } from "@/lib/store/auth-store"
 import { authService } from "@/lib/services/auth-service"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Package, Loader2 } from "lucide-react"
+import { Loader2 } from "lucide-react"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -65,12 +66,16 @@ export default function LoginPage() {
       <Card className="w-full max-w-md mx-4">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <div className="p-3 bg-primary rounded-lg">
-              <Package className="h-8 w-8 text-primary-foreground" />
-            </div>
+            <Image
+              src="/logo.png"
+              alt="Pompeyo Carrasco"
+              width={280}
+              height={80}
+              priority
+              className="object-contain"
+            />
           </div>
-          <CardTitle className="text-2xl font-bold">TechTrace</CardTitle>
-          <CardDescription>Sistema de Gestión de Inventario de Dispositivos Móviles</CardDescription>
+          <CardDescription>Sistema de Gestión de Inventario de Dispositivos TI</CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
@@ -139,7 +144,7 @@ export default function LoginPage() {
               const year = new Date().getFullYear()
               return (
                 <p className="mt-[50px] text-xs text-muted-foreground text-center">
-                  © {year} TechTrace.
+                  © {year} Todos los derechos reservados.
                 </p>
               )
             })()}

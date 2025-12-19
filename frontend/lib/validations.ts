@@ -75,14 +75,6 @@ export const branchSchema = z.object({
     .regex(branchCodeRegex, "El código debe tener el formato XXX-## (ej: SCL-01)")
     .toUpperCase(),
 
-  direccion: z.string()
-    .optional()
-    .or(z.literal("")),
-
-  ciudad: z.string()
-    .min(2, "La ciudad debe tener al menos 2 caracteres")
-    .max(100, "La ciudad no puede exceder 100 caracteres"),
-
   is_active: z.boolean().default(true),
 })
 
@@ -138,7 +130,7 @@ export type EmployeeFormData = z.infer<typeof employeeSchema>
 // ============================================
 
 export const deviceSchema = z.object({
-  tipo_equipo: z.enum(["LAPTOP", "TELEFONO", "TABLET", "TV", "SIM", "ACCESORIO"]),
+  tipo_equipo: z.enum(["LAPTOP", "DESKTOP", "TELEFONO", "TABLET", "TV", "SIM", "ACCESORIO"]),
 
   marca: z.string()
     .min(2, "La marca debe tener al menos 2 caracteres")
@@ -189,8 +181,8 @@ export const deviceSchema = z.object({
   es_valor_manual: z.boolean().optional(),
 
 }).superRefine((data, ctx) => {
-  // VALIDACIÓN 1: numero_serie obligatorio para LAPTOP, TELEFONO, TABLET, TV
-  if (['LAPTOP', 'TELEFONO', 'TABLET', 'TV'].includes(data.tipo_equipo)) {
+  // VALIDACIÓN 1: numero_serie obligatorio para LAPTOP, DESKTOP, TELEFONO, TABLET, TV
+  if (['LAPTOP', 'DESKTOP', 'TELEFONO', 'TABLET', 'TV'].includes(data.tipo_equipo)) {
     if (!data.numero_serie || data.numero_serie.trim() === '') {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -200,8 +192,8 @@ export const deviceSchema = z.object({
     }
   }
 
-  // VALIDACIÓN 2: modelo obligatorio para LAPTOP, TELEFONO, TABLET
-  if (['LAPTOP', 'TELEFONO', 'TABLET'].includes(data.tipo_equipo)) {
+  // VALIDACIÓN 2: modelo obligatorio para LAPTOP, DESKTOP, TELEFONO, TABLET
+  if (['LAPTOP', 'DESKTOP', 'TELEFONO', 'TABLET'].includes(data.tipo_equipo)) {
     if (!data.modelo || data.modelo.trim() === '') {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
