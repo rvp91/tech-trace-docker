@@ -176,12 +176,15 @@ class AssignmentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='generate-discount-letter')
     def generate_discount_letter(self, request, pk=None):
         """
-        Genera una carta de descuento en formato PDF y cambia el estado del dispositivo a ROBO.
+        Genera una carta de descuento en formato PDF y realiza las siguientes acciones:
+        - Cambia el estado del dispositivo a ROBO
+        - Finaliza la asignación (estado_asignacion = 'FINALIZADA')
+        - Agrega observación automática con fecha de reporte
 
         POST /api/assignments/assignments/{id}/generate-discount-letter/
         Body: DiscountLetterSerializer data (monto_total, numero_cuotas, mes_primera_cuota, company_key)
         Returns: PDF como blob (application/pdf)
-        Side Effect: Cambia device.estado a 'ROBO'
+        Side Effects: Cambia device.estado a 'ROBO', finaliza asignación, agrega observación
         """
         assignment = self.get_object()
 
@@ -225,6 +228,23 @@ class AssignmentViewSet(viewsets.ModelViewSet):
 
             # Cambiar estado del dispositivo a ROBO
             assignment.dispositivo.change_status('ROBO', user=request.user)
+
+            # Finalizar la asignación
+            assignment.estado_asignacion = 'FINALIZADA'
+
+            # Agregar observación automática
+            from django.utils import timezone
+            fecha_reporte = timezone.now().strftime('%d/%m/%Y')
+            observacion_automatica = f"Dispositivo reportado como robado/perdido el {fecha_reporte}. Carta de descuento generada."
+
+            # Si ya hay observaciones, agregar al final; si no, crear nueva
+            if assignment.observaciones:
+                assignment.observaciones += f"\n\n{observacion_automatica}"
+            else:
+                assignment.observaciones = observacion_automatica
+
+            # Guardar cambios en la asignación
+            assignment.save(update_fields=['estado_asignacion', 'observaciones', 'updated_at'])
 
             # Retornar PDF
             response = HttpResponse(pdf_buffer.read(), content_type='application/pdf')

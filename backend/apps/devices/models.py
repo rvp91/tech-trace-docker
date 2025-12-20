@@ -22,7 +22,7 @@ class Device(models.Model):
         ('ASIGNADO', 'Asignado'),
         ('MANTENIMIENTO', 'En Mantenimiento'),
         ('BAJA', 'Dado de Baja'),
-        ('ROBO', 'Robo'),
+        ('ROBO', 'Robo/Perdida'),
     ]
 
     # Estados finales que no pueden cambiar una vez establecidos
