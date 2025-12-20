@@ -254,22 +254,23 @@ export default function AssignmentsPage() {
                           {assignment.estado_asignacion === "ACTIVA" &&
                            assignment.estado_carta === "PENDIENTE" && (
                             <Button
-                              size="sm"
+                              size="icon"
                               variant="outline"
                               onClick={() => handleMarkAsSigned(assignment)}
-                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                              className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                              title="Marcar como Firmada"
                             >
-                              <CheckCircle2 className="mr-2 h-4 w-4" />
-                              Marcar Firmada
+                              <CheckCircle2 className="h-4 w-4" />
                             </Button>
                           )}
                           <Button
-                            size="sm"
+                            size="icon"
                             variant="outline"
                             onClick={() => handleViewDetails(assignment.id)}
+                            className="h-8 w-8"
+                            title="Ver Detalles"
                           >
-                            <Eye className="mr-2 h-4 w-4" />
-                            Ver Detalles
+                            <Eye className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>
