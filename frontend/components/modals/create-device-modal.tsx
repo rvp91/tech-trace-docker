@@ -9,8 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus } from "lucide-react"
-import { branchService } from "@/lib/services/branch-service"
-import type { Branch } from "@/lib/types"
+import { BranchSearchCombobox } from "@/components/ui/branch-search-combobox"
 
 interface CreateDeviceModalProps {
   onSubmit?: (data: any) => void
@@ -18,32 +17,12 @@ interface CreateDeviceModalProps {
 
 export function CreateDeviceModal({ onSubmit }: CreateDeviceModalProps) {
   const [open, setOpen] = useState(false)
-  const [branches, setBranches] = useState<Branch[]>([])
-  const [isLoadingBranches, setIsLoadingBranches] = useState(false)
   const [formData, setFormData] = useState({
     modelo: "",
     serial: "",
     tipo: "",
     sucursal: "",
   })
-
-  useEffect(() => {
-    if (open) {
-      loadBranches()
-    }
-  }, [open])
-
-  const loadBranches = async () => {
-    setIsLoadingBranches(true)
-    try {
-      const activeBranches = await branchService.getActiveBranches()
-      setBranches(activeBranches)
-    } catch (error) {
-      console.error("Error loading branches:", error)
-    } finally {
-      setIsLoadingBranches(false)
-    }
-  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -113,18 +92,12 @@ export function CreateDeviceModal({ onSubmit }: CreateDeviceModalProps) {
           </div>
           <div>
             <Label htmlFor="sucursal">Sucursal</Label>
-            <Select value={formData.sucursal} onValueChange={(value) => handleSelectChange("sucursal", value)} disabled={isLoadingBranches}>
-              <SelectTrigger>
-                <SelectValue placeholder={isLoadingBranches ? "Cargando..." : "Seleccionar sucursal"} />
-              </SelectTrigger>
-              <SelectContent>
-                {branches.map((branch) => (
-                  <SelectItem key={branch.id} value={String(branch.id)}>
-                    {branch.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <BranchSearchCombobox
+              value={formData.sucursal}
+              onChange={(value) => handleSelectChange("sucursal", value)}
+              placeholder="Seleccionar sucursal"
+              filter={{ is_active: true }}
+            />
           </div>
           <div className="flex gap-2 justify-end pt-4">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>

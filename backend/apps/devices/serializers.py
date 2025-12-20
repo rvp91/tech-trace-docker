@@ -1,6 +1,45 @@
 from rest_framework import serializers
 from .models import Device
-from apps.branches.serializers import BranchSerializer
+from apps.branches.serializers import BranchSerializer, BranchListSerializer
+
+
+class DeviceListSerializer(serializers.ModelSerializer):
+    """
+    Serializer ligero optimizado para listados de dispositivos.
+    Evita N+1 queries usando BranchListSerializer en lugar del completo.
+    """
+    sucursal_detail = BranchListSerializer(source='sucursal', read_only=True)
+    created_by_username = serializers.CharField(source='created_by.username', read_only=True)
+    tipo_equipo_display = serializers.CharField(source='get_tipo_equipo_display', read_only=True)
+    estado_display = serializers.CharField(source='get_estado_display', read_only=True)
+
+    class Meta:
+        model = Device
+        fields = [
+            'id',
+            'tipo_equipo',
+            'tipo_equipo_display',
+            'marca',
+            'modelo',
+            'numero_serie',
+            'imei',
+            'numero_telefono',
+            'estado',
+            'estado_display',
+            'sucursal',
+            'sucursal_detail',
+            'fecha_ingreso',
+            'created_at',
+            'created_by_username',
+        ]
+        read_only_fields = [
+            'id',
+            'created_at',
+            'sucursal_detail',
+            'created_by_username',
+            'tipo_equipo_display',
+            'estado_display',
+        ]
 
 
 class DeviceSerializer(serializers.ModelSerializer):

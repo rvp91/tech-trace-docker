@@ -36,6 +36,45 @@ export interface DevicePaginatedResponse {
   results: Device[]
 }
 
+export interface InventoryStats {
+  laptops: {
+    total: number
+    asignados: number
+    disponibles: number
+    mantenimiento: number
+  }
+  desktops: {
+    total: number
+    asignados: number
+    disponibles: number
+    mantenimiento: number
+  }
+  telefonos: {
+    total: number
+    asignados: number
+    disponibles: number
+    mantenimiento: number
+  }
+  tablets: {
+    total: number
+    asignados: number
+    disponibles: number
+    mantenimiento: number
+  }
+  tvs: {
+    total: number
+    asignados: number
+    disponibles: number
+    mantenimiento: number
+  }
+  simCards: {
+    total: number
+    asignados: number
+    disponibles: number
+    mantenimiento: number
+  }
+}
+
 export const deviceService = {
   async getDevices(filters: DeviceFilters = {}): Promise<DevicePaginatedResponse> {
     const params = new URLSearchParams()
@@ -80,6 +119,8 @@ export const deviceService = {
   },
 
   async getAllDevices(filters: Omit<DeviceFilters, 'page' | 'page_size'> = {}): Promise<Device[]> {
+    // NOTA: Este método sigue existiendo para exports CSV
+    // Para listados normales, usar getDevices() con paginación
     const allDevices: Device[] = []
     let page = 1
     let hasMore = true
@@ -94,6 +135,12 @@ export const deviceService = {
     }
 
     return allDevices
+  },
+
+  async getInventoryStats(): Promise<InventoryStats> {
+    // OPTIMIZADO: Nuevo endpoint que calcula estadísticas en backend
+    // Reemplaza 28 filtros en frontend con 1 query agregada
+    return apiClient.get<InventoryStats>('/devices/inventory-stats/')
   },
 }
 

@@ -214,7 +214,7 @@ export default function AssignmentsPage() {
                       </TableCell>
                       <TableCell>
                         {assignment.dispositivo_detail
-                          ? `${assignment.dispositivo_detail.marca} ${assignment.dispositivo_detail.modelo || "N/A"} (${getDeviceSerial(assignment.dispositivo_detail)})`
+                          ? `${assignment.dispositivo_detail.marca} ${assignment.dispositivo_detail.modelo || "N/A"}`
                           : `ID: ${assignment.dispositivo}`}
                       </TableCell>
                       <TableCell>{getTipoEntregaLabel(assignment.tipo_entrega)}</TableCell>

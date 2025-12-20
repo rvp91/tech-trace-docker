@@ -29,8 +29,8 @@ import { Search, Edit2, Trash2, Eye, Plus } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { deviceService, getDeviceStatusColor, getDeviceStatusLabel, getDeviceTypeLabel } from "@/lib/services/device-service"
-import { branchService } from "@/lib/services/branch-service"
-import type { Device, Branch, TipoEquipo, EstadoDispositivo } from "@/lib/types"
+import { BranchSearchCombobox } from "@/components/ui/branch-search-combobox"
+import type { Device, TipoEquipo, EstadoDispositivo } from "@/lib/types"
 import { DeviceModal } from "@/components/modals/device-modal"
 import { formatDateLocal } from "@/lib/utils/date-helpers"
 
@@ -39,7 +39,6 @@ export default function DevicesPage() {
   const { toast } = useToast()
 
   const [devices, setDevices] = useState<Device[]>([])
-  const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedType, setSelectedType] = useState<string>("")
@@ -81,20 +80,6 @@ export default function DevicesPage() {
       setLoading(false)
     }
   }, [searchQuery, selectedType, selectedStatus, selectedBranch, currentPage, pageSize, toast])
-
-  // Cargar sucursales
-  const loadBranches = useCallback(async () => {
-    try {
-      const response = await branchService.getBranches({ page_size: 100 })
-      setBranches(response.results)
-    } catch (error) {
-      console.error("Error al cargar sucursales:", error)
-    }
-  }, [])
-
-  useEffect(() => {
-    loadBranches()
-  }, [loadBranches])
 
   // Resetear a página 1 cuando cambien los filtros
   useEffect(() => {
@@ -222,19 +207,14 @@ export default function DevicesPage() {
 
         <div className="w-[200px]">
           <label className="text-sm font-medium mb-2 block">Sucursal</label>
-          <Select value={selectedBranch || "all"} onValueChange={(value) => setSelectedBranch(value === "all" ? "" : value)}>
-            <SelectTrigger>
-              <SelectValue placeholder="Todas las sucursales" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas las sucursales</SelectItem>
-              {branches.map((branch) => (
-                <SelectItem key={branch.id} value={String(branch.id)}>
-                  {branch.nombre}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <BranchSearchCombobox
+            value={selectedBranch || "all"}
+            onChange={(value) => setSelectedBranch(value === "all" ? "" : value)}
+            allowAll={true}
+            allLabel="Todas las sucursales"
+            placeholder="Filtrar por sucursal"
+            filter={{ is_active: true }}
+          />
         </div>
       </div>
 

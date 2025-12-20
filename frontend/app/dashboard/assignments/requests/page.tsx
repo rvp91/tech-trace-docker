@@ -1,11 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useState, useCallback } from "react"
 import { Plus, Search } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Select,
   SelectContent,
@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
+import { TablePagination } from "@/components/ui/table-pagination"
 import { useToast } from "@/hooks/use-toast"
 import { requestService, getRequestStatusColor, getRequestStatusLabel } from "@/lib/services/request-service"
 import type { Request } from "@/lib/types"
@@ -31,7 +32,6 @@ import { AssignmentModal } from "@/components/modals/assignment-modal"
 import { formatDateTime } from "@/lib/utils/format"
 
 export default function RequestsPage() {
-  const router = useRouter()
   const [requests, setRequests] = useState<Request[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
@@ -42,10 +42,18 @@ export default function RequestsPage() {
   const [requestToAssign, setRequestToAssign] = useState<Request | null>(null)
   const { toast } = useToast()
 
-  const loadRequests = async () => {
+  // Estados de paginación
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 20 // Tamaño fijo de página
+  const [totalCount, setTotalCount] = useState(0)
+
+  const loadRequests = useCallback(async () => {
     try {
       setLoading(true)
-      const params: any = {}
+      const params: any = {
+        page: currentPage,
+        page_size: pageSize,
+      }
 
       if (searchTerm) {
         params.search = searchTerm
@@ -57,6 +65,7 @@ export default function RequestsPage() {
 
       const response = await requestService.getRequests(params)
       setRequests(response.data)
+      setTotalCount(response.total)
     } catch (error) {
       toast({
         title: "Error",
@@ -66,7 +75,12 @@ export default function RequestsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [searchTerm, estadoFilter, currentPage, pageSize, toast])
+
+  // Resetear a página 1 cuando cambien los filtros
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, estadoFilter])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -74,7 +88,7 @@ export default function RequestsPage() {
     }, 300) // Debounce de 300ms para la búsqueda
 
     return () => clearTimeout(timer)
-  }, [searchTerm, estadoFilter])
+  }, [loadRequests])
 
   const handleCreateRequest = () => {
     setSelectedRequest(null)
@@ -127,6 +141,13 @@ export default function RequestsPage() {
     })
     loadRequests()
   }
+
+  // Handlers de paginación
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
+
+  const totalPages = Math.ceil(totalCount / pageSize)
 
   return (
     <div className="space-y-6">
@@ -181,92 +202,112 @@ export default function RequestsPage() {
       </div>
 
       {/* Tabla */}
-      <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>ID</TableHead>
-              <TableHead>Empleado</TableHead>
-              <TableHead>Tipo de Dispositivo</TableHead>
-              <TableHead>Jefatura</TableHead>
-              <TableHead>Fecha Solicitud</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              // Skeleton loaders
-              Array.from({ length: 5 }).map((_, index) => (
-                <TableRow key={index}>
-                  <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell><Skeleton className="h-6 w-20" /></TableCell>
-                  <TableCell><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+      <Card>
+        <CardHeader>
+          <CardTitle>Solicitudes ({totalCount})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ID</TableHead>
+                  <TableHead>Empleado</TableHead>
+                  <TableHead>Tipo de Dispositivo</TableHead>
+                  <TableHead>Jefatura</TableHead>
+                  <TableHead>Fecha Solicitud</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
-              ))
-            ) : requests.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                  No se encontraron solicitudes
-                </TableCell>
-              </TableRow>
-            ) : (
-              requests.map((request) => (
-                <TableRow key={request.id}>
-                  <TableCell className="font-medium">#{request.id}</TableCell>
-                  <TableCell>
-                    {request.empleado_detail?.nombre_completo || `ID: ${request.empleado}`}
-                  </TableCell>
-                  <TableCell>{request.tipo_dispositivo}</TableCell>
-                  <TableCell>{request.jefatura_solicitante}</TableCell>
-                  <TableCell>
-                    {formatDateTime(request.fecha_solicitud)}
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getRequestStatusColor(request.estado)}>
-                      {getRequestStatusLabel(request.estado)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      {request.estado === "PENDIENTE" && (
-                        <>
-                          <Button
-                            size="sm"
-                            className="bg-blue-600 hover:bg-blue-700"
-                            onClick={() => handleAssign(request)}
-                          >
-                            Asignar
-                          </Button>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  // Skeleton loaders
+                  Array.from({ length: 5 }).map((_, index) => (
+                    <TableRow key={index}>
+                      <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : requests.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      No se encontraron solicitudes
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  requests.map((request) => (
+                    <TableRow key={request.id}>
+                      <TableCell className="font-medium">#{request.id}</TableCell>
+                      <TableCell>
+                        {request.empleado_detail?.nombre_completo || `ID: ${request.empleado}`}
+                      </TableCell>
+                      <TableCell>{request.tipo_dispositivo}</TableCell>
+                      <TableCell>{request.jefatura_solicitante}</TableCell>
+                      <TableCell>
+                        {formatDateTime(request.fecha_solicitud)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getRequestStatusColor(request.estado)}>
+                          {getRequestStatusLabel(request.estado)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          {request.estado === "PENDIENTE" && (
+                            <>
+                              <Button
+                                size="sm"
+                                className="bg-blue-600 hover:bg-blue-700"
+                                onClick={() => handleAssign(request)}
+                              >
+                                Asignar
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-red-600 border-red-600 hover:bg-red-50"
+                                onClick={() => handleDelete(request.id)}
+                              >
+                                Eliminar
+                              </Button>
+                            </>
+                          )}
                           <Button
                             size="sm"
                             variant="outline"
-                            className="text-red-600 border-red-600 hover:bg-red-50"
-                            onClick={() => handleDelete(request.id)}
+                            onClick={() => handleEditRequest(request)}
                           >
-                            Eliminar
+                            Ver
                           </Button>
-                        </>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleEditRequest(request)}
-                      >
-                        Ver
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Paginación */}
+          {!loading && totalCount > 0 && (
+            <TablePagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              totalCount={totalCount}
+              onPageChange={handlePageChange}
+              onPageSizeChange={() => {}} // No-op: tamaño fijo
+              pageSizeOptions={[20]} // Solo mostrar 20 como opción
+            />
+          )}
+        </CardContent>
+      </Card>
 
       <RequestModal
         open={isModalOpen}

@@ -7,6 +7,7 @@ from .models import Request, Assignment, Return
 from .serializers import (
     RequestSerializer,
     AssignmentSerializer,
+    AssignmentListSerializer,
     ReturnSerializer,
     ResponsibilityLetterSerializer,
     DiscountLetterSerializer
@@ -38,14 +39,9 @@ class AssignmentViewSet(viewsets.ModelViewSet):
     """
     ViewSet para gestionar las asignaciones de dispositivos.
     Proporciona operaciones CRUD completas con filtros y búsqueda.
+    OPTIMIZADO: Usa AssignmentListSerializer para listados y AssignmentSerializer para detalle.
     """
-    queryset = Assignment.objects.select_related(
-        'empleado',
-        'dispositivo',
-        'solicitud',
-        'created_by'
-    ).all()
-    serializer_class = AssignmentSerializer
+    serializer_class = AssignmentSerializer  # Por defecto (detail, create, update)
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['estado_asignacion', 'empleado', 'dispositivo', 'tipo_entrega', 'estado_carta']
     search_fields = [
@@ -59,6 +55,43 @@ class AssignmentViewSet(viewsets.ModelViewSet):
     ]
     ordering_fields = ['fecha_entrega', 'fecha_devolucion', 'estado_asignacion', 'created_at']
     ordering = ['-fecha_entrega']
+
+    def get_queryset(self):
+        """
+        Queryset optimizado según la acción.
+        Para listados usa select_related optimizado, para detalle incluye todo.
+        """
+        if self.action == 'list':
+            # Listado: solo campos necesarios para la tabla
+            return Assignment.objects.select_related(
+                'empleado',
+                'empleado__sucursal',
+                'dispositivo'
+            ).only(
+                # Solo campos necesarios
+                'id', 'tipo_entrega', 'fecha_entrega', 'estado_asignacion', 'created_at',
+                'empleado__nombre_completo', 'empleado__sucursal__nombre',
+                'dispositivo__tipo_equipo', 'dispositivo__marca', 'dispositivo__modelo',
+                'dispositivo__numero_serie', 'dispositivo__imei'
+            )
+        # Detalle: todo completo
+        return Assignment.objects.select_related(
+            'empleado',
+            'empleado__sucursal',
+            'dispositivo',
+            'dispositivo__sucursal',
+            'solicitud',
+            'created_by'
+        )
+
+    def get_serializer_class(self):
+        """
+        Usa serializer ligero para listados, completo para detalle.
+        Esto evita N+1 queries en listados masivos.
+        """
+        if self.action == 'list':
+            return AssignmentListSerializer
+        return AssignmentSerializer
 
     def perform_create(self, serializer):
         """

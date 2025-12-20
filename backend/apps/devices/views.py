@@ -4,27 +4,127 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Count, Q
 from .models import Device
-from .serializers import DeviceSerializer
+from .serializers import DeviceSerializer, DeviceListSerializer
 
 
 class DeviceViewSet(viewsets.ModelViewSet):
     """
     ViewSet para gestionar los dispositivos.
     Proporciona operaciones CRUD completas con filtros y búsqueda.
+    OPTIMIZADO: Usa DeviceListSerializer para listados y DeviceSerializer para detalle.
     """
     queryset = Device.objects.select_related('sucursal', 'created_by').all()
-    serializer_class = DeviceSerializer
+    serializer_class = DeviceSerializer  # Por defecto (detail, create, update)
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['tipo_equipo', 'estado', 'sucursal', 'marca']
     search_fields = ['numero_serie', 'imei', 'marca', 'modelo', 'numero_telefono', 'numero_factura']
     ordering_fields = ['marca', 'modelo', 'fecha_ingreso', 'created_at']
     ordering = ['-fecha_ingreso']
 
+    def get_serializer_class(self):
+        """
+        Usa serializer ligero para listados, completo para detalle.
+        Esto evita N+1 queries en listados masivos.
+        """
+        if self.action == 'list':
+            return DeviceListSerializer
+        return DeviceSerializer
+
     def perform_create(self, serializer):
         """
         Asignar automáticamente el usuario actual como created_by al crear un dispositivo.
         """
         serializer.save(created_by=self.request.user)
+
+    @action(detail=False, methods=['get'], url_path='inventory-stats')
+    def inventory_stats(self, request):
+        """
+        Endpoint optimizado para estadísticas de inventario.
+
+        URL: /api/devices/inventory-stats/
+
+        Retorna estadísticas agregadas calculadas en una sola query.
+        Esto reemplaza el cálculo de 28 filtros en el frontend.
+        """
+        stats = Device.objects.aggregate(
+            # Totales por tipo
+            total_laptops=Count('id', filter=Q(tipo_equipo='LAPTOP')),
+            total_desktops=Count('id', filter=Q(tipo_equipo='DESKTOP')),
+            total_telefonos=Count('id', filter=Q(tipo_equipo='TELEFONO')),
+            total_tablets=Count('id', filter=Q(tipo_equipo='TABLET')),
+            total_tvs=Count('id', filter=Q(tipo_equipo='TV')),
+            total_sims=Count('id', filter=Q(tipo_equipo='SIM')),
+
+            # Laptops por estado
+            laptops_asignados=Count('id', filter=Q(tipo_equipo='LAPTOP', estado='ASIGNADO')),
+            laptops_disponibles=Count('id', filter=Q(tipo_equipo='LAPTOP', estado='DISPONIBLE')),
+            laptops_mantenimiento=Count('id', filter=Q(tipo_equipo='LAPTOP', estado='MANTENIMIENTO')),
+
+            # Desktops por estado
+            desktops_asignados=Count('id', filter=Q(tipo_equipo='DESKTOP', estado='ASIGNADO')),
+            desktops_disponibles=Count('id', filter=Q(tipo_equipo='DESKTOP', estado='DISPONIBLE')),
+            desktops_mantenimiento=Count('id', filter=Q(tipo_equipo='DESKTOP', estado='MANTENIMIENTO')),
+
+            # Teléfonos por estado
+            telefonos_asignados=Count('id', filter=Q(tipo_equipo='TELEFONO', estado='ASIGNADO')),
+            telefonos_disponibles=Count('id', filter=Q(tipo_equipo='TELEFONO', estado='DISPONIBLE')),
+            telefonos_mantenimiento=Count('id', filter=Q(tipo_equipo='TELEFONO', estado='MANTENIMIENTO')),
+
+            # Tablets por estado
+            tablets_asignados=Count('id', filter=Q(tipo_equipo='TABLET', estado='ASIGNADO')),
+            tablets_disponibles=Count('id', filter=Q(tipo_equipo='TABLET', estado='DISPONIBLE')),
+            tablets_mantenimiento=Count('id', filter=Q(tipo_equipo='TABLET', estado='MANTENIMIENTO')),
+
+            # TVs por estado
+            tvs_asignados=Count('id', filter=Q(tipo_equipo='TV', estado='ASIGNADO')),
+            tvs_disponibles=Count('id', filter=Q(tipo_equipo='TV', estado='DISPONIBLE')),
+            tvs_mantenimiento=Count('id', filter=Q(tipo_equipo='TV', estado='MANTENIMIENTO')),
+
+            # SIMs por estado
+            sims_asignados=Count('id', filter=Q(tipo_equipo='SIM', estado='ASIGNADO')),
+            sims_disponibles=Count('id', filter=Q(tipo_equipo='SIM', estado='DISPONIBLE')),
+            sims_mantenimiento=Count('id', filter=Q(tipo_equipo='SIM', estado='MANTENIMIENTO')),
+        )
+
+        # Formatear respuesta de forma estructurada
+        return Response({
+            'laptops': {
+                'total': stats['total_laptops'],
+                'asignados': stats['laptops_asignados'],
+                'disponibles': stats['laptops_disponibles'],
+                'mantenimiento': stats['laptops_mantenimiento'],
+            },
+            'desktops': {
+                'total': stats['total_desktops'],
+                'asignados': stats['desktops_asignados'],
+                'disponibles': stats['desktops_disponibles'],
+                'mantenimiento': stats['desktops_mantenimiento'],
+            },
+            'telefonos': {
+                'total': stats['total_telefonos'],
+                'asignados': stats['telefonos_asignados'],
+                'disponibles': stats['telefonos_disponibles'],
+                'mantenimiento': stats['telefonos_mantenimiento'],
+            },
+            'tablets': {
+                'total': stats['total_tablets'],
+                'asignados': stats['tablets_asignados'],
+                'disponibles': stats['tablets_disponibles'],
+                'mantenimiento': stats['tablets_mantenimiento'],
+            },
+            'tvs': {
+                'total': stats['total_tvs'],
+                'asignados': stats['tvs_asignados'],
+                'disponibles': stats['tvs_disponibles'],
+                'mantenimiento': stats['tvs_mantenimiento'],
+            },
+            'simCards': {
+                'total': stats['total_sims'],
+                'asignados': stats['sims_asignados'],
+                'disponibles': stats['sims_disponibles'],
+                'mantenimiento': stats['sims_mantenimiento'],
+            },
+        })
 
     @action(detail=True, methods=['get'], url_path='history')
     def history(self, request, pk=None):
@@ -59,7 +159,7 @@ class DeviceViewSet(viewsets.ModelViewSet):
                 'estado': device.estado,
             },
             'total_assignments': assignments.count(),
-            'active_assignment': assignments.filter(estado_asignacion='ACTIVA').exists(),
+            'active_assignments': assignments.filter(estado_asignacion='ACTIVA').count(),
             'assignments': serializer.data
         })
 

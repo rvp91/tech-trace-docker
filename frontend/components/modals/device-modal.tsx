@@ -9,8 +9,8 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { deviceService, type CreateDeviceData } from "@/lib/services/device-service"
-import { branchService } from "@/lib/services/branch-service"
-import type { Branch, Device, TipoEquipo, EstadoDispositivo } from "@/lib/types"
+import { BranchSearchCombobox } from "@/components/ui/branch-search-combobox"
+import type { Device, TipoEquipo, EstadoDispositivo } from "@/lib/types"
 import { Info, DollarSign } from "lucide-react"
 import { z } from "zod"
 import { deviceSchema } from "@/lib/validations"
@@ -27,7 +27,6 @@ interface DeviceModalProps {
 export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceModalProps) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
-  const [branches, setBranches] = useState<Branch[]>([])
   const [valorCalculadoSugerido, setValorCalculadoSugerido] = useState<number | null>(null)
   const [mostrarInfoDepreciacion, setMostrarInfoDepreciacion] = useState(false)
   const [formData, setFormData] = useState<CreateDeviceData>({
@@ -79,20 +78,6 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
     }
   }, [formData.valor_inicial, formData.fecha_ingreso, formData.es_valor_manual])
 
-  // Cargar sucursales
-  useEffect(() => {
-    const loadBranches = async () => {
-      try {
-        const response = await branchService.getBranches({ page_size: 100 })
-        setBranches(response.results)
-      } catch (error) {
-        console.error("Error al cargar sucursales:", error)
-      }
-    }
-    if (open) {
-      loadBranches()
-    }
-  }, [open])
 
   // Pre-llenar formulario en modo edición
   useEffect(() => {
@@ -380,22 +365,12 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
             {/* Sucursal */}
             <div>
               <Label htmlFor="sucursal">Sucursal *</Label>
-              <Select
+              <BranchSearchCombobox
                 value={formData.sucursal ? String(formData.sucursal) : ""}
-                onValueChange={(value) => handleSelectChange("sucursal", Number(value))}
-                required
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar sucursal" />
-                </SelectTrigger>
-                <SelectContent>
-                  {branches.map((branch) => (
-                    <SelectItem key={branch.id} value={String(branch.id)}>
-                      {branch.nombre} ({branch.codigo})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(value) => handleSelectChange("sucursal", Number(value))}
+                placeholder="Seleccionar sucursal"
+                filter={{ is_active: true }}
+              />
             </div>
 
             {/* Fecha de Ingreso */}

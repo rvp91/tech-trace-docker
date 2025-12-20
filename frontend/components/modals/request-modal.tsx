@@ -15,10 +15,10 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { EmployeeSearchCombobox } from "@/components/ui/employee-search-combobox"
+import { BranchSearchCombobox } from "@/components/ui/branch-search-combobox"
 import { useToast } from "@/hooks/use-toast"
 import { requestService } from "@/lib/services/request-service"
-import { branchService } from "@/lib/services/branch-service"
-import type { Request, Branch } from "@/lib/types"
+import type { Request } from "@/lib/types"
 
 interface RequestModalProps {
   open: boolean
@@ -44,7 +44,6 @@ const MOTIVOS_SOLICITUD = [
 
 export function RequestModal({ open, onClose, onSuccess, request }: RequestModalProps) {
   const [loading, setLoading] = useState(false)
-  const [branches, setBranches] = useState<Branch[]>([])
   const [formData, setFormData] = useState({
     empleado: "",
     sucursal: "",
@@ -56,21 +55,7 @@ export function RequestModal({ open, onClose, onSuccess, request }: RequestModal
   const { toast } = useToast()
 
   useEffect(() => {
-    const loadBranches = async () => {
-      try {
-        const response = await branchService.getBranches({ is_active: true, page_size: 100 })
-        setBranches(response.results)
-      } catch (error) {
-        toast({
-          title: "Error",
-          description: "No se pudieron cargar las sucursales",
-          variant: "destructive",
-        })
-      }
-    }
-
     if (open) {
-      loadBranches()
       if (request) {
         setFormData({
           empleado: String(request.empleado),
@@ -187,24 +172,15 @@ export function RequestModal({ open, onClose, onSuccess, request }: RequestModal
               <Label htmlFor="sucursal">
                 Sucursal <span className="text-red-500">*</span>
               </Label>
-              <Select
+              <BranchSearchCombobox
                 value={formData.sucursal}
-                onValueChange={(value) =>
+                onChange={(value) =>
                   setFormData((prev) => ({ ...prev, sucursal: value }))
                 }
                 disabled={!!request && request.estado === "COMPLETADA"}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona una sucursal" />
-                </SelectTrigger>
-                <SelectContent>
-                  {branches.map((branch) => (
-                    <SelectItem key={branch.id} value={String(branch.id)}>
-                      {branch.nombre} ({branch.codigo})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder="Selecciona una sucursal"
+                filter={{ is_active: true }}
+              />
             </div>
 
             <div className="grid gap-2">

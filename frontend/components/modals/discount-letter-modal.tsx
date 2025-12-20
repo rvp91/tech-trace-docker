@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
 import {
   Select,
   SelectContent,
@@ -159,7 +158,7 @@ export function DiscountLetterModal({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Generar Carta de Descuento</DialogTitle>
           <DialogDescription>
@@ -167,18 +166,17 @@ export function DiscountLetterModal({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3">
           {/* Advertencia */}
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              <strong>Advertencia:</strong> Al generar esta carta, el dispositivo será marcado automáticamente como{' '}
-              <strong>ROBADO</strong> en el sistema.
+              Advertencia: Al generar esta carta, el dispositivo será marcado como ROBADO en el sistema.
             </AlertDescription>
           </Alert>
 
           {/* Selección de empresa */}
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Label htmlFor="company">Empresa</Label>
             <Select
               value={companyKey}
@@ -198,7 +196,7 @@ export function DiscountLetterModal({
           </div>
 
           {/* Información del dispositivo */}
-          <div className="bg-muted p-4 rounded-md space-y-2">
+          <div className="bg-muted p-3 rounded-md space-y-1">
             <p className="text-sm font-medium">Dispositivo</p>
             <p className="text-sm">
               <span className="font-medium">Tipo:</span> {assignment.dispositivo_detail.tipo_equipo}
@@ -211,44 +209,51 @@ export function DiscountLetterModal({
               <span className="font-medium">N/S:</span>{' '}
               {assignment.dispositivo_detail.numero_serie || 'N/A'}
             </p>
+            {assignment.dispositivo_detail.imei && (
+              <p className="text-sm">
+                <span className="font-medium">IMEI:</span>{' '}
+                {assignment.dispositivo_detail.imei}
+              </p>
+            )}
           </div>
 
-          {/* Monto total */}
-          <div className="space-y-2">
-            <Label htmlFor="monto">Monto Total</Label>
-            <Input
-              id="monto"
-              type="number"
-              value={montoTotal}
-              onChange={(e) => setMontoTotal(e.target.value)}
-              placeholder="Ingrese monto total"
-              required
-              min="1"
-            />
-            <p className="text-sm text-muted-foreground">
-              Valor sugerido: {formatCurrency(assignment.dispositivo_detail.valor_depreciado || assignment.dispositivo_detail.valor_depreciado_calculado || 0)}
-            </p>
-          </div>
+          {/* Monto total y número de cuotas */}
+          <div className="flex gap-3">
+            <div className="space-y-1.5 flex-1" style={{ flexBasis: '75%' }}>
+              <Label htmlFor="monto">Monto Total</Label>
+              <Input
+                id="monto"
+                type="number"
+                value={montoTotal}
+                onChange={(e) => setMontoTotal(e.target.value)}
+                placeholder="Ingrese monto total"
+                required
+                min="1"
+              />
+              <p className="text-sm text-muted-foreground">
+                Valor sugerido: {formatCurrency(assignment.dispositivo_detail.valor_depreciado || assignment.dispositivo_detail.valor_depreciado_calculado || 0)}
+              </p>
+            </div>
 
-          {/* Número de cuotas */}
-          <div className="space-y-2">
-            <Label htmlFor="cuotas">Número de Cuotas</Label>
-            <Input
-              id="cuotas"
-              type="number"
-              value={numeroCuotas}
-              onChange={(e) => setNumeroCuotas(e.target.value)}
-              required
-              min="1"
-              max="24"
-            />
-            <p className="text-sm text-muted-foreground">
-              Mínimo 1, máximo 24 cuotas
-            </p>
+            <div className="space-y-1.5" style={{ flexBasis: '25%' }}>
+              <Label htmlFor="cuotas">Cuotas</Label>
+              <Input
+                id="cuotas"
+                type="number"
+                value={numeroCuotas}
+                onChange={(e) => setNumeroCuotas(e.target.value)}
+                required
+                min="1"
+                max="24"
+              />
+              <p className="text-sm text-muted-foreground">
+                1-24
+              </p>
+            </div>
           </div>
 
           {/* Mes primera cuota */}
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Label htmlFor="mes">Mes de Primera Cuota</Label>
             <Select
               value={mesPrimeraCuota}
@@ -269,9 +274,9 @@ export function DiscountLetterModal({
           </div>
 
           {/* Resumen */}
-          <div className="bg-primary/10 p-4 rounded-md">
-            <p className="text-sm font-medium mb-2">Resumen del Descuento</p>
-            <div className="space-y-1 text-sm">
+          <div className="bg-primary/10 p-3 rounded-md">
+            <p className="text-sm font-medium mb-1.5">Resumen del Descuento</p>
+            <div className="space-y-0.5 text-sm">
               <div className="flex justify-between">
                 <span>Monto Total:</span>
                 <span className="font-medium">{formatCurrency(parseFloat(montoTotal) || 0)}</span>

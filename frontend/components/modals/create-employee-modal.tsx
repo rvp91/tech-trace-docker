@@ -10,9 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
 import { employeeService, type CreateEmployeeData } from "@/lib/services/employee-service"
-import { branchService } from "@/lib/services/branch-service"
 import { businessUnitService } from "@/lib/services/business-unit-service"
-import type { Branch, Employee, BusinessUnit } from "@/lib/types"
+import { BranchSearchCombobox } from "@/components/ui/branch-search-combobox"
+import type { Employee, BusinessUnit } from "@/lib/types"
 
 interface CreateEmployeeModalProps {
   employee?: Employee
@@ -24,7 +24,6 @@ export function CreateEmployeeModal({ employee, children, onSuccess }: CreateEmp
   const { toast } = useToast()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [branches, setBranches] = useState<Branch[]>([])
   const [businessUnits, setBusinessUnits] = useState<BusinessUnit[]>([])
   const [formData, setFormData] = useState<CreateEmployeeData>({
     rut: "",
@@ -40,15 +39,11 @@ export function CreateEmployeeModal({ employee, children, onSuccess }: CreateEmp
 
   const isEditMode = !!employee
 
-  // Cargar sucursales y unidades de negocio
+  // Cargar unidades de negocio
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [branchesResponse, businessUnitsData] = await Promise.all([
-          branchService.getBranches({ page_size: 100 }),
-          businessUnitService.getBusinessUnits()
-        ])
-        setBranches(branchesResponse.results)
+        const businessUnitsData = await businessUnitService.getBusinessUnits()
         setBusinessUnits(businessUnitsData)
       } catch (error) {
         console.error("Error al cargar datos:", error)
@@ -191,22 +186,12 @@ export function CreateEmployeeModal({ employee, children, onSuccess }: CreateEmp
             {/* Sucursal */}
             <div>
               <Label htmlFor="sucursal">Sucursal *</Label>
-              <Select
+              <BranchSearchCombobox
                 value={formData.sucursal ? String(formData.sucursal) : ""}
-                onValueChange={(value) => handleSelectChange("sucursal", Number(value))}
-                required
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar sucursal" />
-                </SelectTrigger>
-                <SelectContent>
-                  {branches.map((branch) => (
-                    <SelectItem key={branch.id} value={String(branch.id)}>
-                      {branch.nombre} ({branch.codigo})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(value) => handleSelectChange("sucursal", Number(value))}
+                placeholder="Seleccionar sucursal"
+                filter={{ is_active: true }}
+              />
             </div>
 
             {/* Correo Corporativo */}

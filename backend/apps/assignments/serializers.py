@@ -5,6 +5,83 @@ from apps.devices.serializers import DeviceSerializer
 from apps.branches.serializers import BranchSerializer
 
 
+class AssignmentListSerializer(serializers.ModelSerializer):
+    """
+    Serializer ligero optimizado para listados de asignaciones.
+    Evita N+1 queries usando campos directos en lugar de serializadores anidados completos.
+    """
+    empleado_nombre = serializers.CharField(source='empleado.nombre_completo', read_only=True)
+    empleado_sucursal = serializers.CharField(source='empleado.sucursal.nombre', read_only=True)
+
+    dispositivo_tipo = serializers.CharField(source='dispositivo.get_tipo_equipo_display', read_only=True)
+    dispositivo_marca = serializers.CharField(source='dispositivo.marca', read_only=True)
+    dispositivo_modelo = serializers.CharField(source='dispositivo.modelo', read_only=True)
+    dispositivo_serial = serializers.SerializerMethodField()
+
+    estado_asignacion_display = serializers.CharField(source='get_estado_asignacion_display', read_only=True)
+
+    # Agregar detalles anidados para compatibilidad con frontend
+    empleado_detail = serializers.SerializerMethodField()
+    dispositivo_detail = serializers.SerializerMethodField()
+
+    def get_dispositivo_serial(self, obj):
+        """Retorna el serial o IMEI del dispositivo"""
+        return obj.dispositivo.numero_serie or obj.dispositivo.imei or 'N/A'
+
+    def get_empleado_detail(self, obj):
+        """Retorna información básica del empleado"""
+        return {
+            'id': obj.empleado.id,
+            'nombre_completo': obj.empleado.nombre_completo,
+            'rut': obj.empleado.rut,
+        }
+
+    def get_dispositivo_detail(self, obj):
+        """Retorna información básica del dispositivo"""
+        return {
+            'id': obj.dispositivo.id,
+            'tipo_equipo': obj.dispositivo.tipo_equipo,
+            'marca': obj.dispositivo.marca,
+            'modelo': obj.dispositivo.modelo,
+            'numero_serie': obj.dispositivo.numero_serie,
+            'imei': obj.dispositivo.imei,
+        }
+
+    class Meta:
+        model = Assignment
+        fields = [
+            'id',
+            'empleado',
+            'empleado_nombre',
+            'empleado_sucursal',
+            'empleado_detail',
+            'dispositivo',
+            'dispositivo_tipo',
+            'dispositivo_marca',
+            'dispositivo_modelo',
+            'dispositivo_serial',
+            'dispositivo_detail',
+            'tipo_entrega',
+            'fecha_entrega',
+            'estado_asignacion',
+            'estado_asignacion_display',
+            'created_at',
+        ]
+        read_only_fields = [
+            'id',
+            'empleado_nombre',
+            'empleado_sucursal',
+            'empleado_detail',
+            'dispositivo_tipo',
+            'dispositivo_marca',
+            'dispositivo_modelo',
+            'dispositivo_serial',
+            'dispositivo_detail',
+            'estado_asignacion_display',
+            'created_at',
+        ]
+
+
 class RequestSerializer(serializers.ModelSerializer):
     """
     Serializer para el modelo Request (Solicitud de dispositivo).

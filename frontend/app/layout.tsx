@@ -19,8 +19,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" suppressHydrationWarning>
-      <body className={`${inter.className} font-sans antialiased`}>
-        <Providers>{children}</Providers>
+      <body className={`${inter.className} font-sans antialiased h-full`}>
+        <Providers>
+          <div className="h-full">{children}</div>
+        </Providers>
       </body>
     </html>
   )

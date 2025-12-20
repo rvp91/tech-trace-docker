@@ -67,7 +67,9 @@ export const employeeService = {
   },
 
   async getActiveEmployees(): Promise<Employee[]> {
-    const response = await this.getEmployees({ estado: "ACTIVO", page_size: 1000 })
+    // OPTIMIZADO: Reducido de 1000 a 100 para evitar carga masiva
+    // Si se necesitan más empleados, implementar paginación o búsqueda
+    const response = await this.getEmployees({ estado: "ACTIVO", page_size: 100 })
     return response.results
   },
 }
