@@ -131,7 +131,7 @@ export function DiscountLetterModal({
 
       toast({
         title: "Carta generada",
-        description: "La carta de descuento se ha descargado. El dispositivo ha sido marcado como robado.",
+        description: "La carta de descuento se ha descargado. El dispositivo ha sido marcado como robado/perdido y la asignación ha sido finalizada.",
       })
 
       onSuccess()
@@ -171,7 +171,7 @@ export function DiscountLetterModal({
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              Advertencia: Al generar esta carta, el dispositivo será marcado como ROBADO en el sistema.
+              Advertencia: Al generar esta carta, el dispositivo será marcado como ROBADO/PERDIDO en el sistema y la asignación se finalizará automáticamente.
             </AlertDescription>
           </Alert>
 
@@ -297,7 +297,7 @@ export function DiscountLetterModal({
               Cancelar
             </Button>
             <Button type="submit" disabled={loading} variant="destructive">
-              {loading ? "Generando..." : "Generar Carta y Marcar como Robado"}
+              {loading ? "Generando..." : "Generar Carta y Marcar como Robado/Perdido"}
             </Button>
           </DialogFooter>
         </form>

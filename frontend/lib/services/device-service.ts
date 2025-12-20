@@ -162,7 +162,7 @@ export function getDeviceStatusLabel(estado: EstadoDispositivo): string {
     ASIGNADO: "Asignado",
     MANTENIMIENTO: "Mantenimiento",
     BAJA: "Baja",
-    ROBO: "Robo",
+    ROBO: "Robo/Perdida",
   }
   return labels[estado] || estado
 }

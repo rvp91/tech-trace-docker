@@ -363,7 +363,7 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
                   <SelectItem value="MANTENIMIENTO">Mantenimiento</SelectItem>
                   {/* Solo mostrar BAJA y ROBO en modo edición (no al crear) */}
                   {isEditMode && <SelectItem value="BAJA">Baja</SelectItem>}
-                  {isEditMode && <SelectItem value="ROBO">Robo</SelectItem>}
+                  {isEditMode && <SelectItem value="ROBO">Robo/Perdida</SelectItem>}
                 </SelectContent>
               </Select>
               {isEstadoFinal && (

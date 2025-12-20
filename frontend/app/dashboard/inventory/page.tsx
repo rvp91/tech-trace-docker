@@ -391,7 +391,7 @@ export default function InventoryPage() {
                     <SelectItem value="ASIGNADO">Asignado</SelectItem>
                     <SelectItem value="MANTENIMIENTO">Mantenimiento</SelectItem>
                     <SelectItem value="BAJA">Baja</SelectItem>
-                    <SelectItem value="ROBO">Robo</SelectItem>
+                    <SelectItem value="ROBO">Robo/Perdida</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
