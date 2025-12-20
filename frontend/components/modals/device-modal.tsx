@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast"
 import { deviceService, type CreateDeviceData } from "@/lib/services/device-service"
 import { BranchSearchCombobox } from "@/components/ui/branch-search-combobox"
 import type { Device, TipoEquipo, EstadoDispositivo } from "@/lib/types"
-import { Info, DollarSign } from "lucide-react"
+import { Info, DollarSign, AlertTriangle } from "lucide-react"
 import { z } from "zod"
 import { deviceSchema } from "@/lib/validations"
 import { formatCurrency, formatCurrencyInput, parseCurrency } from "@/lib/utils"
@@ -205,6 +205,10 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
   const showImeiField = ['TELEFONO', 'TABLET'].includes(formData.tipo_equipo)
   const showTelefonoField = ['TELEFONO', 'SIM'].includes(formData.tipo_equipo)
 
+  // Detectar si el dispositivo está en estado final
+  const FINAL_STATES: EstadoDispositivo[] = ['BAJA', 'ROBO']
+  const isEstadoFinal = isEditMode && device && FINAL_STATES.includes(device.estado)
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -348,18 +352,31 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
                 value={formData.estado}
                 onValueChange={(value) => handleSelectChange("estado", value as EstadoDispositivo)}
                 required
+                disabled={isEstadoFinal}
               >
-                <SelectTrigger>
+                <SelectTrigger className={isEstadoFinal ? "bg-muted cursor-not-allowed" : ""}>
                   <SelectValue placeholder="Seleccionar estado" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="DISPONIBLE">Disponible</SelectItem>
                   <SelectItem value="ASIGNADO">Asignado</SelectItem>
                   <SelectItem value="MANTENIMIENTO">Mantenimiento</SelectItem>
-                  <SelectItem value="BAJA">Baja</SelectItem>
-                  <SelectItem value="ROBO">Robo</SelectItem>
+                  {/* Solo mostrar BAJA y ROBO en modo edición (no al crear) */}
+                  {isEditMode && <SelectItem value="BAJA">Baja</SelectItem>}
+                  {isEditMode && <SelectItem value="ROBO">Robo</SelectItem>}
                 </SelectContent>
               </Select>
+              {isEstadoFinal && (
+                <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  El estado {device.estado} es final y no puede ser modificado
+                </p>
+              )}
+              {!isEditMode && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Nota: Los estados BAJA y ROBO solo se pueden establecer mediante transición
+                </p>
+              )}
             </div>
 
             {/* Sucursal */}

@@ -81,7 +81,8 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             'dispositivo',
             'dispositivo__sucursal',
             'solicitud',
-            'created_by'
+            'created_by',
+            'firmado_por'
         )
 
     def get_serializer_class(self):
@@ -235,6 +236,50 @@ class AssignmentViewSet(viewsets.ModelViewSet):
                 {'error': f'Error al generar la carta: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    @action(detail=True, methods=['post'], url_path='mark-as-signed')
+    def mark_as_signed(self, request, pk=None):
+        """
+        Marca una carta de responsabilidad como firmada.
+
+        POST /api/assignments/assignments/{id}/mark-as-signed/
+        Body: {} (vacío)
+        Returns: Assignment actualizado con auditoría de firma
+        """
+        assignment = self.get_object()
+
+        # Validación 1: La asignación debe estar activa
+        if assignment.estado_asignacion != 'ACTIVA':
+            return Response(
+                {'error': 'Solo se pueden marcar como firmadas las cartas de asignaciones activas'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validación 2: La carta debe estar en estado PENDIENTE
+        if assignment.estado_carta != 'PENDIENTE':
+            return Response(
+                {
+                    'error': f'La carta no puede ser marcada como firmada. Estado actual: {assignment.get_estado_carta_display()}',
+                    'current_status': assignment.estado_carta
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Actualizar estado y campos de auditoría
+        from django.utils import timezone
+
+        assignment.estado_carta = 'FIRMADA'
+        assignment.fecha_firma = timezone.now()
+        assignment.firmado_por = request.user
+        assignment.save(update_fields=['estado_carta', 'fecha_firma', 'firmado_por'])
+
+        # Serializar y retornar
+        serializer = self.get_serializer(assignment)
+
+        return Response({
+            'message': 'Carta marcada como firmada exitosamente',
+            'assignment': serializer.data
+        }, status=status.HTTP_200_OK)
 
 
 class ReturnViewSet(viewsets.ModelViewSet):

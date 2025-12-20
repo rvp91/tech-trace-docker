@@ -152,7 +152,12 @@ export interface Assignment {
   fecha_entrega: string
   fecha_devolucion?: string
   estado_carta: EstadoCarta
+  estado_carta_display?: string
+  fecha_firma?: string
+  firmado_por?: number
+  firmado_por_username?: string
   estado_asignacion: EstadoAsignacion
+  estado_asignacion_display?: string
   observaciones?: string
   created_at: string
   updated_at: string

@@ -15,11 +15,13 @@ import {
   getAssignmentStatusLabel,
   getTipoEntregaLabel,
   getEstadoCartaLabel,
+  getEstadoCartaColor,
 } from "@/lib/services/assignment-service"
 import type { Assignment, Return } from "@/lib/types"
 import { ReturnModal } from "@/components/modals/return-modal"
 import { ResponsibilityLetterModal } from "@/components/modals/responsibility-letter-modal"
 import { DiscountLetterModal } from "@/components/modals/discount-letter-modal"
+import { MarkSignedConfirmationModal } from "@/components/modals/mark-signed-confirmation-modal"
 import { formatDateLocal } from "@/lib/utils/date-helpers"
 import { formatDateTime } from "@/lib/utils/format"
 
@@ -39,6 +41,7 @@ export default function AssignmentDetailPage() {
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false)
   const [isResponsibilityModalOpen, setIsResponsibilityModalOpen] = useState(false)
   const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false)
+  const [isMarkSignedModalOpen, setIsMarkSignedModalOpen] = useState(false)
   const { toast } = useToast()
 
   const assignmentId = Number(params.id)
@@ -77,6 +80,11 @@ export default function AssignmentDetailPage() {
     loadAssignment()
   }
 
+  const handleMarkSignedSuccess = () => {
+    setIsMarkSignedModalOpen(false)
+    loadAssignment()
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -110,6 +118,18 @@ export default function AssignmentDetailPage() {
         <div className="flex gap-2">
           {assignment.estado_asignacion === "ACTIVA" && (
             <>
+              {/* Botón Marcar como Firmada - solo si PENDIENTE */}
+              {assignment.estado_carta === "PENDIENTE" && (
+                <Button
+                  variant="default"
+                  onClick={() => setIsMarkSignedModalOpen(true)}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Marcar como Firmada
+                </Button>
+              )}
+
               {/* Carta de Responsabilidad - solo LAPTOP, DESKTOP o TELEFONO */}
               {(assignment.dispositivo_detail?.tipo_equipo === "LAPTOP" ||
                 assignment.dispositivo_detail?.tipo_equipo === "DESKTOP" ||
@@ -291,8 +311,29 @@ export default function AssignmentDetailPage() {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Estado de Carta</p>
-              <p className="font-medium">{getEstadoCartaLabel(assignment.estado_carta)}</p>
+              <Badge className={getEstadoCartaColor(assignment.estado_carta)}>
+                {getEstadoCartaLabel(assignment.estado_carta)}
+              </Badge>
             </div>
+
+            {/* Mostrar información de firma si existe */}
+            {assignment.estado_carta === "FIRMADA" && assignment.fecha_firma && (
+              <>
+                <div>
+                  <p className="text-sm text-muted-foreground">Fecha de Firma</p>
+                  <p className="font-medium">
+                    {formatDateTime(assignment.fecha_firma)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Firmado por</p>
+                  <p className="font-medium">
+                    {assignment.firmado_por_username || "Sistema"}
+                  </p>
+                </div>
+              </>
+            )}
+
             {assignment.fecha_devolucion && (
               <div>
                 <p className="text-sm text-muted-foreground">Fecha de Devolución</p>
@@ -375,6 +416,13 @@ export default function AssignmentDetailPage() {
         open={isDiscountModalOpen}
         onClose={() => setIsDiscountModalOpen(false)}
         onSuccess={loadAssignment}
+        assignment={assignment}
+      />
+
+      <MarkSignedConfirmationModal
+        open={isMarkSignedModalOpen}
+        onClose={() => setIsMarkSignedModalOpen(false)}
+        onSuccess={handleMarkSignedSuccess}
         assignment={assignment}
       />
     </div>

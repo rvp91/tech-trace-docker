@@ -19,6 +19,7 @@ class AssignmentListSerializer(serializers.ModelSerializer):
     dispositivo_serial = serializers.SerializerMethodField()
 
     estado_asignacion_display = serializers.CharField(source='get_estado_asignacion_display', read_only=True)
+    estado_carta_display = serializers.CharField(source='get_estado_carta_display', read_only=True)
 
     # Agregar detalles anidados para compatibilidad con frontend
     empleado_detail = serializers.SerializerMethodField()
@@ -65,6 +66,8 @@ class AssignmentListSerializer(serializers.ModelSerializer):
             'fecha_entrega',
             'estado_asignacion',
             'estado_asignacion_display',
+            'estado_carta',
+            'estado_carta_display',
             'created_at',
         ]
         read_only_fields = [
@@ -78,6 +81,7 @@ class AssignmentListSerializer(serializers.ModelSerializer):
             'dispositivo_serial',
             'dispositivo_detail',
             'estado_asignacion_display',
+            'estado_carta_display',
             'created_at',
         ]
 
@@ -137,6 +141,7 @@ class AssignmentSerializer(serializers.ModelSerializer):
     dispositivo_detail = DeviceSerializer(source='dispositivo', read_only=True)
     solicitud_detail = RequestSerializer(source='solicitud', read_only=True)
     created_by_username = serializers.CharField(source='created_by.username', read_only=True)
+    firmado_por_username = serializers.CharField(source='firmado_por.username', read_only=True)
     tipo_entrega_display = serializers.CharField(source='get_tipo_entrega_display', read_only=True)
     estado_carta_display = serializers.CharField(source='get_estado_carta_display', read_only=True)
     estado_asignacion_display = serializers.CharField(source='get_estado_asignacion_display', read_only=True)
@@ -157,6 +162,9 @@ class AssignmentSerializer(serializers.ModelSerializer):
             'fecha_devolucion',
             'estado_carta',
             'estado_carta_display',
+            'fecha_firma',
+            'firmado_por',
+            'firmado_por_username',
             'estado_asignacion',
             'estado_asignacion_display',
             'observaciones',
@@ -170,6 +178,9 @@ class AssignmentSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
             'created_by',
+            'fecha_firma',
+            'firmado_por',
+            'firmado_por_username',
             'empleado_detail',
             'dispositivo_detail',
             'solicitud_detail',
@@ -186,6 +197,15 @@ class AssignmentSerializer(serializers.ModelSerializer):
         # Si estamos actualizando, permitir el mismo dispositivo
         if self.instance and self.instance.dispositivo == value:
             return value
+
+        # Prevenir asignación a dispositivos en estados finales
+        from apps.devices.models import FINAL_STATES
+
+        if value.estado in FINAL_STATES:
+            raise serializers.ValidationError(
+                f"No se puede asignar un dispositivo en estado {value.get_estado_display()}. "
+                f"Este dispositivo está en un estado final."
+            )
 
         # Verificar que el dispositivo esté disponible
         if value.estado != 'DISPONIBLE':

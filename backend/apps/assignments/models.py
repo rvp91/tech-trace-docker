@@ -66,6 +66,16 @@ class Assignment(models.Model):
     fecha_entrega = models.DateField(verbose_name='Fecha de entrega')
     fecha_devolucion = models.DateField(blank=True, null=True, verbose_name='Fecha de devolución')
     estado_carta = models.CharField(max_length=20, choices=ESTADO_CARTA_CHOICES, default='PENDIENTE', verbose_name='Estado de carta')
+    # Campos de auditoría para firma de carta
+    fecha_firma = models.DateTimeField(blank=True, null=True, verbose_name='Fecha de firma de carta')
+    firmado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='cartas_firmadas',
+        blank=True,
+        null=True,
+        verbose_name='Firmado por'
+    )
     estado_asignacion = models.CharField(max_length=20, choices=ESTADO_ASIGNACION_CHOICES, default='ACTIVA', verbose_name='Estado de asignación')
     observaciones = models.TextField(blank=True, null=True, verbose_name='Observaciones')
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, verbose_name='Creado por')

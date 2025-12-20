@@ -137,6 +137,18 @@ export const assignmentService = {
       `carta_descuento_${assignmentId}.pdf`
     )
   },
+
+  /**
+   * Marcar carta de responsabilidad como firmada
+   */
+  async markAsSigned(assignmentId: number): Promise<Assignment> {
+    const response = await apiClient.post<{
+      message: string
+      assignment: Assignment
+    }>(`/assignments/assignments/${assignmentId}/mark-as-signed/`, {})
+
+    return response.assignment
+  },
 }
 
 // Helper functions para UI
@@ -183,6 +195,19 @@ export const getEstadoCartaLabel = (estado: string): string => {
       return "No Aplica"
     default:
       return estado
+  }
+}
+
+export const getEstadoCartaColor = (estado: string): string => {
+  switch (estado) {
+    case "FIRMADA":
+      return "bg-green-500"
+    case "PENDIENTE":
+      return "bg-yellow-500"
+    case "NO_APLICA":
+      return "bg-gray-400"
+    default:
+      return "bg-gray-500"
   }
 }
 

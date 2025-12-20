@@ -25,6 +25,9 @@ class Device(models.Model):
         ('ROBO', 'Robo'),
     ]
 
+    # Estados finales que no pueden cambiar una vez establecidos
+    FINAL_STATES = ['BAJA', 'ROBO']
+
     tipo_equipo = models.CharField(max_length=20, choices=TIPO_CHOICES, verbose_name='Tipo de equipo')
     marca = models.CharField(max_length=50, verbose_name='Marca')
     modelo = models.CharField(max_length=100, blank=True, null=True, verbose_name='Modelo')
@@ -128,11 +131,19 @@ class Device(models.Model):
     def change_status(self, new_status, user=None):
         """Cambia el estado del dispositivo y registra en auditoría"""
         from apps.users.audit import AuditLog
+        from django.core.exceptions import ValidationError
 
         old_status = self.estado
 
         if old_status == new_status:
             return False  # No hay cambio
+
+        # VALIDACIÓN: Estados finales no pueden cambiar
+        if old_status in self.FINAL_STATES:
+            raise ValidationError(
+                f'No se puede cambiar el estado de un dispositivo en {old_status}. '
+                f'Este es un estado final y no puede ser modificado.'
+            )
 
         self.estado = new_status
         self.save()

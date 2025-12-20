@@ -22,8 +22,17 @@ def assignment_post_save(sender, instance, created, **kwargs):
     if instance.estado_asignacion == 'ACTIVA':
         dispositivo = instance.dispositivo
 
-        # Solo cambiar a ASIGNADO si el dispositivo no estaba ya asignado
-        if dispositivo.estado != 'ASIGNADO':
+        # NO cambiar estado si el dispositivo está en estado final
+        FINAL_STATES = ['BAJA', 'ROBO']
+        if dispositivo.estado in FINAL_STATES:
+            # Log warning pero no cambiar estado
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                f'Asignación {instance.id} creada para dispositivo {dispositivo.id} '
+                f'en estado final {dispositivo.estado}. No se cambió el estado.'
+            )
+        elif dispositivo.estado != 'ASIGNADO':
             # Obtener el usuario que creó la asignación para la auditoría
             user = instance.created_by if hasattr(instance, 'created_by') else None
             dispositivo.change_status('ASIGNADO', user=user)
@@ -58,7 +67,18 @@ def return_post_save(sender, instance, created, **kwargs):
             asignacion.estado_asignacion = 'FINALIZADA'
             asignacion.save()
 
-        # 2. Cambiar el estado del dispositivo según el estado de devolución
+        # 2. NO cambiar estado si el dispositivo está en estado final
+        FINAL_STATES = ['BAJA', 'ROBO']
+        if dispositivo.estado in FINAL_STATES:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                f'Devolución {instance.id} registrada para dispositivo {dispositivo.id} '
+                f'en estado final {dispositivo.estado}. No se cambió el estado.'
+            )
+            return
+
+        # 3. Cambiar el estado del dispositivo según el estado de devolución
         nuevo_estado = None
 
         if instance.estado_dispositivo == 'OPTIMO':

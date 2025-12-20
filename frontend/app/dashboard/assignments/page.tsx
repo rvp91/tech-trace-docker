@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { Plus, Search, Eye } from "lucide-react"
+import { Plus, Search, Eye, CheckCircle2 } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -31,10 +31,13 @@ import {
   getAssignmentStatusColor,
   getAssignmentStatusLabel,
   getTipoEntregaLabel,
+  getEstadoCartaColor,
+  getEstadoCartaLabel,
 } from "@/lib/services/assignment-service"
 import { getDeviceSerial } from "@/lib/utils"
 import type { Assignment } from "@/lib/types"
 import { AssignmentModal } from "@/components/modals/assignment-modal"
+import { MarkSignedConfirmationModal } from "@/components/modals/mark-signed-confirmation-modal"
 import { formatDateLocal } from "@/lib/utils/date-helpers"
 
 export default function AssignmentsPage() {
@@ -44,6 +47,8 @@ export default function AssignmentsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [estadoFilter, setEstadoFilter] = useState("all")
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null)
+  const [isMarkSignedModalOpen, setIsMarkSignedModalOpen] = useState(false)
   const { toast } = useToast()
 
   // Estados de paginación
@@ -105,6 +110,17 @@ export default function AssignmentsPage() {
 
   const handleViewDetails = (id: number) => {
     router.push(`/dashboard/assignments/${id}`)
+  }
+
+  const handleMarkAsSigned = (assignment: Assignment) => {
+    setSelectedAssignment(assignment)
+    setIsMarkSignedModalOpen(true)
+  }
+
+  const handleMarkSignedSuccess = () => {
+    setIsMarkSignedModalOpen(false)
+    setSelectedAssignment(null)
+    loadAssignments()
   }
 
   // Handlers de paginación
@@ -182,6 +198,7 @@ export default function AssignmentsPage() {
                   <TableHead>Tipo Entrega</TableHead>
                   <TableHead>Fecha Entrega</TableHead>
                   <TableHead>Estado</TableHead>
+                  <TableHead>Estado Carta</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -196,12 +213,13 @@ export default function AssignmentsPage() {
                       <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                       <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-6 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
                     </TableRow>
                   ))
                 ) : assignments.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       No se encontraron asignaciones
                     </TableCell>
                   </TableRow>
@@ -226,15 +244,34 @@ export default function AssignmentsPage() {
                           {getAssignmentStatusLabel(assignment.estado_asignacion)}
                         </Badge>
                       </TableCell>
+                      <TableCell>
+                        <Badge className={getEstadoCartaColor(assignment.estado_carta)}>
+                          {getEstadoCartaLabel(assignment.estado_carta)}
+                        </Badge>
+                      </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleViewDetails(assignment.id)}
-                        >
-                          <Eye className="mr-2 h-4 w-4" />
-                          Ver Detalles
-                        </Button>
+                        <div className="flex gap-2 justify-end">
+                          {assignment.estado_asignacion === "ACTIVA" &&
+                           assignment.estado_carta === "PENDIENTE" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleMarkAsSigned(assignment)}
+                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                            >
+                              <CheckCircle2 className="mr-2 h-4 w-4" />
+                              Marcar Firmada
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleViewDetails(assignment.id)}
+                          >
+                            <Eye className="mr-2 h-4 w-4" />
+                            Ver Detalles
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -262,6 +299,16 @@ export default function AssignmentsPage() {
         open={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSuccess={handleModalSuccess}
+      />
+
+      <MarkSignedConfirmationModal
+        open={isMarkSignedModalOpen}
+        onClose={() => {
+          setIsMarkSignedModalOpen(false)
+          setSelectedAssignment(null)
+        }}
+        onSuccess={handleMarkSignedSuccess}
+        assignment={selectedAssignment}
       />
     </div>
   )
