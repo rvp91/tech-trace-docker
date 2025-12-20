@@ -2,11 +2,17 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { Plus, Search, Eye, CheckCircle2 } from "lucide-react"
+import { Plus, Search, Eye, CheckCircle2, FileText, MoreVertical, RotateCcw } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   Select,
   SelectContent,
@@ -38,6 +44,9 @@ import { getDeviceSerial } from "@/lib/utils"
 import type { Assignment } from "@/lib/types"
 import { AssignmentModal } from "@/components/modals/assignment-modal"
 import { MarkSignedConfirmationModal } from "@/components/modals/mark-signed-confirmation-modal"
+import { ReturnModal } from "@/components/modals/return-modal"
+import { ResponsibilityLetterModal } from "@/components/modals/responsibility-letter-modal"
+import { DiscountLetterModal } from "@/components/modals/discount-letter-modal"
 import { formatDateLocal } from "@/lib/utils/date-helpers"
 
 export default function AssignmentsPage() {
@@ -49,6 +58,9 @@ export default function AssignmentsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null)
   const [isMarkSignedModalOpen, setIsMarkSignedModalOpen] = useState(false)
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false)
+  const [isResponsibilityModalOpen, setIsResponsibilityModalOpen] = useState(false)
+  const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false)
   const { toast } = useToast()
 
   // Estados de paginación
@@ -120,6 +132,33 @@ export default function AssignmentsPage() {
   const handleMarkSignedSuccess = () => {
     setIsMarkSignedModalOpen(false)
     setSelectedAssignment(null)
+    loadAssignments()
+  }
+
+  const handleOpenReturnModal = (assignment: Assignment) => {
+    setSelectedAssignment(assignment)
+    setIsReturnModalOpen(true)
+  }
+
+  const handleOpenResponsibilityModal = (assignment: Assignment) => {
+    setSelectedAssignment(assignment)
+    setIsResponsibilityModalOpen(true)
+  }
+
+  const handleOpenDiscountModal = (assignment: Assignment) => {
+    setSelectedAssignment(assignment)
+    setIsDiscountModalOpen(true)
+  }
+
+  const handleModalClose = () => {
+    setIsReturnModalOpen(false)
+    setIsResponsibilityModalOpen(false)
+    setIsDiscountModalOpen(false)
+    setSelectedAssignment(null)
+  }
+
+  const handleReturnSuccess = () => {
+    handleModalClose()
     loadAssignments()
   }
 
@@ -251,18 +290,59 @@ export default function AssignmentsPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
-                          {assignment.estado_asignacion === "ACTIVA" &&
-                           assignment.estado_carta === "PENDIENTE" && (
-                            <Button
-                              size="icon"
-                              variant="outline"
-                              onClick={() => handleMarkAsSigned(assignment)}
-                              className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
-                              title="Marcar como Firmada"
-                            >
-                              <CheckCircle2 className="h-4 w-4" />
-                            </Button>
+                          {assignment.estado_asignacion === "ACTIVA" && (
+                            <>
+                              {assignment.estado_carta === "PENDIENTE" && (
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  onClick={() => handleMarkAsSigned(assignment)}
+                                  className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                  title="Marcar como Firmada"
+                                >
+                                  <CheckCircle2 className="h-4 w-4" />
+                                </Button>
+                              )}
+
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    size="icon"
+                                    variant="outline"
+                                    className="h-8 w-8"
+                                    title="Generar Cartas"
+                                  >
+                                    <FileText className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  {(assignment.dispositivo_detail?.tipo_equipo === "LAPTOP" ||
+                                    assignment.dispositivo_detail?.tipo_equipo === "DESKTOP" ||
+                                    assignment.dispositivo_detail?.tipo_equipo === "TELEFONO") && (
+                                    <DropdownMenuItem onClick={() => handleOpenResponsibilityModal(assignment)}>
+                                      <FileText className="mr-2 h-4 w-4" />
+                                      Carta de Responsabilidad
+                                    </DropdownMenuItem>
+                                  )}
+                                  <DropdownMenuItem onClick={() => handleOpenDiscountModal(assignment)}>
+                                    <FileText className="mr-2 h-4 w-4" />
+                                    Carta de Descuento
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                onClick={() => handleOpenReturnModal(assignment)}
+                                className="h-8 w-8"
+                                title="Registrar Devolución"
+                              >
+                                <RotateCcw className="h-4 w-4" />
+                              </Button>
+                            </>
                           )}
+
                           <Button
                             size="icon"
                             variant="outline"
@@ -311,6 +391,30 @@ export default function AssignmentsPage() {
         onSuccess={handleMarkSignedSuccess}
         assignment={selectedAssignment}
       />
+
+      {selectedAssignment && (
+        <>
+          <ReturnModal
+            open={isReturnModalOpen}
+            onClose={handleModalClose}
+            onSuccess={handleReturnSuccess}
+            assignment={selectedAssignment}
+          />
+
+          <ResponsibilityLetterModal
+            open={isResponsibilityModalOpen}
+            onClose={handleModalClose}
+            assignment={selectedAssignment}
+          />
+
+          <DiscountLetterModal
+            open={isDiscountModalOpen}
+            onClose={handleModalClose}
+            onSuccess={loadAssignments}
+            assignment={selectedAssignment}
+          />
+        </>
+      )}
     </div>
   )
 }
