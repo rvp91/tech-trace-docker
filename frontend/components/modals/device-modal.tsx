@@ -409,7 +409,7 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
             <div className="border rounded-lg p-4 space-y-4 bg-muted/50 mt-4">
               <div className="flex items-center gap-2">
                 <DollarSign className="h-5 w-5" />
-                <h3 className="text-sm font-semibold">Información de Valor (Opcional)</h3>
+                <h3 className="text-sm font-semibold">Información de Valor</h3>
               </div>
 
               <div className="grid grid-cols-2 gap-4">

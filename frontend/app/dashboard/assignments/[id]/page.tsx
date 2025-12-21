@@ -8,6 +8,12 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { useToast } from "@/hooks/use-toast"
 import {
   assignmentService,
@@ -118,6 +124,30 @@ export default function AssignmentDetailPage() {
         <div className="flex gap-2">
           {assignment.estado_asignacion === "ACTIVA" && (
             <>
+              {/* Menú desplegable para generar cartas */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline">
+                    <FileText className="mr-2 h-4 w-4" />
+                    Generar Cartas
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {(assignment.dispositivo_detail?.tipo_equipo === "LAPTOP" ||
+                    assignment.dispositivo_detail?.tipo_equipo === "DESKTOP" ||
+                    assignment.dispositivo_detail?.tipo_equipo === "TELEFONO") && (
+                    <DropdownMenuItem onClick={() => setIsResponsibilityModalOpen(true)}>
+                      <FileText className="mr-2 h-4 w-4" />
+                      Carta de Responsabilidad
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onClick={() => setIsDiscountModalOpen(true)}>
+                    <FileText className="mr-2 h-4 w-4" />
+                    Carta de Descuento
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
               {/* Botón Marcar como Firmada - solo si PENDIENTE */}
               {assignment.estado_carta === "PENDIENTE" && (
                 <Button
@@ -129,22 +159,6 @@ export default function AssignmentDetailPage() {
                   Marcar como Firmada
                 </Button>
               )}
-
-              {/* Carta de Responsabilidad - solo LAPTOP, DESKTOP o TELEFONO */}
-              {(assignment.dispositivo_detail?.tipo_equipo === "LAPTOP" ||
-                assignment.dispositivo_detail?.tipo_equipo === "DESKTOP" ||
-                assignment.dispositivo_detail?.tipo_equipo === "TELEFONO") && (
-                <Button variant="outline" onClick={() => setIsResponsibilityModalOpen(true)}>
-                  <FileText className="mr-2 h-4 w-4" />
-                  Carta de Responsabilidad
-                </Button>
-              )}
-
-              {/* Carta de Descuento */}
-              <Button variant="outline" onClick={() => setIsDiscountModalOpen(true)}>
-                <FileText className="mr-2 h-4 w-4" />
-                Carta de Descuento
-              </Button>
 
               <Button onClick={() => setIsReturnModalOpen(true)}>
                 <CheckCircle2 className="mr-2 h-4 w-4" />

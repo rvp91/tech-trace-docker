@@ -232,16 +232,72 @@ class StatsViewSet(viewsets.ViewSet):
             'sucursal__codigo'
         ).annotate(total=Count('id')).order_by('-total')
 
-        # 9. Últimas 5 devoluciones
+        # 9. Últimas 5 devoluciones (incluyendo robos/pérdidas)
         from apps.assignments.models import Return
         from apps.assignments.serializers import ReturnSerializer
+
+        # Obtener devoluciones normales
         recent_returns = Return.objects.select_related(
             'asignacion__empleado',
             'asignacion__dispositivo',
             'created_by'
-        ).order_by('-created_at')[:5]
+        ).order_by('-created_at')[:10]  # Obtener más para combinar luego
 
+        # Obtener asignaciones finalizadas por robo/pérdida (dispositivo en estado ROBO)
+        from apps.assignments.models import Assignment
+        from apps.assignments.serializers import AssignmentSerializer
+        recent_losses = Assignment.objects.filter(
+            estado_asignacion='FINALIZADA',
+            dispositivo__estado='ROBO'
+        ).select_related(
+            'empleado',
+            'dispositivo',
+            'created_by'
+        ).order_by('-updated_at')[:10]  # Obtener más para combinar luego
+
+        # Serializar ambos tipos
         recent_returns_serializer = ReturnSerializer(recent_returns, many=True)
+
+        # Crear una lista combinada con información unificada
+        combined_returns = []
+
+        # Agregar devoluciones normales
+        for ret in recent_returns_serializer.data:
+            combined_returns.append({
+                'type': 'return',
+                'data': ret,
+                'timestamp': ret.get('created_at', ret.get('fecha_devolucion'))
+            })
+
+        # Agregar robos/pérdidas
+        for loss in recent_losses:
+            combined_returns.append({
+                'type': 'loss',
+                'data': {
+                    'id': loss.id,
+                    'asignacion_detail': {
+                        'id': loss.id,
+                        'empleado_detail': {
+                            'nombre_completo': loss.empleado.nombre_completo,
+                            'rut': loss.empleado.rut,
+                        },
+                        'dispositivo_detail': {
+                            'id': loss.dispositivo.id,
+                            'tipo_equipo': loss.dispositivo.tipo_equipo,
+                            'marca': loss.dispositivo.marca,
+                            'modelo': loss.dispositivo.modelo,
+                            'numero_serie': loss.dispositivo.numero_serie,
+                        }
+                    },
+                    'estado_dispositivo': 'ROBO',
+                    'fecha_devolucion': loss.fecha_devolucion or loss.updated_at.date().isoformat(),
+                },
+                'timestamp': loss.updated_at.isoformat()
+            })
+
+        # Ordenar por timestamp y tomar las 5 más recientes
+        combined_returns.sort(key=lambda x: x['timestamp'], reverse=True)
+        recent_returns_data = [item['data'] for item in combined_returns[:5]]
 
         return Response({
             'summary': {
@@ -254,5 +310,5 @@ class StatsViewSet(viewsets.ViewSet):
             'devices_by_type': devices_by_type_dict,
             'devices_by_branch': list(devices_by_branch),
             'recent_assignments': recent_assignments_serializer.data,
-            'recent_returns': recent_returns_serializer.data,
+            'recent_returns': recent_returns_data,
         })

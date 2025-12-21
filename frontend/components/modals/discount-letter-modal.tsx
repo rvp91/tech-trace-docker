@@ -24,6 +24,7 @@ import { AlertTriangle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { assignmentService } from "@/lib/services/assignment-service"
 import type { Assignment, CompanyOption, CompanyKey } from "@/lib/types"
+import { formatCurrency, formatCurrencyInput, parseCurrency } from "@/lib/utils"
 
 interface DiscountLetterModalProps {
   open: boolean
@@ -152,10 +153,6 @@ export function DiscountLetterModal({
     return null
   }
 
-  const formatCurrency = (value: number) => {
-    return `$${value.toLocaleString('es-CL')}`
-  }
-
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
@@ -223,12 +220,15 @@ export function DiscountLetterModal({
               <Label htmlFor="monto">Monto Total</Label>
               <Input
                 id="monto"
-                type="number"
-                value={montoTotal}
-                onChange={(e) => setMontoTotal(e.target.value)}
+                type="text"
+                value={montoTotal ? formatCurrency(parseFloat(montoTotal)) : ""}
+                onChange={(e) => {
+                  const formatted = formatCurrencyInput(e.target.value)
+                  const numericValue = parseCurrency(formatted)
+                  setMontoTotal(numericValue ? String(numericValue) : "")
+                }}
                 placeholder="Ingrese monto total"
                 required
-                min="1"
               />
               <p className="text-sm text-muted-foreground">
                 Valor sugerido: {formatCurrency(assignment.dispositivo_detail.valor_depreciado || assignment.dispositivo_detail.valor_depreciado_calculado || 0)}

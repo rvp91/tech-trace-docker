@@ -48,7 +48,8 @@ const STATUS_LABELS: Record<string, string> = {
 const DEVICE_CONDITION_LABELS: Record<string, string> = {
   OPTIMO: "Óptimo",
   CON_DANOS: "Con Daños",
-  NO_FUNCIONAL: "No Funcional"
+  NO_FUNCIONAL: "No Funcional",
+  ROBO: "Robo/Pérdida"
 }
 
 export default function DashboardPage() {
@@ -313,10 +314,10 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Últimas Devoluciones */}
+        {/* Últimas Devoluciones y Robos/Pérdidas */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Últimas Devoluciones</CardTitle>
+            <CardTitle>Últimas Devoluciones y Robos/Pérdidas</CardTitle>
             <Link href="/dashboard/assignments" className="text-sm text-primary hover:underline">
               Ver todas
             </Link>
@@ -324,7 +325,7 @@ export default function DashboardPage() {
           <CardContent>
             {stats.recent_returns.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">
-                No hay devoluciones registradas
+                No hay devoluciones ni robos/pérdidas registrados
               </p>
             ) : (
               <div className="space-y-4">
@@ -342,6 +343,7 @@ export default function DashboardPage() {
                           variant={
                             returnItem.estado_dispositivo === "OPTIMO" ? "default" :
                             returnItem.estado_dispositivo === "CON_DANOS" ? "outline" :
+                            returnItem.estado_dispositivo === "ROBO" ? "destructive" :
                             "destructive"
                           }
                         >
@@ -352,11 +354,11 @@ export default function DashboardPage() {
                         {returnItem.asignacion_detail?.dispositivo_detail?.tipo_equipo} - {returnItem.asignacion_detail?.dispositivo_detail?.marca} {returnItem.asignacion_detail?.dispositivo_detail?.modelo}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Devuelto: {formatDateLocal(returnItem.fecha_devolucion)}
+                        {returnItem.estado_dispositivo === "ROBO" ? "Reportado: " : "Devuelto: "}{formatDateLocal(returnItem.fecha_devolucion)}
                       </p>
                     </div>
                     <Link
-                      href={`/dashboard/assignments/${returnItem.asignacion}`}
+                      href={`/dashboard/assignments/${returnItem.asignacion_detail?.id || returnItem.asignacion}`}
                       className="text-sm text-primary hover:underline"
                     >
                       Ver detalles
