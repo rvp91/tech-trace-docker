@@ -211,12 +211,12 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-[95vw] sm:max-w-xl lg:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditMode ? "Editar Dispositivo" : "Crear Nuevo Dispositivo"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Tipo de Equipo */}
             <div>
               <Label htmlFor="tipo_equipo">Tipo de Equipo *</Label>
@@ -412,7 +412,7 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
                 <h3 className="text-sm font-semibold">Información de Valor</h3>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Valor Inicial */}
                 <div>
                   <Label htmlFor="valor_inicial">Valor Inicial (CLP)</Label>

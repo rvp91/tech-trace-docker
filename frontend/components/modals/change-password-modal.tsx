@@ -121,7 +121,7 @@ export function ChangePasswordModal({ open, onOpenChange, userId, onSuccess }: C
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[450px]">
+      <DialogContent className="max-w-[95vw] sm:max-w-[450px]">
         <DialogHeader>
           <DialogTitle>Cambiar Contraseña</DialogTitle>
           <DialogDescription>

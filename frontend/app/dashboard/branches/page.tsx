@@ -125,8 +125,8 @@ export default function BranchesPage() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Gestión de Sucursales</h1>
-            <p className="text-muted-foreground mt-1">Administra las sucursales de tu empresa</p>
+            <h1 className="text-2xl lg:text-3xl font-bold">Gestión de Sucursales</h1>
+            <p className="text-muted-foreground mt-1 text-sm lg:text-base">Administra las sucursales de tu empresa</p>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -154,18 +154,25 @@ export default function BranchesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Gestión de Sucursales</h1>
-          <p className="text-muted-foreground mt-1">Administra las sucursales de tu empresa</p>
+          <h1 className="text-2xl lg:text-3xl font-bold">Gestión de Sucursales</h1>
+          <p className="text-muted-foreground mt-1 text-sm lg:text-base">Administra las sucursales de tu empresa</p>
         </div>
-        <Button onClick={() => setModalOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nueva Sucursal
-        </Button>
+        <div className="flex gap-2">
+          {/* Botón desktop con texto completo */}
+          <Button onClick={() => setModalOpen(true)} className="hidden lg:inline-flex">
+            <Plus className="h-4 w-4 mr-2" />
+            Nueva Sucursal
+          </Button>
+          {/* Botón móvil con solo icono */}
+          <Button onClick={() => setModalOpen(true)} size="icon" className="lg:hidden" title="Nueva Sucursal">
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Filtros */}
-      <div className="flex gap-4 items-end">
-        <div className="flex-1">
+      <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end">
+        <div className="w-full lg:flex-1">
           <label className="text-sm font-medium mb-2 block">Buscar</label>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />

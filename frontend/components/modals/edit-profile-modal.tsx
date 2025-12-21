@@ -120,7 +120,7 @@ export function EditProfileModal({ open, onOpenChange, user, onSuccess }: EditPr
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[450px]">
+      <DialogContent className="max-w-[95vw] sm:max-w-[450px]">
         <DialogHeader>
           <DialogTitle>Editar Perfil</DialogTitle>
           <DialogDescription>

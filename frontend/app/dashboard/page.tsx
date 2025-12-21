@@ -90,7 +90,7 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+          <h1 className="text-2xl lg:text-3xl font-bold text-foreground">Dashboard</h1>
         </div>
       </div>
 
@@ -99,7 +99,7 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Dispositivos</CardTitle>
-            <Package className="h-4 w-4 text-primary" />
+            <Package className="h-4 w-4 lg:h-5 lg:w-5 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.summary.total_devices}</div>
@@ -112,7 +112,7 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Disponibles</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-600" />
+            <CheckCircle className="h-4 w-4 lg:h-5 lg:w-5 text-green-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{stats.summary.available_devices}</div>
@@ -125,7 +125,7 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Asignaciones Activas</CardTitle>
-            <Activity className="h-4 w-4 text-blue-600" />
+            <Activity className="h-4 w-4 lg:h-5 lg:w-5 text-blue-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">{stats.summary.active_assignments}</div>
@@ -138,7 +138,7 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Empleados Activos</CardTitle>
-            <Users className="h-4 w-4 text-purple-600" />
+            <Users className="h-4 w-4 lg:h-5 lg:w-5 text-purple-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-purple-600">{stats.summary.active_employees}</div>
@@ -157,8 +157,9 @@ export default function DashboardPage() {
             <CardTitle>Distribución de Dispositivos por Tipo</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
+            <div className="h-[250px] lg:h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
                 <Pie
                   data={deviceTypeData}
                   cx="50%"
@@ -204,6 +205,7 @@ export default function DashboardPage() {
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
 
@@ -213,8 +215,9 @@ export default function DashboardPage() {
             <CardTitle>Dispositivos por Estado</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
+            <div className="h-[250px] lg:h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
                 <Pie
                   data={deviceStatusData}
                   cx="50%"
@@ -259,6 +262,7 @@ export default function DashboardPage() {
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
       </div>

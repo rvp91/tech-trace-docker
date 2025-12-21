@@ -128,20 +128,29 @@ export default function EmployeesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Gestión de Empleados</h1>
-          <p className="text-muted-foreground mt-1">Administra los empleados de tu empresa</p>
+          <h1 className="text-2xl lg:text-3xl font-bold">Gestión de Empleados</h1>
+          <p className="text-muted-foreground mt-1 text-sm lg:text-base">Administra los empleados de tu empresa</p>
         </div>
-        <CreateEmployeeModal onSuccess={handleEmployeeCreated}>
-          <Button>
-            <UserPlus className="h-4 w-4 mr-2" />
-            Nuevo Empleado
-          </Button>
-        </CreateEmployeeModal>
+        <div className="flex gap-2">
+          {/* Botón desktop con texto completo */}
+          <CreateEmployeeModal onSuccess={handleEmployeeCreated}>
+            <Button className="hidden lg:inline-flex">
+              <UserPlus className="h-4 w-4 mr-2" />
+              Nuevo Empleado
+            </Button>
+          </CreateEmployeeModal>
+          {/* Botón móvil con solo icono */}
+          <CreateEmployeeModal onSuccess={handleEmployeeCreated}>
+            <Button size="icon" className="lg:hidden" title="Nuevo Empleado">
+              <UserPlus className="h-4 w-4" />
+            </Button>
+          </CreateEmployeeModal>
+        </div>
       </div>
 
       {/* Filtros */}
-      <div className="flex gap-4 items-end">
-        <div className="flex-1">
+      <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end">
+        <div className="w-full lg:flex-1">
           <label className="text-sm font-medium mb-2 block">Buscar</label>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -154,7 +163,7 @@ export default function EmployeesPage() {
           </div>
         </div>
 
-        <div className="w-[200px]">
+        <div className="w-full lg:w-[200px]">
           <label className="text-sm font-medium mb-2 block">Sucursal</label>
           <BranchSearchCombobox
             value={selectedBranch || "all"}
@@ -166,7 +175,7 @@ export default function EmployeesPage() {
           />
         </div>
 
-        <div className="w-[150px]">
+        <div className="w-full lg:w-[150px]">
           <label className="text-sm font-medium mb-2 block">Estado</label>
           <Select value={selectedStatus || "all"} onValueChange={(value) => setSelectedStatus(value === "all" ? "" : value)}>
             <SelectTrigger>
@@ -190,14 +199,21 @@ export default function EmployeesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>RUT</TableHead>
+                  {/* Columnas visibles solo en desktop */}
+                  <TableHead className="hidden lg:table-cell">RUT</TableHead>
+                  {/* Columnas siempre visibles */}
                   <TableHead>Nombre</TableHead>
-                  <TableHead>Cargo</TableHead>
+                  {/* Columnas visibles en tablet y desktop */}
+                  <TableHead className="hidden md:table-cell">Cargo</TableHead>
+                  {/* Columnas siempre visibles */}
                   <TableHead>Sucursal</TableHead>
-                  <TableHead>Unidad de Negocio</TableHead>
-                  <TableHead>Dispositivos Asignados</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead className="w-32">Acciones</TableHead>
+                  {/* Columnas visibles solo en desktop */}
+                  <TableHead className="hidden lg:table-cell">Unidad de Negocio</TableHead>
+                  <TableHead className="hidden lg:table-cell">Dispositivos Asignados</TableHead>
+                  {/* Columnas visibles en tablet y desktop */}
+                  <TableHead className="hidden md:table-cell">Estado</TableHead>
+                  {/* Columnas siempre visibles */}
+                  <TableHead className="w-20 lg:w-32">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -205,13 +221,13 @@ export default function EmployeesPage() {
                   // Skeleton loaders
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell className="hidden lg:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                      <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-28" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-                      <TableCell><Skeleton className="h-6 w-16" /></TableCell>
+                      <TableCell className="hidden lg:table-cell"><Skeleton className="h-4 w-28" /></TableCell>
+                      <TableCell className="hidden lg:table-cell"><Skeleton className="h-4 w-12" /></TableCell>
+                      <TableCell className="hidden md:table-cell"><Skeleton className="h-6 w-16" /></TableCell>
                       <TableCell><Skeleton className="h-8 w-20" /></TableCell>
                     </TableRow>
                   ))
@@ -224,19 +240,19 @@ export default function EmployeesPage() {
                 ) : (
                   employees.map((employee) => (
                     <TableRow key={employee.id}>
-                      <TableCell className="font-mono text-sm">{employee.rut}</TableCell>
+                      <TableCell className="font-mono text-sm hidden lg:table-cell">{employee.rut}</TableCell>
                       <TableCell className="font-medium">{employee.nombre_completo}</TableCell>
-                      <TableCell>{employee.cargo}</TableCell>
+                      <TableCell className="hidden md:table-cell">{employee.cargo}</TableCell>
                       <TableCell>
                         {employee.sucursal_detail ? employee.sucursal_detail.nombre : `ID: ${employee.sucursal}`}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden lg:table-cell">
                         {employee.unidad_negocio_detail?.nombre || "-"}
                       </TableCell>
-                      <TableCell className="text-center font-medium">
+                      <TableCell className="text-center font-medium hidden lg:table-cell">
                         {employee.dispositivos_asignados}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden md:table-cell">
                         <Badge variant={employee.estado === "ACTIVO" ? "default" : "secondary"}>
                           {employee.estado}
                         </Badge>

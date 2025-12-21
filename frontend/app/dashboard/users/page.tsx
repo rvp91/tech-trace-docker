@@ -199,13 +199,20 @@ export default function UsersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Gestión de Usuarios</h1>
-          <p className="text-muted-foreground mt-1">Administra los usuarios del sistema</p>
+          <h1 className="text-2xl lg:text-3xl font-bold">Gestión de Usuarios</h1>
+          <p className="text-muted-foreground mt-1 text-sm lg:text-base">Administra los usuarios del sistema</p>
         </div>
-        <Button onClick={handleCreateUser}>
-          <UserPlus className="h-4 w-4 mr-2" />
-          Nuevo Usuario
-        </Button>
+        <div className="flex gap-2">
+          {/* Botón desktop con texto completo */}
+          <Button onClick={handleCreateUser} className="hidden lg:inline-flex">
+            <UserPlus className="h-4 w-4 mr-2" />
+            Nuevo Usuario
+          </Button>
+          {/* Botón móvil con solo icono */}
+          <Button onClick={handleCreateUser} size="icon" className="lg:hidden" title="Nuevo Usuario">
+            <UserPlus className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -213,8 +220,8 @@ export default function UsersPage() {
           <CardTitle>Usuarios</CardTitle>
           
           {/* Filtros */}
-          <div className="flex gap-4 items-end">
-            <div className="flex-1">
+          <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end">
+            <div className="w-full lg:flex-1">
               <label className="text-sm font-medium mb-2 block">Buscar</label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -227,7 +234,7 @@ export default function UsersPage() {
               </div>
             </div>
 
-            <div className="w-[150px]">
+            <div className="w-full lg:w-[150px]">
               <label className="text-sm font-medium mb-2 block">Rol</label>
               <Select value={roleFilter} onValueChange={setRoleFilter}>
                 <SelectTrigger>
@@ -241,7 +248,7 @@ export default function UsersPage() {
               </Select>
             </div>
 
-            <div className="w-[150px]">
+            <div className="w-full lg:w-[150px]">
               <label className="text-sm font-medium mb-2 block">Estado</label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger>
@@ -270,11 +277,17 @@ export default function UsersPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    {/* Columnas siempre visibles */}
                     <TableHead>Username</TableHead>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Email</TableHead>
+                    {/* Columnas visibles solo en desktop */}
+                    <TableHead className="hidden lg:table-cell">Nombre</TableHead>
+                    {/* Columnas visibles en tablet y desktop */}
+                    <TableHead className="hidden md:table-cell">Email</TableHead>
+                    {/* Columnas siempre visibles */}
                     <TableHead>Rol</TableHead>
-                    <TableHead>Estado</TableHead>
+                    {/* Columnas visibles solo en desktop */}
+                    <TableHead className="hidden lg:table-cell">Estado</TableHead>
+                    {/* Columnas siempre visibles */}
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -282,18 +295,18 @@ export default function UsersPage() {
                   {users.filter((user) => user.username !== "admin").map((user) => (
                     <TableRow key={user.id}>
                       <TableCell className="font-medium">{user.username}</TableCell>
-                      <TableCell>
+                      <TableCell className="hidden lg:table-cell">
                         {user.first_name || user.last_name
                           ? `${user.first_name || ""} ${user.last_name || ""}`.trim()
                           : "-"}
                       </TableCell>
-                      <TableCell>{user.email}</TableCell>
+                      <TableCell className="hidden md:table-cell">{user.email}</TableCell>
                       <TableCell>
                         <Badge variant={user.role === "ADMIN" ? "default" : "secondary"}>
                           {user.role === "ADMIN" ? "Administrador" : "Operador"}
                         </Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden lg:table-cell">
                         <Badge variant={user.is_active ? "default" : "secondary"}>
                           {user.is_active ? "Activo" : "Inactivo"}
                         </Badge>

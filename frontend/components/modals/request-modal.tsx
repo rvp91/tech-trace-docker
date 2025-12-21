@@ -139,7 +139,7 @@ export function RequestModal({ open, onClose, onSuccess, request }: RequestModal
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="max-w-[95vw] sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>
             {request ? "Ver Solicitud" : "Nueva Solicitud de Dispositivo"}

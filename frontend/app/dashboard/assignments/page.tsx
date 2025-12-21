@@ -173,27 +173,33 @@ export default function AssignmentsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Asignaciones de Dispositivos</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-2xl lg:text-3xl font-bold">Asignaciones de Dispositivos</h1>
+          <p className="text-muted-foreground mt-1 text-sm lg:text-base">
             Gestiona las asignaciones activas y finalizadas
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" asChild>
+          {/* Botón Ver Solicitudes - desktop */}
+          <Button variant="outline" asChild className="hidden lg:inline-flex">
             <Link href="/dashboard/assignments/requests">
               Ver Solicitudes
             </Link>
           </Button>
-          <Button onClick={handleCreateAssignment}>
+          {/* Botón Nueva Asignación - desktop con texto */}
+          <Button onClick={handleCreateAssignment} className="hidden lg:inline-flex">
             <Plus className="mr-2 h-4 w-4" />
             Nueva Asignación
+          </Button>
+          {/* Botón Nueva Asignación - móvil solo icono */}
+          <Button onClick={handleCreateAssignment} size="icon" className="lg:hidden" title="Nueva Asignación">
+            <Plus className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
       {/* Filtros */}
-      <div className="flex gap-4 items-end">
-        <div className="flex-1">
+      <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end">
+        <div className="w-full lg:flex-1">
           <label className="text-sm font-medium mb-2 block">Buscar</label>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -206,7 +212,7 @@ export default function AssignmentsPage() {
           </div>
         </div>
 
-        <div className="w-[200px]">
+        <div className="w-full lg:w-[200px]">
           <label className="text-sm font-medium mb-2 block">Estado</label>
           <Select value={estadoFilter} onValueChange={setEstadoFilter}>
             <SelectTrigger>
@@ -231,13 +237,20 @@ export default function AssignmentsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Empleado</TableHead>
+                  {/* Columnas siempre visibles */}
+                  <TableHead className="hidden md:table-cell">ID</TableHead>
+                  {/* Columnas visibles en tablet y desktop */}
+                  <TableHead className="hidden md:table-cell">Empleado</TableHead>
+                  {/* Columnas siempre visibles */}
                   <TableHead>Dispositivo</TableHead>
-                  <TableHead>Tipo Entrega</TableHead>
-                  <TableHead>Fecha Entrega</TableHead>
+                  {/* Columnas visibles solo en desktop */}
+                  <TableHead className="hidden lg:table-cell">Tipo Entrega</TableHead>
+                  <TableHead className="hidden lg:table-cell">Fecha Entrega</TableHead>
+                  {/* Columnas siempre visibles */}
                   <TableHead>Estado</TableHead>
-                  <TableHead>Estado Carta</TableHead>
+                  {/* Columnas visibles solo en desktop */}
+                  <TableHead className="hidden lg:table-cell">Estado Carta</TableHead>
+                  {/* Columnas siempre visibles */}
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -246,13 +259,13 @@ export default function AssignmentsPage() {
                   // Skeleton loaders
                   Array.from({ length: 5 }).map((_, index) => (
                     <TableRow key={index}>
-                      <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                      <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-12" /></TableCell>
+                      <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-32" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell className="hidden lg:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell className="hidden lg:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
                       <TableCell><Skeleton className="h-6 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+                      <TableCell className="hidden lg:table-cell"><Skeleton className="h-6 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
                     </TableRow>
                   ))
@@ -265,8 +278,8 @@ export default function AssignmentsPage() {
                 ) : (
                   assignments.map((assignment) => (
                     <TableRow key={assignment.id}>
-                      <TableCell className="font-medium">#{assignment.id}</TableCell>
-                      <TableCell>
+                      <TableCell className="font-medium hidden md:table-cell">#{assignment.id}</TableCell>
+                      <TableCell className="hidden md:table-cell">
                         {assignment.empleado_detail?.nombre_completo || `ID: ${assignment.empleado}`}
                       </TableCell>
                       <TableCell>
@@ -274,8 +287,8 @@ export default function AssignmentsPage() {
                           ? `${assignment.dispositivo_detail.marca} ${assignment.dispositivo_detail.modelo || "N/A"}`
                           : `ID: ${assignment.dispositivo}`}
                       </TableCell>
-                      <TableCell>{getTipoEntregaLabel(assignment.tipo_entrega)}</TableCell>
-                      <TableCell>
+                      <TableCell className="hidden lg:table-cell">{getTipoEntregaLabel(assignment.tipo_entrega)}</TableCell>
+                      <TableCell className="hidden lg:table-cell">
                         {formatDateLocal(assignment.fecha_entrega)}
                       </TableCell>
                       <TableCell>
@@ -283,7 +296,7 @@ export default function AssignmentsPage() {
                           {getAssignmentStatusLabel(assignment.estado_asignacion)}
                         </Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden lg:table-cell">
                         <Badge className={getEstadoCartaColor(assignment.estado_carta)}>
                           {getEstadoCartaLabel(assignment.estado_carta)}
                         </Badge>

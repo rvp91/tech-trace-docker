@@ -10,6 +10,12 @@ export const metadata: Metadata = {
   title: "TechTrace - Gestión de Inventario",
   description: "Sistema de gestión de inventario de dispositivos móviles",
   generator: "v0.app",
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 5,
+    userScalable: true,
+  },
 }
 
 export default function RootLayout({

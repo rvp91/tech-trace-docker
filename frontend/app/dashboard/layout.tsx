@@ -15,7 +15,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header onSidebarToggle={() => setSidebarOpen(!sidebarOpen)} />
         <main className="flex-1 overflow-auto">
-          <div className="p-6">{children}</div>
+          <div className="p-4 lg:p-6">{children}</div>
         </main>
       </div>
     </div>

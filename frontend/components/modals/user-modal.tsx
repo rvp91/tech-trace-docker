@@ -163,7 +163,7 @@ export function UserModal({ open, onOpenChange, user, onSuccess }: UserModalProp
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="max-w-[95vw] sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>{isEditMode ? "Editar Usuario" : "Crear Nuevo Usuario"}</DialogTitle>
           <DialogDescription>
@@ -174,7 +174,7 @@ export function UserModal({ open, onOpenChange, user, onSuccess }: UserModalProp
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="username">
                 Username <span className="text-destructive">*</span>
@@ -210,7 +210,7 @@ export function UserModal({ open, onOpenChange, user, onSuccess }: UserModalProp
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="first_name">Nombre</Label>
               <Input

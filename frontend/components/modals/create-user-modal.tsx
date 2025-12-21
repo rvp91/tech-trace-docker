@@ -47,7 +47,7 @@ export function CreateUserModal({ onSubmit }: CreateUserModalProps) {
           Nuevo Usuario
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-[95vw] sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Crear Nuevo Usuario</DialogTitle>
         </DialogHeader>

@@ -127,7 +127,7 @@ export function ReturnModal({ open, onClose, onSuccess, assignment }: ReturnModa
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="max-w-[95vw] sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Registrar Devolución de Dispositivo</DialogTitle>
           <DialogDescription>

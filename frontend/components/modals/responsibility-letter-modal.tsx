@@ -148,7 +148,7 @@ export function ResponsibilityLetterModal({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-[95vw] sm:max-w-xl lg:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Generar Carta de Responsabilidad</DialogTitle>
           <DialogDescription>
@@ -213,7 +213,7 @@ export function ResponsibilityLetterModal({
               <div className="space-y-4 border-t pt-4">
                 <h4 className="font-medium">Especificaciones del Laptop</h4>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="procesador">Procesador</Label>
                     <Input
@@ -247,7 +247,7 @@ export function ResponsibilityLetterModal({
 
                 <div className="space-y-3">
                   <h5 className="font-medium text-sm">Accesorios incluidos</h5>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="dvd"
@@ -317,7 +317,7 @@ export function ResponsibilityLetterModal({
               <div className="space-y-4 border-t pt-4">
                 <h4 className="font-medium">Detalles del Teléfono</h4>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="plan">Plan</Label>
                     <Input

@@ -47,8 +47,8 @@ export function Header({ onSidebarToggle }: HeaderProps) {
   }
 
   return (
-    <header className="border-b border-border bg-card h-16">
-      <div className="flex items-center justify-between h-full px-6">
+    <header className="border-b border-border bg-card h-14 lg:h-16">
+      <div className="flex items-center justify-between h-full px-4 lg:px-6">
         {/* Left Section */}
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={onSidebarToggle} className="lg:hidden">

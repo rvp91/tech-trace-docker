@@ -145,18 +145,25 @@ export default function DevicesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Gestión de Dispositivos</h1>
-          <p className="text-muted-foreground mt-1">Administra el inventario de dispositivos</p>
+          <h1 className="text-2xl lg:text-3xl font-bold">Gestión de Dispositivos</h1>
+          <p className="text-muted-foreground mt-1 text-sm lg:text-base">Administra el inventario de dispositivos</p>
         </div>
-        <Button onClick={handleCreateClick}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nuevo Dispositivo
-        </Button>
+        <div className="flex gap-2">
+          {/* Botón desktop con texto completo */}
+          <Button onClick={handleCreateClick} className="hidden lg:inline-flex">
+            <Plus className="h-4 w-4 mr-2" />
+            Nuevo Dispositivo
+          </Button>
+          {/* Botón móvil con solo icono */}
+          <Button onClick={handleCreateClick} size="icon" className="lg:hidden" title="Nuevo Dispositivo">
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Filtros */}
-      <div className="flex gap-4 items-end">
-        <div className="flex-1">
+      <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end">
+        <div className="w-full lg:flex-1">
           <label className="text-sm font-medium mb-2 block">Buscar</label>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -169,7 +176,7 @@ export default function DevicesPage() {
           </div>
         </div>
 
-        <div className="w-[180px]">
+        <div className="w-full lg:w-[180px]">
           <label className="text-sm font-medium mb-2 block">Tipo</label>
           <Select value={selectedType || "all"} onValueChange={(value) => setSelectedType(value === "all" ? "" : value)}>
             <SelectTrigger>
@@ -188,7 +195,7 @@ export default function DevicesPage() {
           </Select>
         </div>
 
-        <div className="w-[180px]">
+        <div className="w-full lg:w-[180px]">
           <label className="text-sm font-medium mb-2 block">Estado</label>
           <Select value={selectedStatus || "all"} onValueChange={(value) => setSelectedStatus(value === "all" ? "" : value)}>
             <SelectTrigger>
@@ -205,7 +212,7 @@ export default function DevicesPage() {
           </Select>
         </div>
 
-        <div className="w-[200px]">
+        <div className="w-full lg:w-[200px]">
           <label className="text-sm font-medium mb-2 block">Sucursal</label>
           <BranchSearchCombobox
             value={selectedBranch || "all"}
@@ -227,14 +234,21 @@ export default function DevicesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Marca</TableHead>
-                  <TableHead>Modelo</TableHead>
+                  {/* Columnas visibles en tablet y desktop */}
+                  <TableHead className="hidden md:table-cell">Tipo</TableHead>
+                  <TableHead className="hidden md:table-cell">Marca</TableHead>
+                  {/* Columnas visibles solo en desktop */}
+                  <TableHead className="hidden lg:table-cell">Modelo</TableHead>
+                  {/* Columnas siempre visibles */}
                   <TableHead>Número de Serie</TableHead>
-                  <TableHead>Fecha de Ingreso</TableHead>
+                  {/* Columnas visibles solo en desktop */}
+                  <TableHead className="hidden lg:table-cell">Fecha de Ingreso</TableHead>
+                  {/* Columnas siempre visibles */}
                   <TableHead>Estado</TableHead>
-                  <TableHead>Sucursal</TableHead>
-                  <TableHead className="w-32">Acciones</TableHead>
+                  {/* Columnas visibles solo en desktop */}
+                  <TableHead className="hidden lg:table-cell">Sucursal</TableHead>
+                  {/* Columnas siempre visibles */}
+                  <TableHead className="w-20 lg:w-32">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -242,13 +256,13 @@ export default function DevicesPage() {
                   // Skeleton loaders
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-20" /></TableCell>
+                      <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell className="hidden lg:table-cell"><Skeleton className="h-4 w-32" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                      <TableCell className="hidden lg:table-cell"><Skeleton className="h-4 w-28" /></TableCell>
                       <TableCell><Skeleton className="h-6 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell className="hidden lg:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
                       <TableCell><Skeleton className="h-8 w-20" /></TableCell>
                     </TableRow>
                   ))
@@ -261,11 +275,11 @@ export default function DevicesPage() {
                 ) : (
                   devices.map((device) => (
                     <TableRow key={device.id}>
-                      <TableCell className="font-medium">{getDeviceTypeLabel(device.tipo_equipo)}</TableCell>
-                      <TableCell>{device.marca}</TableCell>
-                      <TableCell>{device.modelo || "-"}</TableCell>
+                      <TableCell className="font-medium hidden md:table-cell">{getDeviceTypeLabel(device.tipo_equipo)}</TableCell>
+                      <TableCell className="hidden md:table-cell">{device.marca}</TableCell>
+                      <TableCell className="hidden lg:table-cell">{device.modelo || "-"}</TableCell>
                       <TableCell>{device.numero_serie || "-"}</TableCell>
-                      <TableCell>
+                      <TableCell className="hidden lg:table-cell">
                         {formatDateLocal(device.fecha_ingreso)}
                       </TableCell>
                       <TableCell>
@@ -273,7 +287,7 @@ export default function DevicesPage() {
                           {getDeviceStatusLabel(device.estado)}
                         </Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden lg:table-cell">
                         {device.sucursal_detail ? device.sucursal_detail.nombre : `ID: ${device.sucursal}`}
                       </TableCell>
                       <TableCell>

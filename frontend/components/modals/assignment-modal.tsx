@@ -145,7 +145,7 @@ export function AssignmentModal({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-[95vw] sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {assignment ? "Editar Asignación" : "Nueva Asignación de Dispositivo"}
@@ -189,7 +189,7 @@ export function AssignmentModal({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="tipo_entrega">
                   Tipo de Entrega <span className="text-red-500">*</span>
