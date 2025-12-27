@@ -34,6 +34,21 @@ class RequestViewSet(viewsets.ModelViewSet):
         """
         serializer.save(created_by=self.request.user)
 
+    def perform_destroy(self, instance):
+        """
+        Validar que no se puedan eliminar solicitudes vinculadas a asignaciones.
+        """
+        from rest_framework.exceptions import ValidationError
+
+        # Verificar si tiene asignaciones vinculadas
+        if hasattr(instance, 'assignment_set') and instance.assignment_set.exists():
+            count = instance.assignment_set.count()
+            raise ValidationError({
+                'detail': f'No se puede eliminar la solicitud porque tiene {count} asignación(es) vinculada(s).'
+            })
+
+        super().perform_destroy(instance)
+
 
 class AssignmentViewSet(viewsets.ModelViewSet):
     """
@@ -99,6 +114,20 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         Asignar automáticamente el usuario actual como created_by al crear una asignación.
         """
         serializer.save(created_by=self.request.user)
+
+    def perform_destroy(self, instance):
+        """
+        Validar que no se puedan eliminar asignaciones activas.
+        """
+        from rest_framework.exceptions import ValidationError
+
+        if instance.estado_asignacion == 'ACTIVA':
+            raise ValidationError({
+                'detail': 'No se puede eliminar una asignación activa. '
+                         'Debe registrar la devolución primero.'
+            })
+
+        super().perform_destroy(instance)
 
     @action(detail=True, methods=['post'], url_path='generate-responsibility-letter')
     def generate_responsibility_letter(self, request, pk=None):
@@ -373,6 +402,70 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
+    @action(detail=False, methods=['get'], url_path='active-assignments-report')
+    def active_assignments_report(self, request):
+        """
+        Endpoint especializado para reportes de dispositivos asignados activos.
+
+        GET /api/assignments/assignments/active-assignments-report/
+
+        Query params:
+          - fecha_inicio: YYYY-MM-DD (OBLIGATORIO - filtro por fecha de entrega)
+          - fecha_fin: YYYY-MM-DD (OBLIGATORIO - filtro por fecha de entrega)
+          - sucursal: ID de la sucursal del empleado
+          - tipo_dispositivo: LAPTOP, TELEFONO, DESKTOP, TABLET, TV, SIM, ACCESORIO
+          - page: número de página (default 1)
+          - page_size: tamaño de página (default 20, max 1000 para exportación)
+
+        Returns:
+          - Lista paginada de asignaciones activas
+          - Incluye datos completos del empleado, sucursal y dispositivo
+          - Incluye estado de carta y auditoría de firma
+        """
+        # Validar fechas obligatorias
+        fecha_inicio = request.query_params.get('fecha_inicio')
+        fecha_fin = request.query_params.get('fecha_fin')
+
+        if not fecha_inicio or not fecha_fin:
+            return Response(
+                {'error': 'Los parámetros fecha_inicio y fecha_fin son obligatorios'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Filtrar asignaciones activas con optimización de queries
+        queryset = Assignment.objects.filter(
+            estado_asignacion='ACTIVA'
+        ).select_related(
+            'empleado',
+            'empleado__sucursal',
+            'dispositivo',
+            'firmado_por'
+        ).order_by('-fecha_entrega')
+
+        # Aplicar filtros de fecha (obligatorios)
+        queryset = queryset.filter(
+            fecha_entrega__gte=fecha_inicio,
+            fecha_entrega__lte=fecha_fin
+        )
+
+        # Aplicar filtros opcionales
+        sucursal_id = request.query_params.get('sucursal')
+        tipo_dispositivo = request.query_params.get('tipo_dispositivo')
+
+        if sucursal_id:
+            queryset = queryset.filter(empleado__sucursal_id=sucursal_id)
+        if tipo_dispositivo:
+            queryset = queryset.filter(dispositivo__tipo_equipo=tipo_dispositivo)
+
+        # Paginación
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
 
 class ReturnViewSet(viewsets.ModelViewSet):
     """
@@ -397,3 +490,14 @@ class ReturnViewSet(viewsets.ModelViewSet):
         Asignar automáticamente el usuario actual como created_by al crear una devolución.
         """
         serializer.save(created_by=self.request.user)
+
+    def perform_destroy(self, instance):
+        """
+        Las devoluciones NO deberían ser eliminables (son registros de auditoría).
+        """
+        from rest_framework.exceptions import ValidationError
+
+        raise ValidationError({
+            'detail': 'No se pueden eliminar devoluciones. Las devoluciones son registros '
+                     'inmutables de auditoría y trazabilidad.'
+        })

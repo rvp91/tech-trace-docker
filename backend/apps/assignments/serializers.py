@@ -13,9 +13,9 @@ class AssignmentListSerializer(serializers.ModelSerializer):
     empleado_nombre = serializers.CharField(source='empleado.nombre_completo', read_only=True)
     empleado_sucursal = serializers.CharField(source='empleado.sucursal.nombre', read_only=True)
 
-    dispositivo_tipo = serializers.CharField(source='dispositivo.get_tipo_equipo_display', read_only=True)
-    dispositivo_marca = serializers.CharField(source='dispositivo.marca', read_only=True)
-    dispositivo_modelo = serializers.CharField(source='dispositivo.modelo', read_only=True)
+    dispositivo_tipo = serializers.SerializerMethodField()
+    dispositivo_marca = serializers.SerializerMethodField()
+    dispositivo_modelo = serializers.SerializerMethodField()
     dispositivo_serial = serializers.SerializerMethodField()
 
     estado_asignacion_display = serializers.CharField(source='get_estado_asignacion_display', read_only=True)
@@ -25,8 +25,28 @@ class AssignmentListSerializer(serializers.ModelSerializer):
     empleado_detail = serializers.SerializerMethodField()
     dispositivo_detail = serializers.SerializerMethodField()
 
+    def get_dispositivo_tipo(self, obj):
+        """Retorna el tipo de equipo del dispositivo"""
+        if not obj.dispositivo:
+            return 'N/A'
+        return obj.dispositivo.get_tipo_equipo_display()
+
+    def get_dispositivo_marca(self, obj):
+        """Retorna la marca del dispositivo"""
+        if not obj.dispositivo:
+            return 'N/A'
+        return obj.dispositivo.marca
+
+    def get_dispositivo_modelo(self, obj):
+        """Retorna el modelo del dispositivo"""
+        if not obj.dispositivo:
+            return 'N/A'
+        return obj.dispositivo.modelo or 'N/A'
+
     def get_dispositivo_serial(self, obj):
         """Retorna el serial o IMEI del dispositivo"""
+        if not obj.dispositivo:
+            return 'Dispositivo eliminado'
         return obj.dispositivo.numero_serie or obj.dispositivo.imei or 'N/A'
 
     def get_empleado_detail(self, obj):
@@ -39,6 +59,8 @@ class AssignmentListSerializer(serializers.ModelSerializer):
 
     def get_dispositivo_detail(self, obj):
         """Retorna información básica del dispositivo"""
+        if not obj.dispositivo:
+            return None
         return {
             'id': obj.dispositivo.id,
             'tipo_equipo': obj.dispositivo.tipo_equipo,
@@ -131,6 +153,23 @@ class RequestSerializer(serializers.ModelSerializer):
             'motivo_display',
         ]
 
+    def validate(self, data):
+        """
+        Validaciones a nivel de objeto.
+        """
+        # VALIDACIÓN: Prevenir edición de solicitudes completadas
+        if self.instance and self.instance.estado == 'COMPLETADA':
+            allowed_fields = {'justificacion'}
+            changed_fields = set(data.keys()) - allowed_fields
+
+            if changed_fields:
+                raise serializers.ValidationError(
+                    'No se puede modificar una solicitud completada. '
+                    'Solo se permite actualizar la justificación.'
+                )
+
+        return data
+
 
 class AssignmentSerializer(serializers.ModelSerializer):
     """
@@ -195,6 +234,12 @@ class AssignmentSerializer(serializers.ModelSerializer):
         """
         Validar que el dispositivo esté disponible para asignación.
         """
+        # Si el valor es None (dispositivo eliminado), permitir solo en actualizaciones
+        if value is None:
+            if not self.instance:
+                raise serializers.ValidationError("Debe especificar un dispositivo para crear una asignación")
+            return value
+
         # Si estamos actualizando, permitir el mismo dispositivo
         if self.instance and self.instance.dispositivo == value:
             return value
@@ -226,6 +271,52 @@ class AssignmentSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({
                     'fecha_devolucion': 'La fecha de devolución debe ser posterior a la fecha de entrega'
                 })
+
+        # Validaciones para actualizaciones de asignaciones
+        if self.instance:  # Solo en actualización
+            errors = {}
+
+            # VALIDACIÓN 1: Prevenir cambio de empleado en asignación activa
+            if 'empleado' in data and data['empleado'] != self.instance.empleado:
+                if self.instance.estado_asignacion == 'ACTIVA':
+                    errors['empleado'] = (
+                        'No se puede cambiar el empleado de una asignación activa. '
+                        'Debe registrar la devolución primero.'
+                    )
+
+            # VALIDACIÓN 2: Prevenir cambio de dispositivo en asignación activa
+            if 'dispositivo' in data and data['dispositivo'] != self.instance.dispositivo:
+                if self.instance.estado_asignacion == 'ACTIVA':
+                    errors['dispositivo'] = (
+                        'No se puede cambiar el dispositivo de una asignación activa. '
+                        'Debe registrar la devolución primero.'
+                    )
+
+            # VALIDACIÓN 3: Prevenir cambio manual de estado_asignacion
+            old_status = self.instance.estado_asignacion
+            new_status = data.get('estado_asignacion')
+
+            if new_status and new_status != old_status:
+                if old_status == 'ACTIVA' and new_status == 'FINALIZADA':
+                    if not hasattr(self.instance, 'return'):
+                        errors['estado_asignacion'] = (
+                            'No se puede finalizar una asignación sin registrar la devolución. '
+                            'Use el endpoint de devoluciones.'
+                        )
+
+            # VALIDACIÓN 4: Prevenir edición de asignaciones finalizadas
+            if self.instance.estado_asignacion == 'FINALIZADA':
+                allowed_fields = {'observaciones'}
+                changed_fields = set(data.keys()) - allowed_fields
+
+                if changed_fields:
+                    errors['non_field_errors'] = (
+                        'No se puede modificar una asignación finalizada. '
+                        'Solo se permite actualizar observaciones.'
+                    )
+
+            if errors:
+                raise serializers.ValidationError(errors)
 
         return data
 
@@ -280,6 +371,13 @@ class ReturnSerializer(serializers.ModelSerializer):
         """
         Validaciones a nivel de objeto.
         """
+        # VALIDACIÓN: Las devoluciones son inmutables
+        if self.instance:  # Si existe, es una actualización
+            raise serializers.ValidationError(
+                'No se pueden modificar devoluciones ya registradas. '
+                'Las devoluciones son registros inmutables de auditoría.'
+            )
+
         # Validar que la fecha de devolución no sea anterior a la fecha de entrega
         if data.get('fecha_devolucion') and data.get('asignacion'):
             if data['fecha_devolucion'] < data['asignacion'].fecha_entrega:

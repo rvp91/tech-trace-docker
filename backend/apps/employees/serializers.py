@@ -57,3 +57,21 @@ class EmployeeSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("El RUT debe tener entre 8 y 9 caracteres (sin puntos ni guión)")
 
         return value
+
+    def validate(self, data):
+        """
+        Validaciones a nivel de objeto.
+        """
+        # VALIDACIÓN: Prevenir inactivación con asignaciones activas
+        if self.instance:  # Solo en actualización
+            old_status = self.instance.estado
+            new_status = data.get('estado')
+
+            if new_status == 'INACTIVO' and old_status == 'ACTIVO':
+                if self.instance.has_active_assignments():
+                    raise serializers.ValidationError({
+                        'estado': 'No se puede marcar como inactivo un empleado con asignaciones activas. '
+                                 'Debe registrar las devoluciones primero.'
+                    })
+
+        return data

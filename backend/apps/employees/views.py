@@ -41,6 +41,28 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         """
         serializer.save(created_by=self.request.user)
 
+    def perform_destroy(self, instance):
+        """
+        Validar que no se puedan eliminar empleados con asignaciones activas
+        y proporcionar mensajes de error descriptivos.
+        """
+        from rest_framework.exceptions import ValidationError
+        from django.db.models import ProtectedError
+
+        try:
+            instance.delete()
+        except ProtectedError:
+            if instance.has_active_assignments():
+                active_count = instance.assignment_set.filter(estado_asignacion='ACTIVA').count()
+                raise ValidationError({
+                    'detail': f'No se puede eliminar el empleado porque tiene {active_count} asignación(es) activa(s).',
+                    'active_assignments': active_count
+                })
+            else:
+                raise ValidationError({
+                    'detail': 'No se puede eliminar el empleado porque está siendo referenciado por otros registros.'
+                })
+
     @action(detail=True, methods=['get'], url_path='history')
     def history(self, request, pk=None):
         """

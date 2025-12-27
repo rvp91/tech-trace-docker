@@ -36,3 +36,30 @@ class BranchViewSet(viewsets.ModelViewSet):
             total_dispositivos=Count('device', distinct=True),
             total_empleados=Count('employee', distinct=True)
         ).prefetch_related('device_set')
+
+    def perform_destroy(self, instance):
+        """
+        Validar que no se puedan eliminar sucursales con dispositivos o empleados
+        y proporcionar mensajes de error descriptivos.
+        """
+        from rest_framework.exceptions import ValidationError
+        from django.db.models import ProtectedError
+
+        try:
+            instance.delete()
+        except ProtectedError:
+            # Contar referencias
+            device_count = instance.device_set.count()
+            employee_count = instance.employee_set.count()
+
+            msg_parts = []
+            if device_count > 0:
+                msg_parts.append(f'{device_count} dispositivo(s)')
+            if employee_count > 0:
+                msg_parts.append(f'{employee_count} empleado(s)')
+
+            raise ValidationError({
+                'detail': f'No se puede eliminar la sucursal porque tiene {" y ".join(msg_parts)} asociado(s).',
+                'devices': device_count,
+                'employees': employee_count
+            })
