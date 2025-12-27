@@ -11,7 +11,7 @@ import { Download, FileSpreadsheet } from "lucide-react"
 import { BranchSearchCombobox } from "@/components/ui/branch-search-combobox"
 import { EmployeeSearchCombobox } from "@/components/ui/employee-search-combobox"
 import { exportToCSV, exportToExcel, getDeviceSerial, formatCurrency } from "@/lib/utils"
-import { formatDateLocal } from "@/lib/utils/date-helpers"
+import { formatDateTimeToDate } from "@/lib/utils/date-helpers"
 import { reportService } from "@/lib/services/report-service"
 import { getDeviceTypeLabel } from "@/lib/services/device-service"
 import type { Assignment, DiscountReportFilters, TipoEquipo } from "@/lib/types"
@@ -89,7 +89,7 @@ export default function DiscountReportsPage() {
         marca: assignment.dispositivo_detail?.marca || "N/A",
         modelo: assignment.dispositivo_detail?.modelo || "N/A",
         serie_imei: assignment.dispositivo_detail ? getDeviceSerial(assignment.dispositivo_detail) : "N/A",
-        fecha_reporte: formatDateLocal(assignment.updated_at),
+        fecha_reporte: formatDateTimeToDate(assignment.updated_at),
         monto_total: assignment.discount_data?.monto_total || "N/A",
         numero_cuotas: assignment.discount_data?.numero_cuotas || "N/A",
         mes_primera_cuota: assignment.discount_data?.mes_primera_cuota || "N/A",
@@ -137,7 +137,7 @@ export default function DiscountReportsPage() {
         marca: assignment.dispositivo_detail?.marca || "N/A",
         modelo: assignment.dispositivo_detail?.modelo || "N/A",
         serie_imei: assignment.dispositivo_detail ? getDeviceSerial(assignment.dispositivo_detail) : "N/A",
-        fecha_reporte: formatDateLocal(assignment.updated_at),
+        fecha_reporte: formatDateTimeToDate(assignment.updated_at),
         monto_total: assignment.discount_data?.monto_total || "N/A",
         numero_cuotas: assignment.discount_data?.numero_cuotas || "N/A",
         mes_primera_cuota: assignment.discount_data?.mes_primera_cuota || "N/A",
@@ -323,7 +323,7 @@ export default function DiscountReportsPage() {
                       <TableCell className="font-mono text-sm">
                         {assignment.dispositivo_detail ? getDeviceSerial(assignment.dispositivo_detail) : "N/A"}
                       </TableCell>
-                      <TableCell>{formatDateLocal(assignment.updated_at)}</TableCell>
+                      <TableCell>{formatDateTimeToDate(assignment.updated_at)}</TableCell>
                       <TableCell className="text-right font-semibold">
                         {assignment.discount_data?.monto_total
                           ? formatCurrency(parseInt(assignment.discount_data.monto_total))

@@ -80,3 +80,23 @@ export function getDaysDifference(date1: string, date2: string): number {
   const diffMs = d2.getTime() - d1.getTime()
   return Math.floor(diffMs / (1000 * 60 * 60 * 24))
 }
+
+/**
+ * Formatea un datetime ISO a formato DD-MM-YYYY (solo fecha, sin hora)
+ * Input: "2025-12-11T15:30:00Z" | Output: "11-12-2025"
+ */
+export function formatDateTimeToDate(dateTimeString: string | null | undefined): string {
+  if (!dateTimeString) return ""
+
+  try {
+    const date = new Date(dateTimeString)
+    const day = date.getDate().toString().padStart(2, "0")
+    const month = (date.getMonth() + 1).toString().padStart(2, "0")
+    const year = date.getFullYear()
+
+    return `${day}-${month}-${year}`
+  } catch (error) {
+    console.warn(`Error formateando datetime: ${dateTimeString}`, error)
+    return dateTimeString
+  }
+}
