@@ -32,12 +32,7 @@ class BranchViewSet(viewsets.ModelViewSet):
         Queryset optimizado con estadísticas pre-calculadas usando annotate().
         Esto evita N+1 queries al serializar las sucursales.
         """
-        from apps.devices.models import Device
-
         return Branch.objects.annotate(
             total_dispositivos=Count('device', distinct=True),
             total_empleados=Count('employee', distinct=True)
-        ).prefetch_related(
-            # Evita queries innecesarias en dispositivos_por_tipo
-            Prefetch('device_set', queryset=Device.objects.none())
-        )
+        ).prefetch_related('device_set')

@@ -200,20 +200,18 @@ class DeviceSerializer(serializers.ModelSerializer):
                 errors['numero_telefono'] = 'El número de teléfono es obligatorio para SIM cards'
 
         # VALIDACIÓN: Prevenir cambio de estados finales
-        from apps.devices.models import FINAL_STATES
-
         if self.instance:  # Solo en actualización
             old_status = self.instance.estado
             new_status = data.get('estado')
 
-            if old_status in FINAL_STATES and new_status and new_status != old_status:
+            if old_status in Device.FINAL_STATES and new_status and new_status != old_status:
                 errors['estado'] = (
                     f'No se puede cambiar el estado de un dispositivo en {old_status}. '
                     f'Este es un estado final y no puede ser modificado.'
                 )
         else:  # Creación de nuevo dispositivo
             new_status = data.get('estado')
-            if new_status in FINAL_STATES:
+            if new_status in Device.FINAL_STATES:
                 errors['estado'] = (
                     f'No se puede crear un dispositivo directamente en estado {new_status}. '
                     f'Los estados BAJA y ROBO solo se pueden alcanzar mediante transición.'

@@ -199,9 +199,9 @@ class AssignmentSerializer(serializers.ModelSerializer):
             return value
 
         # Prevenir asignación a dispositivos en estados finales
-        from apps.devices.models import FINAL_STATES
+        from apps.devices.models import Device
 
-        if value.estado in FINAL_STATES:
+        if value.estado in Device.FINAL_STATES:
             raise serializers.ValidationError(
                 f"No se puede asignar un dispositivo en estado {value.get_estado_display()}. "
                 f"Este dispositivo está en un estado final."
