@@ -78,6 +78,12 @@ class Assignment(models.Model):
     )
     estado_asignacion = models.CharField(max_length=20, choices=ESTADO_ASIGNACION_CHOICES, default='ACTIVA', verbose_name='Estado de asignación')
     observaciones = models.TextField(blank=True, null=True, verbose_name='Observaciones')
+    discount_data = models.JSONField(
+        null=True,
+        blank=True,
+        verbose_name='Datos de descuento',
+        help_text='Almacena información del descuento (monto, cuotas, mes primera cuota)'
+    )
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, verbose_name='Creado por')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Fecha de creación')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Última actualización')

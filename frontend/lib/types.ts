@@ -159,10 +159,27 @@ export interface Assignment {
   estado_asignacion: EstadoAsignacion
   estado_asignacion_display?: string
   observaciones?: string
+  discount_data?: DiscountData
   created_at: string
   updated_at: string
   created_by?: number
   created_by_username?: string
+}
+
+// Tipos para descuentos
+export interface DiscountData {
+  monto_total: string
+  numero_cuotas: number
+  mes_primera_cuota: string
+  fecha_generacion: string
+}
+
+export interface DiscountReportFilters {
+  fecha_inicio?: string
+  fecha_fin?: string
+  empleado?: number
+  sucursal?: number
+  tipo_dispositivo?: TipoEquipo | ''
 }
 
 // Return (Devolución) types

@@ -208,3 +208,64 @@ export function formatCurrencyInput(value: string): string {
 export function getDeviceSerial(device: { numero_serie?: string | null; imei?: string | null }): string {
   return device.numero_serie || device.imei || "N/A"
 }
+
+/**
+ * Exporta datos a un archivo Excel (.xlsx)
+ * Requiere: pnpm add xlsx
+ * @param data - Array de objetos a exportar
+ * @param columns - Configuración de columnas {key: string, header: string}
+ * @param filename - Nombre del archivo (sin extensión)
+ * @param sheetName - Nombre de la hoja de Excel
+ */
+export function exportToExcel<T extends Record<string, any>>(
+  data: T[],
+  columns: { key: keyof T; header: string }[],
+  filename: string,
+  sheetName: string = "Datos"
+): void {
+  if (!data || data.length === 0) {
+    console.warn('No hay datos para exportar')
+    return
+  }
+
+  // Importación dinámica de xlsx para reducir bundle size
+  import('xlsx').then((XLSX) => {
+    // Crear datos para el worksheet
+    const wsData = [
+      // Fila de encabezados
+      columns.map(col => col.header),
+      // Filas de datos
+      ...data.map(item =>
+        columns.map(col => {
+          const value = item[col.key]
+          return value ?? ''
+        })
+      )
+    ]
+
+    // Crear worksheet desde array of arrays
+    const ws = XLSX.utils.aoa_to_sheet(wsData)
+
+    // Auto-ajustar ancho de columnas basado en contenido
+    const colWidths = columns.map((col) => {
+      const headerLength = col.header.length
+      const maxDataLength = Math.max(
+        ...data.map(item => String(item[col.key] ?? '').length)
+      )
+      return { wch: Math.max(headerLength, maxDataLength, 10) }
+    })
+    ws['!cols'] = colWidths
+
+    // Crear workbook y agregar worksheet
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, sheetName)
+
+    // Generar y descargar archivo
+    const date = getTodayLocal()
+    const fullFilename = `${filename}_${date}.xlsx`
+    XLSX.writeFile(wb, fullFilename)
+  }).catch(error => {
+    console.error('Error al exportar a Excel:', error)
+    alert('Error al exportar a Excel. Por favor intenta con CSV.')
+  })
+}

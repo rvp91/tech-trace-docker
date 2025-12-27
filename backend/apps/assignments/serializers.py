@@ -168,6 +168,7 @@ class AssignmentSerializer(serializers.ModelSerializer):
             'estado_asignacion',
             'estado_asignacion_display',
             'observaciones',
+            'discount_data',
             'created_by',
             'created_by_username',
             'created_at',

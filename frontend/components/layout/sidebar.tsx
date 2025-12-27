@@ -1,7 +1,7 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, Package, Tablet, Zap, Building2, Settings, LogOut } from "lucide-react"
+import { LayoutDashboard, Users, Package, Tablet, Zap, Building2, Settings, LogOut, FileBarChart } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import Image from "next/image"
@@ -22,6 +22,7 @@ const ICON_MAP = {
   Zap,
   Building2,
   Settings,
+  FileBarChart,
 }
 
 const NAVIGATION = [
@@ -31,6 +32,7 @@ const NAVIGATION = [
   { name: "Asignaciones", href: "/dashboard/assignments", icon: "Zap" },
   { name: "Inventario", href: "/dashboard/inventory", icon: "Package" },
   { name: "Sucursales", href: "/dashboard/branches", icon: "Building2" },
+  { name: "Reportes", href: "/dashboard/reports/discounts", icon: "FileBarChart" },
   { name: "Usuarios", href: "/dashboard/users", icon: "Settings" },
 ]
 

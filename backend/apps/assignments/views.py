@@ -243,8 +243,16 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             else:
                 assignment.observaciones = observacion_automatica
 
+            # Guardar datos de descuento en formato estructurado
+            assignment.discount_data = {
+                'monto_total': str(discount_data['monto_total']),
+                'numero_cuotas': discount_data['numero_cuotas'],
+                'mes_primera_cuota': discount_data['mes_primera_cuota'],
+                'fecha_generacion': timezone.now().isoformat()
+            }
+
             # Guardar cambios en la asignación
-            assignment.save(update_fields=['estado_asignacion', 'observaciones', 'updated_at'])
+            assignment.save(update_fields=['estado_asignacion', 'observaciones', 'discount_data', 'updated_at'])
 
             # Retornar PDF
             response = HttpResponse(pdf_buffer.read(), content_type='application/pdf')
@@ -300,6 +308,70 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             'message': 'Carta marcada como firmada exitosamente',
             'assignment': serializer.data
         }, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'], url_path='discount-reports')
+    def discount_reports(self, request):
+        """
+        Endpoint especializado para reportes de descuentos por robo/pérdida.
+
+        GET /api/assignments/assignments/discount-reports/
+
+        Query params:
+          - fecha_inicio: YYYY-MM-DD (filtro por fecha de finalización)
+          - fecha_fin: YYYY-MM-DD
+          - empleado: ID del empleado
+          - sucursal: ID de la sucursal del empleado
+          - tipo_dispositivo: LAPTOP, TELEFONO, DESKTOP, TABLET, TV, SIMCARD
+          - page: número de página (default 1)
+          - page_size: tamaño de página (default 20, max 1000 para exportación)
+
+        Returns:
+          - Lista paginada de asignaciones finalizadas con dispositivos en estado ROBO
+          - Incluye datos completos del empleado, sucursal y dispositivo
+          - Incluye discount_data si está disponible
+        """
+        # Filtrar asignaciones finalizadas con dispositivos robados
+        queryset = Assignment.objects.filter(
+            estado_asignacion='FINALIZADA',
+            dispositivo__estado='ROBO'
+        ).select_related(
+            'empleado',
+            'empleado__sucursal',
+            'empleado__unidad_negocio',
+            'dispositivo',
+            'dispositivo__sucursal'
+        ).order_by('-updated_at')
+
+        # Aplicar filtros opcionales
+        fecha_inicio = request.query_params.get('fecha_inicio')
+        fecha_fin = request.query_params.get('fecha_fin')
+        empleado_id = request.query_params.get('empleado')
+        sucursal_id = request.query_params.get('sucursal')
+        tipo_dispositivo = request.query_params.get('tipo_dispositivo')
+
+        if fecha_inicio:
+            queryset = queryset.filter(updated_at__gte=fecha_inicio)
+        if fecha_fin:
+            # Agregar un día para incluir todo el día de fecha_fin
+            from datetime import datetime, timedelta
+            fecha_fin_dt = datetime.fromisoformat(fecha_fin.replace('Z', '+00:00'))
+            fecha_fin_dt = fecha_fin_dt + timedelta(days=1)
+            queryset = queryset.filter(updated_at__lt=fecha_fin_dt)
+        if empleado_id:
+            queryset = queryset.filter(empleado_id=empleado_id)
+        if sucursal_id:
+            queryset = queryset.filter(empleado__sucursal_id=sucursal_id)
+        if tipo_dispositivo:
+            queryset = queryset.filter(dispositivo__tipo_equipo=tipo_dispositivo)
+
+        # Paginación
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 class ReturnViewSet(viewsets.ModelViewSet):

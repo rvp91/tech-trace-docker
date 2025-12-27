@@ -1,0 +1,38 @@
+import { apiClient } from "@/lib/api-client"
+import type { Assignment, DiscountReportFilters } from "@/lib/types"
+
+interface GetDiscountReportsParams extends DiscountReportFilters {
+  page?: number
+  page_size?: number
+}
+
+export const reportService = {
+  /**
+   * Obtener reportes de descuentos con filtros y paginación
+   */
+  async getDiscountReports(params?: GetDiscountReportsParams): Promise<{
+    results: Assignment[]
+    count: number
+  }> {
+    return await apiClient.get<{
+      count: number
+      results: Assignment[]
+    }>("/assignments/assignments/discount-reports/", params)
+  },
+
+  /**
+   * Obtener todos los reportes de descuentos (para exportación)
+   * Usa page_size alto para obtener todos los registros filtrados
+   */
+  async getAllDiscountReports(filters?: DiscountReportFilters): Promise<Assignment[]> {
+    const response = await apiClient.get<{
+      count: number
+      results: Assignment[]
+    }>("/assignments/assignments/discount-reports/", {
+      ...filters,
+      page_size: 1000, // Límite alto para exportación
+    })
+
+    return response.results
+  },
+}
