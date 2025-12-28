@@ -230,7 +230,7 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="LAPTOP">Laptop</SelectItem>
-                  <SelectItem value="DESKTOP">Computadora de Escritorio</SelectItem>
+                  <SelectItem value="DESKTOP">Desktop</SelectItem>
                   <SelectItem value="TELEFONO">Teléfono</SelectItem>
                   <SelectItem value="TABLET">Tablet</SelectItem>
                   <SelectItem value="TV">TV</SelectItem>
@@ -352,31 +352,22 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
                 value={formData.estado}
                 onValueChange={(value) => handleSelectChange("estado", value as EstadoDispositivo)}
                 required
-                disabled={isEstadoFinal}
+                disabled={true}  // Siempre deshabilitado: cambios via acciones específicas
               >
-                <SelectTrigger className={isEstadoFinal ? "bg-muted cursor-not-allowed" : ""}>
+                <SelectTrigger className="bg-muted cursor-not-allowed">
                   <SelectValue placeholder="Seleccionar estado" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="DISPONIBLE">Disponible</SelectItem>
                   <SelectItem value="ASIGNADO">Asignado</SelectItem>
                   <SelectItem value="MANTENIMIENTO">Mantenimiento</SelectItem>
-                  {/* Solo mostrar BAJA y ROBO en modo edición (no al crear) */}
                   {isEditMode && <SelectItem value="BAJA">Baja</SelectItem>}
                   {isEditMode && <SelectItem value="ROBO">Robo/Perdida</SelectItem>}
                 </SelectContent>
               </Select>
-              {isEstadoFinal && (
-                <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-                  <AlertTriangle className="h-3 w-3" />
-                  El estado {device.estado} es final y no puede ser modificado
-                </p>
-              )}
-              {!isEditMode && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Nota: Los estados BAJA y ROBO solo se pueden establecer mediante transición
-                </p>
-              )}
+              <p className="text-xs text-muted-foreground mt-1">
+                Los cambios de estado se realizan a través de las acciones en la página de detalle del dispositivo.
+              </p>
             </div>
 
             {/* Sucursal */}

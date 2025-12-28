@@ -110,7 +110,22 @@ export const deviceService = {
   },
 
   async changeDeviceStatus(id: number, newStatus: EstadoDispositivo): Promise<Device> {
+    // DEPRECATED: El campo estado ahora es read-only
+    // Usar los métodos específicos de acción en su lugar
     return apiClient.patch<Device>(`/devices/${id}/`, { estado: newStatus })
+  },
+
+  // Nuevos métodos para acciones específicas de cambio de estado
+  async sendToMaintenance(id: number, data: { motivo: string; observaciones?: string }): Promise<{ message: string; device: Device }> {
+    return apiClient.post<{ message: string; device: Device }>(`/devices/${id}/send-to-maintenance/`, data)
+  },
+
+  async markAvailable(id: number, data?: { observaciones?: string }): Promise<{ message: string; device: Device }> {
+    return apiClient.post<{ message: string; device: Device }>(`/devices/${id}/mark-available/`, data || {})
+  },
+
+  async markAsRetired(id: number, data: { motivo: string; observaciones?: string }): Promise<{ message: string; device: Device }> {
+    return apiClient.post<{ message: string; device: Device }>(`/devices/${id}/mark-as-retired/`, data)
   },
 
   async getAvailableDevices(): Promise<Device[]> {
@@ -170,7 +185,7 @@ export function getDeviceStatusLabel(estado: EstadoDispositivo): string {
 export function getDeviceTypeLabel(tipo: TipoEquipo): string {
   const labels: Record<TipoEquipo, string> = {
     LAPTOP: "Laptop",
-    DESKTOP: "Computadora de Escritorio",
+    DESKTOP: "Desktop",
     TELEFONO: "Teléfono",
     TABLET: "Tablet",
     TV: "TV",
