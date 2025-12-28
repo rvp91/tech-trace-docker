@@ -7,26 +7,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog"
 import { ArrowLeft, Edit2, Package, Building2, Calendar, Hash, Smartphone, RefreshCw } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { deviceService, getDeviceStatusColor, getDeviceStatusLabel, getDeviceTypeLabel } from "@/lib/services/device-service"
-import type { Device, DeviceHistory, EstadoDispositivo } from "@/lib/types"
+import type { Device, DeviceHistory } from "@/lib/types"
 import { DeviceModal } from "@/components/modals/device-modal"
 import { formatDateLocal } from "@/lib/utils/date-helpers"
 
@@ -42,9 +26,6 @@ export default function DeviceDetailPage() {
   const [loading, setLoading] = useState(true)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [editModalOpen, setEditModalOpen] = useState(false)
-  const [changeStatusDialogOpen, setChangeStatusDialogOpen] = useState(false)
-  const [newStatus, setNewStatus] = useState<EstadoDispositivo>("DISPONIBLE")
-  const [changingStatus, setChangingStatus] = useState(false)
 
   useEffect(() => {
     const loadDeviceData = async () => {
@@ -56,7 +37,6 @@ export default function DeviceDetailPage() {
         ])
         setDevice(deviceData)
         setHistory(historyData)
-        setNewStatus(deviceData.estado)
       } catch (error) {
         toast({
           title: "Error",
@@ -75,29 +55,6 @@ export default function DeviceDetailPage() {
   const handleDeviceUpdated = () => {
     setRefreshTrigger(prev => prev + 1)
     setEditModalOpen(false)
-  }
-
-  const handleStatusChange = async () => {
-    if (!device) return
-
-    try {
-      setChangingStatus(true)
-      await deviceService.changeDeviceStatus(device.id, newStatus)
-      toast({
-        title: "Estado actualizado",
-        description: `El estado del dispositivo ha sido cambiado a ${getDeviceStatusLabel(newStatus)}.`,
-      })
-      setRefreshTrigger(prev => prev + 1)
-      setChangeStatusDialogOpen(false)
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Error al cambiar el estado del dispositivo",
-        variant: "destructive",
-      })
-    } finally {
-      setChangingStatus(false)
-    }
   }
 
   if (loading) {
@@ -148,10 +105,6 @@ export default function DeviceDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setChangeStatusDialogOpen(true)}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Cambiar Estado
-          </Button>
           <Button variant="outline" onClick={() => setEditModalOpen(true)}>
             <Edit2 className="h-4 w-4 mr-2" />
             Editar
@@ -452,50 +405,6 @@ export default function DeviceDetailPage() {
         device={device}
         onSuccess={handleDeviceUpdated}
       />
-
-      {/* Dialog de cambio de estado */}
-      <Dialog open={changeStatusDialogOpen} onOpenChange={setChangeStatusDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Cambiar Estado del Dispositivo</DialogTitle>
-            <DialogDescription>
-              Selecciona el nuevo estado para el dispositivo. Los cambios se registrarán en el historial de auditoría.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <Label htmlFor="status">Nuevo Estado</Label>
-            <Select
-              value={newStatus}
-              onValueChange={(value) => setNewStatus(value as EstadoDispositivo)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="DISPONIBLE">Disponible</SelectItem>
-                <SelectItem value="MANTENIMIENTO">Mantenimiento</SelectItem>
-                <SelectItem value="BAJA">Baja</SelectItem>
-                <SelectItem value="ROBO">Robo/Perdida</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-sm text-muted-foreground mt-2">
-              Nota: El estado "Asignado" solo se puede establecer mediante una asignación formal a un empleado.
-            </p>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setChangeStatusDialogOpen(false)}
-              disabled={changingStatus}
-            >
-              Cancelar
-            </Button>
-            <Button onClick={handleStatusChange} disabled={changingStatus}>
-              {changingStatus ? "Cambiando..." : "Cambiar Estado"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
