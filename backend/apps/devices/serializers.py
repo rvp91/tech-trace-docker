@@ -93,6 +93,7 @@ class DeviceSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
             'created_by',
+            'estado',  # Solo lectura: cambios de estado via endpoints específicos
             'sucursal_detail',
             'created_by_username',
             'tipo_equipo_display',
@@ -217,23 +218,9 @@ class DeviceSerializer(serializers.ModelSerializer):
                     f'Los estados BAJA y ROBO solo se pueden alcanzar mediante transición.'
                 )
 
-        # VALIDACIÓN: Prevenir cambio de estado si tiene asignación activa
-        if self.instance:  # Solo en actualización
-            old_status = self.instance.estado
-            new_status = data.get('estado')
-
-            # Si hay cambio de estado Y el dispositivo tiene asignación activa
-            if new_status and new_status != old_status:
-                if self.instance.has_active_assignment():
-                    # Estados permitidos con asignación activa: ROBO y MANTENIMIENTO
-                    ALLOWED_WITH_ACTIVE_ASSIGNMENT = ['ROBO', 'MANTENIMIENTO']
-
-                    if new_status not in ALLOWED_WITH_ACTIVE_ASSIGNMENT:
-                        errors['estado'] = (
-                            f'No se puede cambiar el estado a {new_status} mientras el dispositivo '
-                            f'tenga una asignación activa. Primero debe registrarse la devolución '
-                            f'del dispositivo.'
-                        )
+        # NOTA: Las validaciones de cambio de estado se eliminaron porque el campo 'estado'
+        # ahora es read-only. Los cambios de estado se realizan exclusivamente a través de
+        # endpoints específicos en DeviceViewSet que incluyen sus propias validaciones.
 
         if errors:
             raise serializers.ValidationError(errors)

@@ -36,6 +36,221 @@ class DeviceViewSet(viewsets.ModelViewSet):
         """
         serializer.save(created_by=self.request.user)
 
+    def perform_destroy(self, instance):
+        """
+        Personaliza el proceso de eliminación para proporcionar mensajes de error más descriptivos.
+        """
+        from rest_framework.exceptions import ValidationError
+        from django.db.models import ProtectedError
+
+        try:
+            instance.delete()
+        except ProtectedError as e:
+            # Verificar si el error es por asignaciones activas
+            if instance.has_active_assignment():
+                active_assignments = instance.assignment_set.filter(estado_asignacion='ACTIVA')
+                employees = [a.empleado.nombre_completo for a in active_assignments]
+
+                raise ValidationError({
+                    'detail': f'No se puede eliminar el dispositivo porque tiene {active_assignments.count()} asignación(es) activa(s).',
+                    'active_assignments': active_assignments.count(),
+                    'employees': employees
+                })
+            else:
+                # Otro tipo de error de protección
+                raise ValidationError({
+                    'detail': 'No se puede eliminar el dispositivo porque está siendo referenciado por otros registros.'
+                })
+
+    @action(detail=True, methods=['post'], url_path='send-to-maintenance')
+    def send_to_maintenance(self, request, pk=None):
+        """
+        Envía un dispositivo a mantenimiento.
+
+        POST /api/devices/{id}/send-to-maintenance/
+        Body: { motivo: string, observaciones?: string }
+
+        Transiciones permitidas:
+        - DISPONIBLE → MANTENIMIENTO
+        - ASIGNADO → MANTENIMIENTO (mantenimiento urgente, asignación sigue activa)
+
+        Registra el cambio en auditoría via change_status().
+        """
+        from rest_framework import status
+        from rest_framework.response import Response
+        from rest_framework.exceptions import ValidationError
+
+        device = self.get_object()
+        motivo = request.data.get('motivo', '').strip()
+        observaciones = request.data.get('observaciones', '').strip()
+
+        # Validaciones
+        if not motivo:
+            return Response(
+                {'error': 'El motivo es obligatorio'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validar que no esté en estado final
+        if device.estado in Device.FINAL_STATES:
+            return Response(
+                {'error': f'No se puede enviar a mantenimiento un dispositivo en estado {device.get_estado_display()}.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validar que no esté ya en mantenimiento
+        if device.estado == 'MANTENIMIENTO':
+            return Response(
+                {'error': 'El dispositivo ya está en mantenimiento.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Cambiar estado con auditoría
+        try:
+            device.change_status('MANTENIMIENTO', user=request.user)
+
+            # Añadir observación si se proporcionó
+            # TODO: Si el modelo Device tuviera un campo para observaciones,
+            # se agregaría aquí. Por ahora solo queda en auditoría.
+
+            serializer = self.get_serializer(device)
+            return Response({
+                'message': f'Dispositivo enviado a mantenimiento. Motivo: {motivo}',
+                'device': serializer.data
+            }, status=status.HTTP_200_OK)
+
+        except ValidationError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(detail=True, methods=['post'], url_path='mark-available')
+    def mark_available(self, request, pk=None):
+        """
+        Marca un dispositivo como disponible (salida de mantenimiento).
+
+        POST /api/devices/{id}/mark-available/
+        Body: { observaciones?: string }
+
+        Transiciones permitidas:
+        - MANTENIMIENTO → DISPONIBLE
+
+        Validaciones:
+        - No permitir si tiene asignación activa
+        - Solo desde MANTENIMIENTO
+
+        Registra el cambio en auditoría via change_status().
+        """
+        from rest_framework import status
+        from rest_framework.response import Response
+        from rest_framework.exceptions import ValidationError
+
+        device = self.get_object()
+        observaciones = request.data.get('observaciones', '').strip()
+
+        # Validar que esté en mantenimiento
+        if device.estado != 'MANTENIMIENTO':
+            return Response(
+                {'error': f'Solo se pueden marcar como disponibles dispositivos en mantenimiento. Estado actual: {device.get_estado_display()}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validar que no tenga asignación activa
+        if device.has_active_assignment():
+            return Response(
+                {'error': 'No se puede marcar como disponible un dispositivo con asignación activa. Debe registrar la devolución primero.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Cambiar estado con auditoría
+        try:
+            device.change_status('DISPONIBLE', user=request.user)
+
+            serializer = self.get_serializer(device)
+            return Response({
+                'message': 'Dispositivo marcado como disponible.',
+                'device': serializer.data
+            }, status=status.HTTP_200_OK)
+
+        except ValidationError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(detail=True, methods=['post'], url_path='mark-as-retired')
+    def mark_as_retired(self, request, pk=None):
+        """
+        Marca un dispositivo como dado de baja (fin de vida útil).
+
+        POST /api/devices/{id}/mark-as-retired/
+        Body: { motivo: string, observaciones?: string }
+
+        Transiciones permitidas:
+        - DISPONIBLE → BAJA
+        - MANTENIMIENTO → BAJA
+
+        Validaciones:
+        - No permitir si está ASIGNADO (debe devolver primero)
+        - No permitir si ya está en BAJA o ROBO
+
+        IMPORTANTE: BAJA es un estado final, NO es reversible.
+
+        Registra el cambio en auditoría via change_status().
+        """
+        from rest_framework import status
+        from rest_framework.response import Response
+        from rest_framework.exceptions import ValidationError
+
+        device = self.get_object()
+        motivo = request.data.get('motivo', '').strip()
+        observaciones = request.data.get('observaciones', '').strip()
+
+        # Validaciones
+        if not motivo:
+            return Response(
+                {'error': 'El motivo es obligatorio para dar de baja un dispositivo'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validar que no esté en estado ASIGNADO
+        if device.estado == 'ASIGNADO':
+            return Response(
+                {'error': 'No se puede dar de baja un dispositivo asignado. Debe registrar la devolución primero.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validar que no esté ya en estado final
+        if device.estado in Device.FINAL_STATES:
+            return Response(
+                {'error': f'El dispositivo ya está en un estado final: {device.get_estado_display()}.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validar que esté en DISPONIBLE o MANTENIMIENTO
+        if device.estado not in ['DISPONIBLE', 'MANTENIMIENTO']:
+            return Response(
+                {'error': f'Solo se pueden dar de baja dispositivos en estado DISPONIBLE o MANTENIMIENTO. Estado actual: {device.get_estado_display()}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Cambiar estado con auditoría
+        try:
+            device.change_status('BAJA', user=request.user)
+
+            serializer = self.get_serializer(device)
+            return Response({
+                'message': f'Dispositivo dado de baja. Motivo: {motivo}. NOTA: Este es un estado final y no puede ser revertido.',
+                'device': serializer.data
+            }, status=status.HTTP_200_OK)
+
+        except ValidationError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
     @action(detail=False, methods=['get'], url_path='inventory-stats')
     def inventory_stats(self, request):
         """
