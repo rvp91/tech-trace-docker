@@ -64,6 +64,10 @@ vendor/
 # Bases de datos / archivos temporales
 *.sqlite3
 *.db
+db.sqlite3
+db.sqlite3-journal
+*.backup*
+db.sqlite3.backup*
 *.pid
 *.seed
 

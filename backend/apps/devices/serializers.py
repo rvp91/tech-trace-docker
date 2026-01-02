@@ -29,6 +29,8 @@ class DeviceListSerializer(serializers.ModelSerializer):
             'sucursal',
             'sucursal_detail',
             'fecha_ingreso',
+            'activo',
+            'fecha_inactivacion',
             'created_at',
             'created_by_username',
         ]
@@ -39,6 +41,8 @@ class DeviceListSerializer(serializers.ModelSerializer):
             'created_by_username',
             'tipo_equipo_display',
             'estado_display',
+            'activo',
+            'fecha_inactivacion',
         ]
 
 
@@ -57,6 +61,7 @@ class DeviceSerializer(serializers.ModelSerializer):
     valor_depreciado_calculado = serializers.SerializerMethodField()
     puede_tener_edad = serializers.SerializerMethodField()
     puede_tener_valor = serializers.SerializerMethodField()
+    asignacion_activa = serializers.SerializerMethodField()
 
     class Meta:
         model = Device
@@ -83,6 +88,9 @@ class DeviceSerializer(serializers.ModelSerializer):
             'es_valor_manual',
             'puede_tener_edad',
             'puede_tener_valor',
+            'asignacion_activa',
+            'activo',
+            'fecha_inactivacion',
             'created_at',
             'updated_at',
             'created_by',
@@ -102,6 +110,9 @@ class DeviceSerializer(serializers.ModelSerializer):
             'valor_depreciado_calculado',
             'puede_tener_edad',
             'puede_tener_valor',
+            'asignacion_activa',
+            'activo',
+            'fecha_inactivacion',
         ]
 
     def validate_modelo(self, value):
@@ -246,6 +257,10 @@ class DeviceSerializer(serializers.ModelSerializer):
     def get_puede_tener_valor(self, obj):
         """Indica si el tipo de dispositivo puede tener valor"""
         return obj.debe_calcular_valor()
+
+    def get_asignacion_activa(self, obj):
+        """Retorna True si el dispositivo tiene asignación activa"""
+        return obj.has_active_assignment()
 
     def create(self, validated_data):
         """Crear dispositivo y calcular edad si aplica"""

@@ -18,10 +18,10 @@ import {
 interface TablePaginationProps {
   currentPage: number
   totalPages: number
-  pageSize: number
+  pageSize?: number
   totalCount: number
   onPageChange: (page: number) => void
-  onPageSizeChange: (pageSize: number) => void
+  onPageSizeChange?: (pageSize: number) => void
   pageSizeOptions?: number[]
 }
 
@@ -35,8 +35,8 @@ export function TablePagination({
   pageSizeOptions = [10, 20, 50, 100],
 }: TablePaginationProps) {
   // Calcular rango de elementos mostrados
-  const from = (currentPage - 1) * pageSize + 1
-  const to = Math.min(currentPage * pageSize, totalCount)
+  const from = pageSize ? (currentPage - 1) * pageSize + 1 : 0
+  const to = pageSize ? Math.min(currentPage * pageSize, totalCount) : totalCount
 
   // Generar números de página a mostrar
   const generatePageNumbers = () => {
@@ -75,16 +75,22 @@ export function TablePagination({
     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4">
       {/* Info de resultados y selector de tamaño de página */}
       <div className="flex items-center gap-4 text-sm text-muted-foreground">
-        <span>
-          Mostrando {from} a {to} de {totalCount} resultados
-        </span>
-        {/* Solo mostrar selector si hay más de una opción */}
-        {pageSizeOptions.length > 1 && (
+        {pageSize ? (
+          <span>
+            Mostrando {from} a {to} de {totalCount} resultados
+          </span>
+        ) : (
+          <span>
+            {totalCount} {totalCount === 1 ? "resultado" : "resultados"}
+          </span>
+        )}
+        {/* Solo mostrar selector si hay pageSize, onPageSizeChange y más de una opción */}
+        {pageSize !== undefined && onPageSizeChange && pageSizeOptions.length > 1 && (
           <div className="flex items-center gap-2">
             <span className="text-sm">Filas por página:</span>
             <Select
               value={pageSize.toString()}
-              onValueChange={(value) => onPageSizeChange(Number(value))}
+              onValueChange={(value) => onPageSizeChange!(Number(value))}
             >
               <SelectTrigger className="h-8 w-[70px]">
                 <SelectValue />

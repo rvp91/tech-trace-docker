@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { Check, ChevronsUpDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -41,13 +41,16 @@ export function EmployeeSearchCombobox({
   const [loading, setLoading] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
 
+  // Memorizar filter para evitar re-renders innecesarios
+  const memoizedFilter = useMemo(() => filter, [filter?.estado])
+
   // Cargar empleados con búsqueda
   const loadEmployees = useCallback(async (searchTerm: string = "") => {
     try {
       setLoading(true)
       const params: any = {
         page_size: 20,
-        ...filter,
+        ...memoizedFilter,
       }
 
       if (searchTerm) {
@@ -62,7 +65,7 @@ export function EmployeeSearchCombobox({
     } finally {
       setLoading(false)
     }
-  }, [filter])
+  }, [memoizedFilter])
 
   // Cargar empleado seleccionado por ID
   const loadSelectedEmployee = useCallback(async (employeeId: number) => {
@@ -75,14 +78,16 @@ export function EmployeeSearchCombobox({
     }
   }, [])
 
-  // Debounce para búsqueda
+  // Debounce para búsqueda - solo cargar cuando el popover está abierto
   useEffect(() => {
+    if (!open) return
+
     const timer = setTimeout(() => {
       loadEmployees(search)
     }, 300)
 
     return () => clearTimeout(timer)
-  }, [search, loadEmployees])
+  }, [search, loadEmployees, open])
 
   // Cargar empleado seleccionado cuando cambia el value
   useEffect(() => {

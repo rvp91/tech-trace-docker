@@ -33,6 +33,7 @@ interface AssignmentModalProps {
   onSuccess: () => void
   assignment?: Assignment | null
   preSelectedEmployee?: number
+  preSelectedDevice?: number
   preSelectedRequest?: Request | null
 }
 
@@ -42,6 +43,7 @@ export function AssignmentModal({
   onSuccess,
   assignment,
   preSelectedEmployee,
+  preSelectedDevice,
   preSelectedRequest,
 }: AssignmentModalProps) {
   const [loading, setLoading] = useState(false)
@@ -67,14 +69,17 @@ export function AssignmentModal({
           observaciones: assignment.observaciones || "",
         })
       } else {
-        // Si hay un empleado preseleccionado (desde solicitud)
+        // Si hay un empleado o dispositivo preseleccionado
         const empleadoId = preSelectedEmployee
           ? String(preSelectedEmployee)
+          : ""
+        const dispositivoId = preSelectedDevice
+          ? String(preSelectedDevice)
           : ""
 
         setFormData({
           empleado: empleadoId,
-          dispositivo: "",
+          dispositivo: dispositivoId,
           tipo_entrega: "PERMANENTE",
           fecha_entrega: getTodayLocal(),
           estado_carta: "PENDIENTE",
@@ -82,7 +87,7 @@ export function AssignmentModal({
         })
       }
     }
-  }, [open, assignment, preSelectedEmployee])
+  }, [open, assignment, preSelectedEmployee, preSelectedDevice])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -183,7 +188,7 @@ export function AssignmentModal({
                 onChange={(value) =>
                   setFormData((prev) => ({ ...prev, dispositivo: value }))
                 }
-                disabled={!!assignment}
+                disabled={!!assignment || !!preSelectedDevice}
                 placeholder="Buscar dispositivo..."
                 filter={{ estado: "DISPONIBLE" }}
               />

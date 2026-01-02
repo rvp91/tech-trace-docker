@@ -32,7 +32,7 @@ const NAVIGATION = [
   { name: "Asignaciones", href: "/dashboard/assignments", icon: "Zap" },
   { name: "Inventario", href: "/dashboard/inventory", icon: "Package" },
   { name: "Sucursales", href: "/dashboard/branches", icon: "Building2" },
-  { name: "Reportes", href: "/dashboard/reports/discounts", icon: "FileBarChart" },
+  { name: "Reportes", href: "/dashboard/reports", icon: "FileBarChart" },
   { name: "Usuarios", href: "/dashboard/users", icon: "Settings" },
 ]
 

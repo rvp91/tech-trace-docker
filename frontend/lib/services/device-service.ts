@@ -105,10 +105,6 @@ export const deviceService = {
     return apiClient.patch<Device>(`/devices/${id}/`, data)
   },
 
-  async deleteDevice(id: number): Promise<void> {
-    return apiClient.delete<void>(`/devices/${id}/`)
-  },
-
   async changeDeviceStatus(id: number, newStatus: EstadoDispositivo): Promise<Device> {
     // DEPRECATED: El campo estado ahora es read-only
     // Usar los métodos específicos de acción en su lugar
@@ -122,6 +118,10 @@ export const deviceService = {
 
   async markAvailable(id: number, data?: { observaciones?: string }): Promise<{ message: string; device: Device }> {
     return apiClient.post<{ message: string; device: Device }>(`/devices/${id}/mark-available/`, data || {})
+  },
+
+  async returnFromMaintenance(id: number, data?: { observaciones?: string }): Promise<{ message: string; device: Device }> {
+    return apiClient.post<{ message: string; device: Device }>(`/devices/${id}/return-from-maintenance/`, data || {})
   },
 
   async markAsRetired(id: number, data: { motivo: string; observaciones?: string }): Promise<{ message: string; device: Device }> {

@@ -55,6 +55,7 @@ export default function AssignmentsPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [estadoFilter, setEstadoFilter] = useState("all")
+  const [estadoCartaFilter, setEstadoCartaFilter] = useState("all")
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null)
   const [isMarkSignedModalOpen, setIsMarkSignedModalOpen] = useState(false)
@@ -84,6 +85,10 @@ export default function AssignmentsPage() {
         params.estado_asignacion = estadoFilter
       }
 
+      if (estadoCartaFilter !== "all") {
+        params.estado_carta = estadoCartaFilter
+      }
+
       const response = await assignmentService.getAssignments(params)
       setAssignments(response.data)
       setTotalCount(response.total)
@@ -96,12 +101,12 @@ export default function AssignmentsPage() {
     } finally {
       setLoading(false)
     }
-  }, [searchTerm, estadoFilter, currentPage, pageSize, toast])
+  }, [searchTerm, estadoFilter, estadoCartaFilter, currentPage, pageSize, toast])
 
   // Resetear a página 1 cuando cambien los filtros
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, estadoFilter])
+  }, [searchTerm, estadoFilter, estadoCartaFilter])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -222,6 +227,20 @@ export default function AssignmentsPage() {
               <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="ACTIVA">Activas</SelectItem>
               <SelectItem value="FINALIZADA">Finalizadas</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="w-full lg:w-[200px]">
+          <label className="text-sm font-medium mb-2 block">Estado Carta</label>
+          <Select value={estadoCartaFilter} onValueChange={setEstadoCartaFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Todos" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="PENDIENTE">Pendiente</SelectItem>
+              <SelectItem value="FIRMADA">Firmada</SelectItem>
             </SelectContent>
           </Select>
         </div>

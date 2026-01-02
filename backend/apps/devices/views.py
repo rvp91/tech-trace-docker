@@ -13,13 +13,42 @@ class DeviceViewSet(viewsets.ModelViewSet):
     Proporciona operaciones CRUD completas con filtros y búsqueda.
     OPTIMIZADO: Usa DeviceListSerializer para listados y DeviceSerializer para detalle.
     """
-    queryset = Device.objects.select_related('sucursal', 'created_by').all()
     serializer_class = DeviceSerializer  # Por defecto (detail, create, update)
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['tipo_equipo', 'estado', 'sucursal', 'marca']
     search_fields = ['numero_serie', 'imei', 'marca', 'modelo', 'numero_telefono', 'numero_factura']
     ordering_fields = ['marca', 'modelo', 'fecha_ingreso', 'created_at']
     ordering = ['-fecha_ingreso']
+
+    # Desactivar método DELETE - los dispositivos se marcan como inactivos, no se eliminan
+    http_method_names = ['get', 'post', 'put', 'patch', 'head', 'options']
+
+    def get_queryset(self):
+        """
+        Retorna queryset filtrando dispositivos inactivos por defecto.
+        Parámetro ?incluir_inactivos=true para incluirlos.
+        """
+        queryset = Device.objects.select_related('sucursal', 'created_by')
+
+        incluir_inactivos = self.request.query_params.get('incluir_inactivos', 'false').lower()
+
+        if incluir_inactivos not in ['true', '1', 'yes']:
+            queryset = queryset.filter(activo=True)
+
+        return queryset
+
+    def destroy(self, request, *args, **kwargs):
+        """Previene eliminación física de dispositivos"""
+        from rest_framework import status as http_status
+
+        return Response(
+            {
+                'error': 'No se permite eliminar dispositivos del sistema.',
+                'detail': 'Los dispositivos deben marcarse como BAJA o ROBO para excluirlos del inventario activo.',
+                'hint': 'Use los endpoints correspondientes: /mark-as-retired/ para dar de baja, /mark-as-stolen/ para robo/pérdida.'
+            },
+            status=http_status.HTTP_405_METHOD_NOT_ALLOWED
+        )
 
     def get_serializer_class(self):
         """
@@ -35,32 +64,6 @@ class DeviceViewSet(viewsets.ModelViewSet):
         Asignar automáticamente el usuario actual como created_by al crear un dispositivo.
         """
         serializer.save(created_by=self.request.user)
-
-    def perform_destroy(self, instance):
-        """
-        Personaliza el proceso de eliminación para proporcionar mensajes de error más descriptivos.
-        """
-        from rest_framework.exceptions import ValidationError
-        from django.db.models import ProtectedError
-
-        try:
-            instance.delete()
-        except ProtectedError as e:
-            # Verificar si el error es por asignaciones activas
-            if instance.has_active_assignment():
-                active_assignments = instance.assignment_set.filter(estado_asignacion='ACTIVA')
-                employees = [a.empleado.nombre_completo for a in active_assignments]
-
-                raise ValidationError({
-                    'detail': f'No se puede eliminar el dispositivo porque tiene {active_assignments.count()} asignación(es) activa(s).',
-                    'active_assignments': active_assignments.count(),
-                    'employees': employees
-                })
-            else:
-                # Otro tipo de error de protección
-                raise ValidationError({
-                    'detail': 'No se puede eliminar el dispositivo porque está siendo referenciado por otros registros.'
-                })
 
     @action(detail=True, methods=['post'], url_path='send-to-maintenance')
     def send_to_maintenance(self, request, pk=None):
@@ -159,7 +162,9 @@ class DeviceViewSet(viewsets.ModelViewSet):
         # Validar que no tenga asignación activa
         if device.has_active_assignment():
             return Response(
-                {'error': 'No se puede marcar como disponible un dispositivo con asignación activa. Debe registrar la devolución primero.'},
+                {'error': 'No se puede marcar como disponible un dispositivo con asignación activa. '
+                        'Si el dispositivo está en mantenimiento urgente, use "Retornar de Mantenimiento". '
+                        'Si quiere finalizar la asignación, registre la devolución primero.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -179,6 +184,68 @@ class DeviceViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+    @action(detail=True, methods=['post'], url_path='return-from-maintenance')
+    def return_from_maintenance(self, request, pk=None):
+        """
+        Retorna un dispositivo de mantenimiento urgente al estado ASIGNADO.
+        Solo válido cuando el dispositivo tiene una asignación activa.
+
+        POST /api/devices/{id}/return-from-maintenance/
+        Body: { observaciones?: string }
+
+        Transiciones permitidas:
+        - MANTENIMIENTO → ASIGNADO (solo con asignación activa)
+
+        Este endpoint es el complemento de send-to-maintenance para el flujo
+        de mantenimiento urgente, donde el dispositivo mantiene su asignación activa.
+
+        Registra el cambio en auditoría via change_status().
+        """
+        from rest_framework import status
+        from rest_framework.response import Response
+        from rest_framework.exceptions import ValidationError
+
+        device = self.get_object()
+        observaciones = request.data.get('observaciones', '').strip()
+
+        # VALIDACIÓN 1: Solo desde MANTENIMIENTO
+        if device.estado != 'MANTENIMIENTO':
+            return Response(
+                {'error': 'Solo se pueden retornar dispositivos que están en MANTENIMIENTO'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # VALIDACIÓN 2: No desde estados finales (ya cubierto por validación 1, pero por consistencia)
+        if device.estado in Device.FINAL_STATES:
+            return Response(
+                {'error': f'No se puede cambiar el estado de un dispositivo en {device.estado}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # VALIDACIÓN 3: DEBE tener asignación activa
+        if not device.has_active_assignment():
+            return Response(
+                {'error': 'Este dispositivo no tiene asignación activa. '
+                        'Use "Marcar como Disponible" para dispositivos sin asignación.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Cambiar estado a ASIGNADO con auditoría
+        try:
+            device.change_status('ASIGNADO', user=request.user)
+
+            serializer = self.get_serializer(device)
+            return Response({
+                'message': 'Dispositivo retornado de mantenimiento. Ahora está ASIGNADO nuevamente.',
+                'device': serializer.data
+            }, status=status.HTTP_200_OK)
+
+        except ValidationError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
     @action(detail=True, methods=['post'], url_path='mark-as-retired')
     def mark_as_retired(self, request, pk=None):
         """
@@ -189,13 +256,15 @@ class DeviceViewSet(viewsets.ModelViewSet):
 
         Transiciones permitidas:
         - DISPONIBLE → BAJA
-        - MANTENIMIENTO → BAJA
+        - ASIGNADO → BAJA (finaliza asignación automáticamente)
+        - MANTENIMIENTO → BAJA (finaliza asignación si existe)
 
         Validaciones:
-        - No permitir si está ASIGNADO (debe devolver primero)
         - No permitir si ya está en BAJA o ROBO
 
-        IMPORTANTE: BAJA es un estado final, NO es reversible.
+        IMPORTANTE:
+        - BAJA es un estado final, NO es reversible.
+        - Si el dispositivo tiene asignación activa, se finalizará automáticamente.
 
         Registra el cambio en auditoría via change_status().
         """
@@ -214,13 +283,6 @@ class DeviceViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Validar que no esté en estado ASIGNADO
-        if device.estado == 'ASIGNADO':
-            return Response(
-                {'error': 'No se puede dar de baja un dispositivo asignado. Debe registrar la devolución primero.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
         # Validar que no esté ya en estado final
         if device.estado in Device.FINAL_STATES:
             return Response(
@@ -228,12 +290,31 @@ class DeviceViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Validar que esté en DISPONIBLE o MANTENIMIENTO
-        if device.estado not in ['DISPONIBLE', 'MANTENIMIENTO']:
+        # Validar que esté en DISPONIBLE, ASIGNADO o MANTENIMIENTO
+        if device.estado not in ['DISPONIBLE', 'ASIGNADO', 'MANTENIMIENTO']:
             return Response(
-                {'error': f'Solo se pueden dar de baja dispositivos en estado DISPONIBLE o MANTENIMIENTO. Estado actual: {device.get_estado_display()}'},
+                {'error': f'Solo se pueden dar de baja dispositivos en estado DISPONIBLE, ASIGNADO o MANTENIMIENTO. Estado actual: {device.get_estado_display()}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+        # Si tiene asignación activa, finalizarla automáticamente
+        # (similar al comportamiento de ROBO/carta de descuento)
+        if device.has_active_assignment():
+            active_assignment = device.assignment_set.filter(estado_asignacion='ACTIVA').first()
+            if active_assignment:
+                active_assignment.estado_asignacion = 'FINALIZADA'
+
+                # Agregar observación automática sobre la baja
+                from django.utils import timezone
+                fecha_baja = timezone.now().strftime('%Y-%m-%d')
+                obs_baja = f"[{fecha_baja}] Dispositivo dado de baja. Motivo: {motivo}"
+
+                if active_assignment.observaciones:
+                    active_assignment.observaciones += f"\n{obs_baja}"
+                else:
+                    active_assignment.observaciones = obs_baja
+
+                active_assignment.save(update_fields=['estado_asignacion', 'observaciones', 'updated_at'])
 
         # Cambiar estado con auditoría
         try:
@@ -260,8 +341,9 @@ class DeviceViewSet(viewsets.ModelViewSet):
 
         Retorna estadísticas agregadas calculadas en una sola query.
         Esto reemplaza el cálculo de 28 filtros en el frontend.
+        Solo incluye dispositivos activos.
         """
-        stats = Device.objects.aggregate(
+        stats = Device.objects.filter(activo=True).aggregate(
             # Totales por tipo
             total_laptops=Count('id', filter=Q(tipo_equipo='LAPTOP')),
             total_desktops=Count('id', filter=Q(tipo_equipo='DESKTOP')),
@@ -405,15 +487,15 @@ class StatsViewSet(viewsets.ViewSet):
         from apps.assignments.models import Assignment
         from apps.assignments.serializers import AssignmentSerializer
 
-        # 1. Dispositivos por estado
-        devices_by_status = Device.objects.values('estado').annotate(
+        # 1. Dispositivos por estado (solo activos)
+        devices_by_status = Device.objects.filter(activo=True).values('estado').annotate(
             total=Count('id')
         ).order_by('estado')
 
         devices_by_status_dict = {item['estado']: item['total'] for item in devices_by_status}
 
-        # 2. Dispositivos por tipo
-        devices_by_type = Device.objects.values('tipo_equipo').annotate(
+        # 2. Dispositivos por tipo (solo activos)
+        devices_by_type = Device.objects.filter(activo=True).values('tipo_equipo').annotate(
             total=Count('id')
         ).order_by('tipo_equipo')
 
@@ -422,11 +504,11 @@ class StatsViewSet(viewsets.ViewSet):
         # 3. Total de empleados activos
         active_employees = Employee.objects.filter(estado='ACTIVO').count()
 
-        # 4. Total de dispositivos
-        total_devices = Device.objects.count()
+        # 4. Total de dispositivos (solo activos)
+        total_devices = Device.objects.filter(activo=True).count()
 
-        # 5. Dispositivos disponibles
-        available_devices = Device.objects.filter(estado='DISPONIBLE').count()
+        # 5. Dispositivos disponibles (solo activos)
+        available_devices = Device.objects.filter(activo=True, estado='DISPONIBLE').count()
 
         # 6. Asignaciones activas
         active_assignments_count = Assignment.objects.filter(estado_asignacion='ACTIVA').count()
@@ -440,9 +522,9 @@ class StatsViewSet(viewsets.ViewSet):
 
         recent_assignments_serializer = AssignmentSerializer(recent_assignments, many=True)
 
-        # 8. Dispositivos por sucursal
+        # 8. Dispositivos por sucursal (solo activos)
         from apps.branches.models import Branch
-        devices_by_branch = Device.objects.values(
+        devices_by_branch = Device.objects.filter(activo=True).values(
             'sucursal__nombre',
             'sucursal__codigo'
         ).annotate(total=Count('id')).order_by('-total')

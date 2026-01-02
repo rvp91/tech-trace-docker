@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -32,10 +32,10 @@ export default function BranchesPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
-  const [pageSize, setPageSize] = useState(8)
+  const pageSize = 8 // Tamaño fijo de página
   const { toast } = useToast()
 
-  const loadBranches = async (page: number = 1) => {
+  const loadBranches = useCallback(async (page: number = 1) => {
     try {
       setLoading(true)
       const data = await branchService.getBranches({
@@ -57,7 +57,7 @@ export default function BranchesPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [pageSize, searchQuery, toast])
 
   // Resetear a página 1 cuando cambie la búsqueda
   useEffect(() => {
@@ -70,7 +70,7 @@ export default function BranchesPage() {
       loadBranches(currentPage)
     }, 300)
     return () => clearTimeout(timer)
-  }, [searchQuery, currentPage, pageSize])
+  }, [searchQuery, currentPage, loadBranches])
 
   const handleEdit = (branch: Branch) => {
     setEditingBranch(branch)
@@ -111,11 +111,6 @@ export default function BranchesPage() {
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
-  }
-
-  const handlePageSizeChange = (newPageSize: number) => {
-    setPageSize(newPageSize)
-    setCurrentPage(1) // Resetear a la primera página cuando cambia el tamaño
   }
 
   const totalPages = Math.ceil(totalCount / pageSize)
@@ -324,8 +319,6 @@ export default function BranchesPage() {
           pageSize={pageSize}
           totalCount={totalCount}
           onPageChange={handlePageChange}
-          onPageSizeChange={handlePageSizeChange}
-          pageSizeOptions={[8, 16, 24, 32]}
         />
       )}
 

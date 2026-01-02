@@ -27,12 +27,16 @@ wheels/
 *.log
 db.sqlite3
 db.sqlite3-journal
+*.sqlite3
+*.sqlite3.backup*
+*.db
 /media
 /static
 
 # Environment variables
 .env
-.env.example
+.env.local
+.env.*.local
 
 # IDEs
 .vscode/

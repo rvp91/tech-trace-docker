@@ -26,28 +26,49 @@ class AssignmentListSerializer(serializers.ModelSerializer):
     dispositivo_detail = serializers.SerializerMethodField()
 
     def get_dispositivo_tipo(self, obj):
-        """Retorna el tipo de equipo del dispositivo"""
-        if not obj.dispositivo:
-            return 'N/A'
-        return obj.dispositivo.get_tipo_equipo_display()
+        """Retorna el tipo de equipo del dispositivo o del snapshot"""
+        if obj.dispositivo:
+            return obj.dispositivo.get_tipo_equipo_display()
+
+        # Fallback: usar snapshot si existe
+        if obj.discount_data and 'dispositivo_snapshot' in obj.discount_data:
+            return obj.discount_data['dispositivo_snapshot'].get('tipo_equipo_display', 'N/A')
+
+        return 'N/A'
 
     def get_dispositivo_marca(self, obj):
-        """Retorna la marca del dispositivo"""
-        if not obj.dispositivo:
-            return 'N/A'
-        return obj.dispositivo.marca
+        """Retorna la marca del dispositivo o del snapshot"""
+        if obj.dispositivo:
+            return obj.dispositivo.marca
+
+        # Fallback: usar snapshot si existe
+        if obj.discount_data and 'dispositivo_snapshot' in obj.discount_data:
+            return obj.discount_data['dispositivo_snapshot'].get('marca', 'N/A')
+
+        return 'N/A'
 
     def get_dispositivo_modelo(self, obj):
-        """Retorna el modelo del dispositivo"""
-        if not obj.dispositivo:
-            return 'N/A'
-        return obj.dispositivo.modelo or 'N/A'
+        """Retorna el modelo del dispositivo o del snapshot"""
+        if obj.dispositivo:
+            return obj.dispositivo.modelo or 'N/A'
+
+        # Fallback: usar snapshot si existe
+        if obj.discount_data and 'dispositivo_snapshot' in obj.discount_data:
+            return obj.discount_data['dispositivo_snapshot'].get('modelo', 'N/A')
+
+        return 'N/A'
 
     def get_dispositivo_serial(self, obj):
-        """Retorna el serial o IMEI del dispositivo"""
-        if not obj.dispositivo:
-            return 'Dispositivo eliminado'
-        return obj.dispositivo.numero_serie or obj.dispositivo.imei or 'N/A'
+        """Retorna el serial o IMEI del dispositivo o del snapshot"""
+        if obj.dispositivo:
+            return obj.dispositivo.numero_serie or obj.dispositivo.imei or 'N/A'
+
+        # Fallback: usar snapshot si existe
+        if obj.discount_data and 'dispositivo_snapshot' in obj.discount_data:
+            snapshot = obj.discount_data['dispositivo_snapshot']
+            return snapshot.get('numero_serie') or snapshot.get('imei') or 'N/A'
+
+        return 'Dispositivo eliminado'
 
     def get_empleado_detail(self, obj):
         """Retorna información básica del empleado"""
@@ -58,17 +79,30 @@ class AssignmentListSerializer(serializers.ModelSerializer):
         }
 
     def get_dispositivo_detail(self, obj):
-        """Retorna información básica del dispositivo"""
-        if not obj.dispositivo:
-            return None
-        return {
-            'id': obj.dispositivo.id,
-            'tipo_equipo': obj.dispositivo.tipo_equipo,
-            'marca': obj.dispositivo.marca,
-            'modelo': obj.dispositivo.modelo,
-            'numero_serie': obj.dispositivo.numero_serie,
-            'imei': obj.dispositivo.imei,
-        }
+        """Retorna información del dispositivo o del snapshot"""
+        if obj.dispositivo:
+            return {
+                'id': obj.dispositivo.id,
+                'tipo_equipo': obj.dispositivo.tipo_equipo,
+                'marca': obj.dispositivo.marca,
+                'modelo': obj.dispositivo.modelo,
+                'numero_serie': obj.dispositivo.numero_serie,
+                'imei': obj.dispositivo.imei,
+            }
+
+        # Fallback: usar snapshot si existe
+        if obj.discount_data and 'dispositivo_snapshot' in obj.discount_data:
+            snapshot = obj.discount_data['dispositivo_snapshot']
+            return {
+                'id': snapshot.get('id'),
+                'tipo_equipo': snapshot.get('tipo_equipo'),
+                'marca': snapshot.get('marca'),
+                'modelo': snapshot.get('modelo'),
+                'numero_serie': snapshot.get('numero_serie'),
+                'imei': snapshot.get('imei'),
+            }
+
+        return None
 
     class Meta:
         model = Assignment

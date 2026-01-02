@@ -272,12 +272,26 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             else:
                 assignment.observaciones = observacion_automatica
 
-            # Guardar datos de descuento en formato estructurado
+            # Guardar datos de descuento en formato estructurado con snapshot del dispositivo
             assignment.discount_data = {
                 'monto_total': str(discount_data['monto_total']),
                 'numero_cuotas': discount_data['numero_cuotas'],
                 'mes_primera_cuota': discount_data['mes_primera_cuota'],
-                'fecha_generacion': timezone.now().isoformat()
+                'fecha_generacion': timezone.now().isoformat(),
+                # Snapshot del dispositivo para preservar datos históricos incluso si se elimina
+                'dispositivo_snapshot': {
+                    'id': assignment.dispositivo.id,
+                    'tipo_equipo': assignment.dispositivo.tipo_equipo,
+                    'tipo_equipo_display': assignment.dispositivo.get_tipo_equipo_display(),
+                    'marca': assignment.dispositivo.marca,
+                    'modelo': assignment.dispositivo.modelo,
+                    'numero_serie': assignment.dispositivo.numero_serie,
+                    'imei': assignment.dispositivo.imei,
+                    'numero_telefono': assignment.dispositivo.numero_telefono,
+                    'estado': 'ROBO',
+                    'sucursal_id': assignment.dispositivo.sucursal_id,
+                    'sucursal_nombre': assignment.dispositivo.sucursal.nombre if assignment.dispositivo.sucursal else None,
+                }
             }
 
             # Guardar cambios en la asignación
@@ -358,11 +372,19 @@ class AssignmentViewSet(viewsets.ModelViewSet):
           - Lista paginada de asignaciones finalizadas con dispositivos en estado ROBO
           - Incluye datos completos del empleado, sucursal y dispositivo
           - Incluye discount_data si está disponible
+          - IMPORTANTE: Incluye dispositivos INACTIVOS que fueron marcados como ROBO (soft delete)
         """
         # Filtrar asignaciones finalizadas con dispositivos robados
+        # Incluye tanto dispositivos activos como inactivos (para históricos)
+        from django.db.models import Q
+
         queryset = Assignment.objects.filter(
-            estado_asignacion='FINALIZADA',
-            dispositivo__estado='ROBO'
+            estado_asignacion='FINALIZADA'
+        ).filter(
+            # Dispositivo existe con estado ROBO (activo o inactivo)
+            Q(dispositivo__estado='ROBO') |
+            # Dispositivo eliminado con snapshot (casos antiguos)
+            Q(dispositivo__isnull=True, discount_data__isnull=False)
         ).select_related(
             'empleado',
             'empleado__sucursal',
@@ -391,7 +413,11 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         if sucursal_id:
             queryset = queryset.filter(empleado__sucursal_id=sucursal_id)
         if tipo_dispositivo:
-            queryset = queryset.filter(dispositivo__tipo_equipo=tipo_dispositivo)
+            # Filtrar por tipo considerando tanto dispositivos existentes como snapshots
+            queryset = queryset.filter(
+                Q(dispositivo__tipo_equipo=tipo_dispositivo) |
+                Q(dispositivo__isnull=True, discount_data__dispositivo_snapshot__tipo_equipo=tipo_dispositivo)
+            )
 
         # Paginación
         page = self.paginate_queryset(queryset)
@@ -421,6 +447,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
           - Lista paginada de asignaciones activas
           - Incluye datos completos del empleado, sucursal y dispositivo
           - Incluye estado de carta y auditoría de firma
+          - IMPORTANTE: Solo muestra dispositivos ACTIVOS (no inactivos/eliminados)
         """
         # Validar fechas obligatorias
         fecha_inicio = request.query_params.get('fecha_inicio')
@@ -432,9 +459,10 @@ class AssignmentViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Filtrar asignaciones activas con optimización de queries
+        # Filtrar asignaciones activas con dispositivos activos únicamente
         queryset = Assignment.objects.filter(
-            estado_asignacion='ACTIVA'
+            estado_asignacion='ACTIVA',
+            dispositivo__activo=True  # Solo dispositivos activos (no eliminados)
         ).select_related(
             'empleado',
             'empleado__sucursal',

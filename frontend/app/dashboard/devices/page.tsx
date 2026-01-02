@@ -13,21 +13,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { TablePagination } from "@/components/ui/table-pagination"
-import { Search, Edit2, Trash2, Eye, Plus } from "lucide-react"
+import { Search, Edit2, Eye, Plus } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
+import { DeviceActionsMenu } from "@/components/devices/device-actions-menu"
 import { deviceService, getDeviceStatusColor, getDeviceStatusLabel, getDeviceTypeLabel } from "@/lib/services/device-service"
 import { BranchSearchCombobox } from "@/components/ui/branch-search-combobox"
 import type { Device, TipoEquipo, EstadoDispositivo } from "@/lib/types"
@@ -44,9 +35,6 @@ export default function DevicesPage() {
   const [selectedType, setSelectedType] = useState<string>("")
   const [selectedStatus, setSelectedStatus] = useState<string>("")
   const [selectedBranch, setSelectedBranch] = useState<string>("")
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [deviceToDelete, setDeviceToDelete] = useState<Device | null>(null)
-  const [isDeleting, setIsDeleting] = useState(false)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [modalOpen, setModalOpen] = useState(false)
   const [deviceToEdit, setDeviceToEdit] = useState<Device | null>(null)
@@ -100,30 +88,6 @@ export default function DevicesPage() {
   }
 
   const totalPages = Math.ceil(totalCount / pageSize)
-
-  const handleDelete = async () => {
-    if (!deviceToDelete) return
-
-    try {
-      setIsDeleting(true)
-      await deviceService.deleteDevice(deviceToDelete.id)
-      toast({
-        title: "Dispositivo eliminado",
-        description: `${deviceToDelete.marca} ${deviceToDelete.modelo} ha sido eliminado exitosamente.`,
-      })
-      setRefreshTrigger(prev => prev + 1)
-      setDeleteDialogOpen(false)
-      setDeviceToDelete(null)
-    } catch (error) {
-      toast({
-        title: "Error al eliminar",
-        description: error instanceof Error ? error.message : "No se pudo eliminar el dispositivo. Puede tener asignaciones activas.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsDeleting(false)
-    }
-  }
 
   const handleDeviceCreated = () => {
     setRefreshTrigger(prev => prev + 1)
@@ -185,7 +149,7 @@ export default function DevicesPage() {
             <SelectContent>
               <SelectItem value="all">Todos los tipos</SelectItem>
               <SelectItem value="LAPTOP">Laptop</SelectItem>
-              <SelectItem value="DESKTOP">Computadora de Escritorio</SelectItem>
+              <SelectItem value="DESKTOP">Desktop</SelectItem>
               <SelectItem value="TELEFONO">Teléfono</SelectItem>
               <SelectItem value="TABLET">Tablet</SelectItem>
               <SelectItem value="TV">TV</SelectItem>
@@ -308,17 +272,7 @@ export default function DevicesPage() {
                           >
                             <Edit2 className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => {
-                              setDeviceToDelete(device)
-                              setDeleteDialogOpen(true)
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <DeviceActionsMenu device={device} onActionComplete={loadDevices} />
                         </div>
                       </TableCell>
                     </TableRow>
@@ -336,8 +290,6 @@ export default function DevicesPage() {
               pageSize={pageSize}
               totalCount={totalCount}
               onPageChange={handlePageChange}
-              onPageSizeChange={() => {}} // No-op: tamaño fijo
-              pageSizeOptions={[20]} // Solo mostrar 20 como opción
             />
           )}
         </CardContent>
@@ -350,34 +302,6 @@ export default function DevicesPage() {
         device={deviceToEdit}
         onSuccess={handleDeviceCreated}
       />
-
-      {/* Dialog de confirmación de eliminación */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar dispositivo?</AlertDialogTitle>
-            <AlertDialogDescription>
-              ¿Estás seguro de que deseas eliminar el dispositivo <strong>{deviceToDelete?.marca} {deviceToDelete?.modelo}</strong>?
-              Esta acción no se puede deshacer.
-              {deviceToDelete && (
-                <span className="block mt-2 text-sm">
-                  Si el dispositivo tiene asignaciones activas, no podrá ser eliminado.
-                </span>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={isDeleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {isDeleting ? "Eliminando..." : "Eliminar"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { Check, ChevronsUpDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -45,13 +45,16 @@ export function BranchSearchCombobox({
   const [loading, setLoading] = useState(false)
   const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null)
 
+  // Memorizar filter para evitar re-renders innecesarios
+  const memoizedFilter = useMemo(() => filter, [filter?.is_active])
+
   // Cargar sucursales con búsqueda
   const loadBranches = useCallback(async (searchTerm: string = "") => {
     try {
       setLoading(true)
       const params: any = {
         page_size: 20,
-        ...filter,
+        ...memoizedFilter,
       }
 
       if (searchTerm) {
@@ -66,7 +69,7 @@ export function BranchSearchCombobox({
     } finally {
       setLoading(false)
     }
-  }, [filter])
+  }, [memoizedFilter])
 
   // Cargar sucursal seleccionada por ID
   const loadSelectedBranch = useCallback(async (branchId: number) => {
@@ -79,14 +82,16 @@ export function BranchSearchCombobox({
     }
   }, [])
 
-  // Debounce para búsqueda
+  // Debounce para búsqueda - solo cargar cuando el popover está abierto
   useEffect(() => {
+    if (!open) return
+
     const timer = setTimeout(() => {
       loadBranches(search)
     }, 300)
 
     return () => clearTimeout(timer)
-  }, [search, loadBranches])
+  }, [search, loadBranches, open])
 
   // Cargar sucursal seleccionada cuando cambia el value
   useEffect(() => {

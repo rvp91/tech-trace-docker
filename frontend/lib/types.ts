@@ -92,6 +92,13 @@ export interface Device {
   es_valor_manual?: boolean
   puede_tener_valor?: boolean
 
+  // Campo para validar asignaciones activas
+  asignacion_activa?: boolean
+
+  // Soft delete fields
+  activo: boolean
+  fecha_inactivacion?: string | null
+
   created_at: string
   updated_at: string
   created_by?: number
@@ -178,6 +185,13 @@ export interface DiscountReportFilters {
   fecha_inicio?: string
   fecha_fin?: string
   empleado?: number
+  sucursal?: number
+  tipo_dispositivo?: TipoEquipo | ''
+}
+
+export interface ActiveAssignmentReportFilters {
+  fecha_inicio: string  // OBLIGATORIO
+  fecha_fin: string     // OBLIGATORIO
   sucursal?: number
   tipo_dispositivo?: TipoEquipo | ''
 }

@@ -500,7 +500,12 @@ class PDFLetterGenerator:
         numero_serie = (dispositivo.numero_serie or 'N/A').upper()
         monto_formatted = self._format_currency(discount_data['monto_total'])
 
-        para2 = f"El monto total de la deuda es de {monto_formatted}, por el concepto {tipo_concepto}, N/S: {numero_serie}."
+        # Si es un teléfono, incluir IMEI
+        if dispositivo.tipo_equipo.upper() == 'TELEFONO':
+            imei = dispositivo.imei or 'N/A'
+            para2 = f"El monto total de la deuda es de {monto_formatted}, por el concepto {tipo_concepto}, N/S: {numero_serie}, IMEI: {imei}."
+        else:
+            para2 = f"El monto total de la deuda es de {monto_formatted}, por el concepto {tipo_concepto}, N/S: {numero_serie}."
         y_position = self._draw_justified_text(c, para2, 0.75*inch, y_position, width - 1.5*inch)
         y_position -= 0.4*inch
 

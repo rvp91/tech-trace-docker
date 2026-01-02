@@ -61,7 +61,7 @@ class Assignment(models.Model):
 
     solicitud = models.ForeignKey(Request, on_delete=models.SET_NULL, null=True, blank=True, verbose_name='Solicitud')
     empleado = models.ForeignKey('employees.Employee', on_delete=models.PROTECT, verbose_name='Empleado')
-    dispositivo = models.ForeignKey('devices.Device', on_delete=models.PROTECT, verbose_name='Dispositivo')
+    dispositivo = models.ForeignKey('devices.Device', on_delete=models.SET_NULL, null=True, blank=True, verbose_name='Dispositivo')
     tipo_entrega = models.CharField(max_length=20, choices=TIPO_ENTREGA_CHOICES, verbose_name='Tipo de entrega')
     fecha_entrega = models.DateField(verbose_name='Fecha de entrega')
     fecha_devolucion = models.DateField(blank=True, null=True, verbose_name='Fecha de devolución')
@@ -94,7 +94,8 @@ class Assignment(models.Model):
         ordering = ['-fecha_entrega']
 
     def __str__(self):
-        return f"Asignación #{self.id} - {self.empleado.nombre_completo} - {self.dispositivo.serial_identifier}"
+        dispositivo_info = self.dispositivo.serial_identifier if self.dispositivo else 'Dispositivo eliminado'
+        return f"Asignación #{self.id} - {self.empleado.nombre_completo} - {dispositivo_info}"
 
 
 class Return(models.Model):

@@ -7,17 +7,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
 import { deviceService, type CreateDeviceData } from "@/lib/services/device-service"
 import { BranchSearchCombobox } from "@/components/ui/branch-search-combobox"
 import type { Device, TipoEquipo, EstadoDispositivo } from "@/lib/types"
-import { Info, DollarSign, AlertTriangle, Wrench, CheckCircle, Trash2 } from "lucide-react"
+import { Info, DollarSign } from "lucide-react"
 import { z } from "zod"
 import { deviceSchema } from "@/lib/validations"
 import { formatCurrency, formatCurrencyInput, parseCurrency } from "@/lib/utils"
 import { getTodayLocal } from "@/lib/utils/date-helpers"
-import { DeviceActionModal } from "./device-action-modal"
 
 interface DeviceModalProps {
   open: boolean
@@ -31,10 +29,6 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
   const [loading, setLoading] = useState(false)
   const [valorCalculadoSugerido, setValorCalculadoSugerido] = useState<number | null>(null)
   const [mostrarInfoDepreciacion, setMostrarInfoDepreciacion] = useState(false)
-  const [actionModal, setActionModal] = useState<{
-    open: boolean
-    type: "maintenance" | "available" | "retired" | null
-  }>({ open: false, type: null })
   const [formData, setFormData] = useState<CreateDeviceData>({
     tipo_equipo: "LAPTOP",
     marca: "",
@@ -202,66 +196,6 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
     }
   }
 
-  // Handlers para acciones de cambio de estado
-  const handleSendToMaintenance = () => {
-    setActionModal({ open: true, type: "maintenance" })
-  }
-
-  const handleMarkAvailable = () => {
-    setActionModal({ open: true, type: "available" })
-  }
-
-  const handleRetire = () => {
-    setActionModal({ open: true, type: "retired" })
-  }
-
-  const handleActionConfirm = async (data: { motivo?: string; observaciones?: string }) => {
-    if (!device || !actionModal.type) return
-
-    try {
-      let response
-
-      switch (actionModal.type) {
-        case "maintenance":
-          if (!data.motivo) throw new Error("El motivo es requerido")
-          response = await deviceService.sendToMaintenance(device.id, {
-            motivo: data.motivo,
-            observaciones: data.observaciones,
-          })
-          break
-        case "available":
-          response = await deviceService.markAvailable(device.id, {
-            observaciones: data.observaciones,
-          })
-          break
-        case "retired":
-          if (!data.motivo) throw new Error("El motivo es requerido")
-          response = await deviceService.markAsRetired(device.id, {
-            motivo: data.motivo,
-            observaciones: data.observaciones,
-          })
-          break
-      }
-
-      toast({
-        title: "Éxito",
-        description: response.message || "Acción completada exitosamente",
-      })
-
-      // Cerrar ambos modales y ejecutar callback de éxito
-      setActionModal({ open: false, type: null })
-      onOpenChange(false)
-      onSuccess?.()
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Error al realizar la acción",
-        variant: "destructive",
-      })
-      throw error // Re-throw para que el modal no se cierre automáticamente
-    }
-  }
-
   // Determinar si campos son requeridos u opcionales según tipo
   const isNumeroSerieRequired = ['LAPTOP', 'DESKTOP', 'TELEFONO', 'TABLET', 'TV'].includes(formData.tipo_equipo)
   const isModeloRequired = ['LAPTOP', 'DESKTOP', 'TELEFONO', 'TABLET'].includes(formData.tipo_equipo)
@@ -270,10 +204,6 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
   const showValorFields = ['LAPTOP', 'DESKTOP', 'TELEFONO', 'TABLET'].includes(formData.tipo_equipo)
   const showImeiField = ['TELEFONO', 'TABLET'].includes(formData.tipo_equipo)
   const showTelefonoField = ['TELEFONO', 'SIM'].includes(formData.tipo_equipo)
-
-  // Detectar si el dispositivo está en estado final
-  const FINAL_STATES: EstadoDispositivo[] = ['BAJA', 'ROBO']
-  const isEstadoFinal = isEditMode && device && FINAL_STATES.includes(device.estado)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -570,63 +500,6 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
             </div>
           )}
 
-          {/* Sección de Acciones de Estado - Solo en modo edición */}
-          {isEditMode && device && (
-            <>
-              <Separator className="my-6" />
-              <div className="space-y-3">
-                <div>
-                  <h3 className="text-sm font-semibold mb-1">Acciones de Estado</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Cambia el estado del dispositivo según las acciones administrativas necesarias.
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {device.estado === "DISPONIBLE" && (
-                    <Button type="button" variant="outline" size="sm" onClick={handleSendToMaintenance}>
-                      <Wrench className="mr-2 h-4 w-4" />
-                      Enviar a Mantenimiento
-                    </Button>
-                  )}
-
-                  {device.estado === "ASIGNADO" && (
-                    <Button type="button" variant="outline" size="sm" onClick={handleSendToMaintenance}>
-                      <Wrench className="mr-2 h-4 w-4" />
-                      Enviar a Mantenimiento Urgente
-                    </Button>
-                  )}
-
-                  {device.estado === "MANTENIMIENTO" && (
-                    <Button type="button" variant="outline" size="sm" onClick={handleMarkAvailable}>
-                      <CheckCircle className="mr-2 h-4 w-4" />
-                      Marcar como Disponible
-                    </Button>
-                  )}
-
-                  {(device.estado === "DISPONIBLE" || device.estado === "MANTENIMIENTO") && (
-                    <Button type="button" variant="destructive" size="sm" onClick={handleRetire}>
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Dar de Baja
-                    </Button>
-                  )}
-
-                  {device.estado === "BAJA" && (
-                    <p className="text-xs text-muted-foreground py-1">
-                      Este dispositivo está dado de baja. No hay acciones disponibles.
-                    </p>
-                  )}
-
-                  {device.estado === "ROBO" && (
-                    <p className="text-xs text-muted-foreground py-1">
-                      Este dispositivo está marcado como robado/perdido. No hay acciones disponibles.
-                    </p>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
-
           <div className="flex gap-2 justify-end pt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
               Cancelar
@@ -636,40 +509,6 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
             </Button>
           </div>
         </form>
-
-        {/* Modal de confirmación de acciones */}
-        {isEditMode && device && (
-          <DeviceActionModal
-            open={actionModal.open}
-            onOpenChange={(open) => setActionModal({ open, type: null })}
-            onConfirm={handleActionConfirm}
-            title={
-              actionModal.type === "maintenance"
-                ? "Enviar a Mantenimiento"
-                : actionModal.type === "available"
-                ? "Marcar como Disponible"
-                : "Dar de Baja"
-            }
-            description={
-              actionModal.type === "maintenance"
-                ? device.estado === "ASIGNADO"
-                  ? "El dispositivo está asignado. Al enviarlo a mantenimiento urgente, la asignación permanecerá activa. Por favor, indique el motivo del mantenimiento."
-                  : "Por favor, indique el motivo por el cual el dispositivo requiere mantenimiento."
-                : actionModal.type === "available"
-                ? "El dispositivo será marcado como disponible y estará listo para ser asignado nuevamente."
-                : "El dispositivo será dado de baja permanentemente. Por favor, indique el motivo de la baja."
-            }
-            requiresMotivo={actionModal.type === "maintenance" || actionModal.type === "retired"}
-            confirmButtonText={
-              actionModal.type === "maintenance"
-                ? "Enviar a Mantenimiento"
-                : actionModal.type === "available"
-                ? "Marcar Disponible"
-                : "Dar de Baja"
-            }
-            confirmButtonVariant={actionModal.type === "retired" ? "destructive" : "default"}
-          />
-        )}
       </DialogContent>
     </Dialog>
   )

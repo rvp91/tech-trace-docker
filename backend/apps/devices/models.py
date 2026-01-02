@@ -9,7 +9,7 @@ class Device(models.Model):
     """
     TIPO_CHOICES = [
         ('LAPTOP', 'Laptop'),
-        ('DESKTOP', 'Computadora de Escritorio'),
+        ('DESKTOP', 'Desktop'),
         ('TELEFONO', 'Teléfono Móvil'),
         ('TABLET', 'Tablet'),
         ('TV', 'TV'),
@@ -45,6 +45,18 @@ class Device(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Fecha de creación')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Última actualización')
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, verbose_name='Creado por')
+    activo = models.BooleanField(
+        default=True,
+        verbose_name='Activo',
+        db_index=True,  # Índice para optimizar queries
+        help_text='Indica si el dispositivo está activo en el inventario'
+    )
+    fecha_inactivacion = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name='Fecha de inactivación',
+        help_text='Fecha en que el dispositivo fue marcado como inactivo'
+    )
 
     class Meta:
         verbose_name = 'Dispositivo'
@@ -129,9 +141,13 @@ class Device(models.Model):
         return self.tipo_equipo in ['LAPTOP', 'DESKTOP', 'TELEFONO', 'TABLET']
 
     def change_status(self, new_status, user=None):
-        """Cambia el estado del dispositivo y registra en auditoría"""
+        """
+        Cambia el estado del dispositivo y registra en auditoría.
+        Marca automáticamente como inactivo si se cambia a estado final.
+        """
         from apps.users.audit import AuditLog
         from django.core.exceptions import ValidationError
+        from django.utils import timezone
 
         old_status = self.estado
 
@@ -146,21 +162,34 @@ class Device(models.Model):
             )
 
         self.estado = new_status
+
+        # LÓGICA DE INACTIVACIÓN: Si el nuevo estado es final, marcar como inactivo
+        if new_status in self.FINAL_STATES:
+            self.activo = False
+            if not self.fecha_inactivacion:
+                self.fecha_inactivacion = timezone.now()
+
         self.save()
 
-        # Registrar en auditoría si se proporciona un usuario
+        # Registrar en auditoría
         if user:
+            changes = {
+                'field': 'estado',
+                'old_value': old_status,
+                'new_value': new_status,
+                'device': str(self)
+            }
+
+            if new_status in self.FINAL_STATES:
+                changes['activo_changed'] = True
+                changes['fecha_inactivacion'] = self.fecha_inactivacion.isoformat()
+
             AuditLog.objects.create(
                 user=user,
                 action='UPDATE',
                 entity_type='Device',
                 entity_id=self.id,
-                changes={
-                    'field': 'estado',
-                    'old_value': old_status,
-                    'new_value': new_status,
-                    'device': str(self)
-                }
+                changes=changes
             )
 
         return True
@@ -168,12 +197,3 @@ class Device(models.Model):
     def has_active_assignment(self):
         """Retorna True si el dispositivo tiene una asignación activa"""
         return self.assignment_set.filter(estado_asignacion='ACTIVA').exists()
-
-    def delete(self, *args, **kwargs):
-        """Previene la eliminación si tiene asignaciones activas"""
-        if self.has_active_assignment():
-            raise models.ProtectedError(
-                "No se puede eliminar el dispositivo porque tiene una asignación activa",
-                self
-            )
-        super().delete(*args, **kwargs)

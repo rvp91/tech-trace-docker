@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast"
 import { deviceService, getDeviceStatusColor, getDeviceStatusLabel, getDeviceTypeLabel } from "@/lib/services/device-service"
 import type { Device, DeviceHistory } from "@/lib/types"
 import { DeviceModal } from "@/components/modals/device-modal"
+import { AssignmentModal } from "@/components/modals/assignment-modal"
 import { formatDateLocal } from "@/lib/utils/date-helpers"
 
 export default function DeviceDetailPage() {
@@ -26,6 +27,7 @@ export default function DeviceDetailPage() {
   const [loading, setLoading] = useState(true)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [editModalOpen, setEditModalOpen] = useState(false)
+  const [assignModalOpen, setAssignModalOpen] = useState(false)
 
   useEffect(() => {
     const loadDeviceData = async () => {
@@ -55,6 +57,11 @@ export default function DeviceDetailPage() {
   const handleDeviceUpdated = () => {
     setRefreshTrigger(prev => prev + 1)
     setEditModalOpen(false)
+  }
+
+  const handleAssignmentCreated = () => {
+    setRefreshTrigger(prev => prev + 1)
+    setAssignModalOpen(false)
   }
 
   if (loading) {
@@ -110,7 +117,7 @@ export default function DeviceDetailPage() {
             Editar
           </Button>
           {device.estado === "DISPONIBLE" && (
-            <Button>
+            <Button onClick={() => setAssignModalOpen(true)}>
               <Package className="h-4 w-4 mr-2" />
               Asignar
             </Button>
@@ -404,6 +411,14 @@ export default function DeviceDetailPage() {
         onOpenChange={setEditModalOpen}
         device={device}
         onSuccess={handleDeviceUpdated}
+      />
+
+      {/* Modal de asignación */}
+      <AssignmentModal
+        open={assignModalOpen}
+        onClose={() => setAssignModalOpen(false)}
+        onSuccess={handleAssignmentCreated}
+        preSelectedDevice={deviceId}
       />
     </div>
   )

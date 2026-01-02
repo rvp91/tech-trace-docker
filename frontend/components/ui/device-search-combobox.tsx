@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { Check, ChevronsUpDown } from "lucide-react"
 import { cn, getDeviceSerial } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -41,13 +41,16 @@ export function DeviceSearchCombobox({
   const [loading, setLoading] = useState(false)
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null)
 
+  // Memorizar filter para evitar re-renders innecesarios
+  const memoizedFilter = useMemo(() => filter, [filter?.estado])
+
   // Cargar dispositivos con búsqueda
   const loadDevices = useCallback(async (searchTerm: string = "") => {
     try {
       setLoading(true)
       const params: any = {
         page_size: 20,
-        ...filter,
+        ...memoizedFilter,
       }
 
       if (searchTerm) {
@@ -62,7 +65,7 @@ export function DeviceSearchCombobox({
     } finally {
       setLoading(false)
     }
-  }, [filter])
+  }, [memoizedFilter])
 
   // Cargar dispositivo seleccionado por ID
   const loadSelectedDevice = useCallback(async (deviceId: number) => {
@@ -75,14 +78,16 @@ export function DeviceSearchCombobox({
     }
   }, [])
 
-  // Debounce para búsqueda
+  // Debounce para búsqueda - solo cargar cuando el popover está abierto
   useEffect(() => {
+    if (!open) return
+
     const timer = setTimeout(() => {
       loadDevices(search)
     }, 300)
 
     return () => clearTimeout(timer)
-  }, [search, loadDevices])
+  }, [search, loadDevices, open])
 
   // Cargar dispositivo seleccionado cuando cambia el value
   useEffect(() => {
