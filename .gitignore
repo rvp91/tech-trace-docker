@@ -83,3 +83,6 @@ Thumbs.db
 # /.env.local
 # /.idea/
 # /.vscode/
+
+# Memory bank
+memory-bank/
