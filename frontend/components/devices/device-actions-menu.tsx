@@ -168,7 +168,7 @@ export function DeviceActionsMenu({ device, onActionComplete }: DeviceActionsMen
                 onClick={() => setActionModal({ open: true, type: "maintenance" })}
               >
                 <Wrench className="mr-2 h-4 w-4" />
-                Enviar a Mantenimiento Urgente
+                Enviar a Mantenimiento
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -184,12 +184,22 @@ export function DeviceActionsMenu({ device, onActionComplete }: DeviceActionsMen
           {device.estado === "MANTENIMIENTO" && (
             <>
               {device.asignacion_activa ? (
-                <DropdownMenuItem
-                  onClick={() => setActionModal({ open: true, type: "return-from-maintenance" })}
-                >
-                  <RotateCw className="mr-2 h-4 w-4" />
-                  Retornar de Mantenimiento
-                </DropdownMenuItem>
+                <>
+                  <DropdownMenuItem
+                    onClick={() => setActionModal({ open: true, type: "return-from-maintenance" })}
+                  >
+                    <RotateCw className="mr-2 h-4 w-4" />
+                    Retornar de Mantenimiento
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => setActionModal({ open: true, type: "retired" })}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Dar de Baja
+                  </DropdownMenuItem>
+                </>
               ) : (
                 <>
                   <DropdownMenuItem

@@ -196,6 +196,13 @@ export interface ActiveAssignmentReportFilters {
   tipo_dispositivo?: TipoEquipo | ''
 }
 
+export interface RetiredDevicesFilters {
+  fecha_inicio?: string  // Opcional
+  fecha_fin?: string     // Opcional
+  sucursal?: number
+  tipo_dispositivo?: TipoEquipo | ''
+}
+
 // Return (Devolución) types
 export type EstadoDevolucion = "OPTIMO" | "CON_DANOS" | "NO_FUNCIONAL"
 

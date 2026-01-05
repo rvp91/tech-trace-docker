@@ -460,6 +460,67 @@ class DeviceViewSet(viewsets.ModelViewSet):
             'assignments': serializer.data
         })
 
+    @action(detail=False, methods=['get'], url_path='retired-devices-report')
+    def retired_devices_report(self, request):
+        """
+        Endpoint especializado para reportes de dispositivos dados de baja.
+
+        GET /api/devices/retired-devices-report/
+
+        Query params:
+          - fecha_inicio: YYYY-MM-DD (filtro opcional por fecha de inactivación)
+          - fecha_fin: YYYY-MM-DD (filtro opcional)
+          - sucursal: ID de la sucursal del dispositivo
+          - tipo_dispositivo: LAPTOP, TELEFONO, DESKTOP, TABLET, TV, SIM, ACCESORIO
+          - page: número de página (default 1)
+          - page_size: tamaño de página (default 20, max 1000 para exportación)
+
+        Returns:
+          - Lista paginada de dispositivos dados de baja
+          - Solo dispositivos con estado='BAJA' y activo=False
+          - Ordenados por fecha de inactivación (más recientes primero)
+        """
+        # Filtrar dispositivos dados de baja
+        queryset = Device.objects.filter(
+            estado='BAJA',
+            activo=False
+        ).select_related(
+            'sucursal',
+            'created_by'
+        ).order_by('-fecha_inactivacion')
+
+        # Aplicar filtros opcionales
+        fecha_inicio = request.query_params.get('fecha_inicio')
+        fecha_fin = request.query_params.get('fecha_fin')
+        sucursal_id = request.query_params.get('sucursal')
+        tipo_dispositivo = request.query_params.get('tipo_dispositivo')
+
+        if fecha_inicio:
+            from datetime import datetime
+            fecha_inicio_dt = datetime.fromisoformat(fecha_inicio)
+            queryset = queryset.filter(fecha_inactivacion__gte=fecha_inicio_dt)
+
+        if fecha_fin:
+            from datetime import datetime, timedelta
+            fecha_fin_dt = datetime.fromisoformat(fecha_fin)
+            fecha_fin_dt = fecha_fin_dt + timedelta(days=1)
+            queryset = queryset.filter(fecha_inactivacion__lt=fecha_fin_dt)
+
+        if sucursal_id:
+            queryset = queryset.filter(sucursal_id=sucursal_id)
+
+        if tipo_dispositivo:
+            queryset = queryset.filter(tipo_equipo=tipo_dispositivo)
+
+        # Paginación
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
 
 class StatsViewSet(viewsets.ViewSet):
     """

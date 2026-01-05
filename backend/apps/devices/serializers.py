@@ -12,6 +12,7 @@ class DeviceListSerializer(serializers.ModelSerializer):
     created_by_username = serializers.CharField(source='created_by.username', read_only=True)
     tipo_equipo_display = serializers.CharField(source='get_tipo_equipo_display', read_only=True)
     estado_display = serializers.CharField(source='get_estado_display', read_only=True)
+    asignacion_activa = serializers.SerializerMethodField()
 
     class Meta:
         model = Device
@@ -29,6 +30,7 @@ class DeviceListSerializer(serializers.ModelSerializer):
             'sucursal',
             'sucursal_detail',
             'fecha_ingreso',
+            'asignacion_activa',
             'activo',
             'fecha_inactivacion',
             'created_at',
@@ -41,9 +43,14 @@ class DeviceListSerializer(serializers.ModelSerializer):
             'created_by_username',
             'tipo_equipo_display',
             'estado_display',
+            'asignacion_activa',
             'activo',
             'fecha_inactivacion',
         ]
+
+    def get_asignacion_activa(self, obj):
+        """Retorna True si el dispositivo tiene asignación activa"""
+        return obj.has_active_assignment()
 
 
 class DeviceSerializer(serializers.ModelSerializer):
@@ -188,8 +195,10 @@ class DeviceSerializer(serializers.ModelSerializer):
             if numero_serie is None and self.instance:
                 numero_serie = self.instance.numero_serie
 
-            if not numero_serie:
-                errors['numero_serie'] = f'El número de serie es obligatorio para {tipo_equipo}'
+            # Solo validar si estamos creando o si se está intentando modificar el numero_serie
+            if not self.instance or 'numero_serie' in data:
+                if not numero_serie:
+                    errors['numero_serie'] = f'El número de serie es obligatorio para {tipo_equipo}'
 
         # VALIDACIÓN 2: modelo obligatorio para LAPTOP, DESKTOP, TELEFONO, TABLET
         if tipo_equipo in ['LAPTOP', 'DESKTOP', 'TELEFONO', 'TABLET']:
@@ -198,8 +207,10 @@ class DeviceSerializer(serializers.ModelSerializer):
             if modelo is None and self.instance:
                 modelo = self.instance.modelo
 
-            if not modelo:
-                errors['modelo'] = f'El modelo es obligatorio para {tipo_equipo}'
+            # Solo validar si estamos creando o si se está intentando modificar el modelo
+            if not self.instance or 'modelo' in data:
+                if not modelo:
+                    errors['modelo'] = f'El modelo es obligatorio para {tipo_equipo}'
 
         # VALIDACIÓN 3: numero_telefono obligatorio solo para SIM
         if tipo_equipo == 'SIM':
@@ -208,8 +219,10 @@ class DeviceSerializer(serializers.ModelSerializer):
             if numero_telefono is None and self.instance:
                 numero_telefono = self.instance.numero_telefono
 
-            if not numero_telefono:
-                errors['numero_telefono'] = 'El número de teléfono es obligatorio para SIM cards'
+            # Solo validar si estamos creando o si se está intentando modificar el numero_telefono
+            if not self.instance or 'numero_telefono' in data:
+                if not numero_telefono:
+                    errors['numero_telefono'] = 'El número de teléfono es obligatorio para SIM cards'
 
         # VALIDACIÓN: Prevenir cambio de estados finales
         if self.instance:  # Solo en actualización

@@ -170,8 +170,6 @@ export default function DevicesPage() {
               <SelectItem value="DISPONIBLE">Disponible</SelectItem>
               <SelectItem value="ASIGNADO">Asignado</SelectItem>
               <SelectItem value="MANTENIMIENTO">Mantenimiento</SelectItem>
-              <SelectItem value="BAJA">Baja</SelectItem>
-              <SelectItem value="ROBO">Robo/Perdida</SelectItem>
             </SelectContent>
           </Select>
         </div>

@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api-client"
-import type { Assignment, DiscountReportFilters, ActiveAssignmentReportFilters } from "@/lib/types"
+import type { Assignment, DiscountReportFilters, ActiveAssignmentReportFilters, RetiredDevicesFilters, Device } from "@/lib/types"
 
 interface GetDiscountReportsParams extends DiscountReportFilters {
   page?: number
@@ -63,6 +63,35 @@ export const reportService = {
       count: number
       results: Assignment[]
     }>("/assignments/assignments/active-assignments-report/", {
+      ...filters,
+      page_size: 1000,
+    })
+
+    return response.results
+  },
+
+  /**
+   * Obtener reportes de dispositivos dados de baja con filtros y paginación
+   */
+  async getRetiredDevicesReport(params?: RetiredDevicesFilters & { page?: number; page_size?: number }): Promise<{
+    results: Device[]
+    count: number
+  }> {
+    return await apiClient.get<{
+      count: number
+      results: Device[]
+    }>("/devices/retired-devices-report/", params)
+  },
+
+  /**
+   * Obtener todos los reportes de dispositivos dados de baja (para exportación)
+   * Usa page_size alto para obtener todos los registros filtrados
+   */
+  async getAllRetiredDevicesReport(filters?: RetiredDevicesFilters): Promise<Device[]> {
+    const response = await apiClient.get<{
+      count: number
+      results: Device[]
+    }>("/devices/retired-devices-report/", {
       ...filters,
       page_size: 1000,
     })

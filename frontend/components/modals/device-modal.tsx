@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -85,17 +85,17 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
       setFormData({
         tipo_equipo: device.tipo_equipo,
         marca: device.marca,
-        modelo: device.modelo || "",
-        numero_serie: device.numero_serie || "",
-        imei: device.imei || "",
-        numero_telefono: device.numero_telefono || "",
-        numero_factura: device.numero_factura || "",
+        modelo: device.modelo ?? "",
+        numero_serie: device.numero_serie ?? "",
+        imei: device.imei ?? "",
+        numero_telefono: device.numero_telefono ?? "",
+        numero_factura: device.numero_factura ?? "",
         estado: device.estado,
         sucursal: device.sucursal,
         fecha_ingreso: device.fecha_ingreso,
-        valor_inicial: device.valor_inicial,
-        valor_depreciado: device.valor_depreciado,
-        es_valor_manual: device.es_valor_manual || false,
+        valor_inicial: device.valor_inicial ?? undefined,
+        valor_depreciado: device.valor_depreciado ?? undefined,
+        es_valor_manual: device.es_valor_manual ?? false,
       })
     } else if (!device && open) {
       // Reset form cuando se abre en modo creación
@@ -149,13 +149,30 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
 
     // Validar con Zod
     try {
-      deviceSchema.parse(formData)
+      // En modo edición, skipear validación de campos inmutables (numero_serie, imei)
+      // poniendo valores dummy que pasen la validación
+      const dataToValidate = isEditMode && device
+        ? {
+            ...formData,
+            // Si el campo está vacío, usar un valor dummy para pasar validación
+            // (estos campos no se enviarán al backend de todos modos)
+            numero_serie: (device.numero_serie && device.numero_serie.trim() !== '')
+              ? device.numero_serie
+              : 'DUMMY_SERIAL_FOR_VALIDATION',
+            imei: (device.imei && device.imei.trim() !== '')
+              ? device.imei
+              : 'DUMMY_IMEI_FOR_VALIDATION',
+          }
+        : formData
+
+      deviceSchema.parse(dataToValidate)
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const firstError = error.errors[0]
+        // @ts-ignore - Zod tiene la propiedad errors pero TypeScript no la reconoce correctamente
+        const firstError = error.errors?.[0]
         toast({
           title: "Error de validación",
-          description: firstError.message,
+          description: firstError?.message || "Error al validar los datos del formulario",
           variant: "destructive",
         })
         return
@@ -166,8 +183,23 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
       setLoading(true)
 
       if (isEditMode && device) {
-        // Modo edición - excluir numero_serie e imei ya que no son editables
-        const { numero_serie, imei, ...updateData } = formData
+        // Modo edición
+        // NO enviar numero_serie e imei ya que son campos inmutables
+        // El backend validará contra la instancia existente
+        const updateData: Partial<CreateDeviceData> = {
+          tipo_equipo: formData.tipo_equipo,
+          marca: formData.marca,
+          modelo: formData.modelo,
+          numero_telefono: formData.numero_telefono,
+          numero_factura: formData.numero_factura,
+          estado: formData.estado,
+          sucursal: formData.sucursal,
+          fecha_ingreso: formData.fecha_ingreso,
+          valor_inicial: formData.valor_inicial,
+          valor_depreciado: formData.valor_depreciado,
+          es_valor_manual: formData.es_valor_manual,
+        }
+
         await deviceService.updateDevice(device.id, updateData)
         toast({
           title: "Dispositivo actualizado",
@@ -210,6 +242,11 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
       <DialogContent className="max-w-[95vw] sm:max-w-xl lg:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditMode ? "Editar Dispositivo" : "Crear Nuevo Dispositivo"}</DialogTitle>
+          <DialogDescription>
+            {isEditMode
+              ? "Actualiza la información del dispositivo. El número de serie e IMEI no pueden ser modificados."
+              : "Completa la información para agregar un nuevo dispositivo al inventario."}
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

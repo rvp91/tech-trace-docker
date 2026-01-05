@@ -88,6 +88,8 @@ class AssignmentListSerializer(serializers.ModelSerializer):
                 'modelo': obj.dispositivo.modelo,
                 'numero_serie': obj.dispositivo.numero_serie,
                 'imei': obj.dispositivo.imei,
+                'valor_depreciado': obj.dispositivo.valor_depreciado,
+                'valor_depreciado_calculado': obj.dispositivo.get_valor_depreciado(),
             }
 
         # Fallback: usar snapshot si existe
@@ -100,6 +102,8 @@ class AssignmentListSerializer(serializers.ModelSerializer):
                 'modelo': snapshot.get('modelo'),
                 'numero_serie': snapshot.get('numero_serie'),
                 'imei': snapshot.get('imei'),
+                'valor_depreciado': snapshot.get('valor_depreciado'),
+                'valor_depreciado_calculado': snapshot.get('valor_depreciado_calculado'),
             }
 
         return None

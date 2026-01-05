@@ -183,7 +183,7 @@ export const deviceSchema = z.object({
 }).superRefine((data, ctx) => {
   // VALIDACIÓN 1: numero_serie obligatorio para LAPTOP, DESKTOP, TELEFONO, TABLET, TV
   if (['LAPTOP', 'DESKTOP', 'TELEFONO', 'TABLET', 'TV'].includes(data.tipo_equipo)) {
-    if (!data.numero_serie || data.numero_serie.trim() === '') {
+    if (!data.numero_serie || (typeof data.numero_serie === 'string' && data.numero_serie.trim() === '')) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: `El número de serie es obligatorio para ${data.tipo_equipo}`,
@@ -194,7 +194,7 @@ export const deviceSchema = z.object({
 
   // VALIDACIÓN 2: modelo obligatorio para LAPTOP, DESKTOP, TELEFONO, TABLET
   if (['LAPTOP', 'DESKTOP', 'TELEFONO', 'TABLET'].includes(data.tipo_equipo)) {
-    if (!data.modelo || data.modelo.trim() === '') {
+    if (!data.modelo || (typeof data.modelo === 'string' && data.modelo.trim() === '')) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: `El modelo es obligatorio para ${data.tipo_equipo}`,
@@ -205,7 +205,7 @@ export const deviceSchema = z.object({
 
   // VALIDACIÓN 3: numero_telefono obligatorio solo para SIM
   if (data.tipo_equipo === 'SIM') {
-    if (!data.numero_telefono || data.numero_telefono.trim() === '') {
+    if (!data.numero_telefono || (typeof data.numero_telefono === 'string' && data.numero_telefono.trim() === '')) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'El número de teléfono es obligatorio para SIM cards',
