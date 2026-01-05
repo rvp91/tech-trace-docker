@@ -56,6 +56,7 @@ class DeviceListSerializer(serializers.ModelSerializer):
 class DeviceSerializer(serializers.ModelSerializer):
     """
     Serializer para el modelo Device (Dispositivo).
+    Los campos numero_serie e imei solo pueden ser modificados por usuarios ADMIN.
     """
     # Campos de solo lectura con información anidada
     sucursal_detail = BranchSerializer(source='sucursal', read_only=True)
@@ -122,6 +123,23 @@ class DeviceSerializer(serializers.ModelSerializer):
             'fecha_inactivacion',
         ]
 
+    def __init__(self, *args, **kwargs):
+        """
+        Inicializar serializer y hacer numero_serie e imei read-only para OPERADORES.
+        Solo los usuarios ADMIN pueden modificar estos campos.
+        """
+        super().__init__(*args, **kwargs)
+
+        # Obtener el usuario del contexto (si existe)
+        request = self.context.get('request')
+
+        # Si el usuario NO es ADMIN, hacer numero_serie e imei read-only
+        if request and hasattr(request, 'user') and request.user.is_authenticated:
+            if request.user.role != 'ADMIN':
+                # Para OPERADORES, estos campos son solo lectura
+                self.fields['numero_serie'].read_only = True
+                self.fields['imei'].read_only = True
+
     def validate_modelo(self, value):
         """Convertir cadena vacía a None para campos opcionales"""
         if value == "" or value is None:
@@ -177,6 +195,20 @@ class DeviceSerializer(serializers.ModelSerializer):
         | SIM      | -            | -        | Opcional    | Obligatorio     | No   | No    |
         | ACCESORIO| -            | -        | Opcional    | -               | No   | No    |
         """
+        errors = {}
+
+        # VALIDACIÓN DE PERMISOS: Solo ADMIN puede modificar numero_serie e imei
+        request = self.context.get('request')
+        if request and hasattr(request, 'user') and request.user.is_authenticated:
+            if request.user.role != 'ADMIN' and self.instance:  # Solo en actualizaciones
+                # Verificar si se intentó modificar numero_serie
+                if 'numero_serie' in data and data['numero_serie'] != self.instance.numero_serie:
+                    errors['numero_serie'] = 'Solo los administradores pueden modificar el número de serie'
+
+                # Verificar si se intentó modificar imei
+                if 'imei' in data and data['imei'] != self.instance.imei:
+                    errors['imei'] = 'Solo los administradores pueden modificar el IMEI'
+
         # Obtener tipo_equipo (puede venir en data o en instance al editar)
         tipo_equipo = data.get('tipo_equipo')
         if not tipo_equipo and self.instance:
@@ -184,9 +216,9 @@ class DeviceSerializer(serializers.ModelSerializer):
 
         # Si no hay tipo_equipo, no podemos validar (pero debería ser requerido)
         if not tipo_equipo:
+            if errors:
+                raise serializers.ValidationError(errors)
             return data
-
-        errors = {}
 
         # VALIDACIÓN 1: numero_serie obligatorio para LAPTOP, DESKTOP, TELEFONO, TABLET, TV
         if tipo_equipo in ['LAPTOP', 'DESKTOP', 'TELEFONO', 'TABLET', 'TV']:

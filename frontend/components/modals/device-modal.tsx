@@ -16,6 +16,7 @@ import { z } from "zod"
 import { deviceSchema } from "@/lib/validations"
 import { formatCurrency, formatCurrencyInput, parseCurrency } from "@/lib/utils"
 import { getTodayLocal } from "@/lib/utils/date-helpers"
+import { useAuthStore } from "@/lib/store/auth-store"
 
 interface DeviceModalProps {
   open: boolean
@@ -26,6 +27,7 @@ interface DeviceModalProps {
 
 export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceModalProps) {
   const { toast } = useToast()
+  const user = useAuthStore((state) => state.user)
   const [loading, setLoading] = useState(false)
   const [valorCalculadoSugerido, setValorCalculadoSugerido] = useState<number | null>(null)
   const [mostrarInfoDepreciacion, setMostrarInfoDepreciacion] = useState(false)
@@ -46,6 +48,9 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
   })
 
   const isEditMode = !!device
+  const isAdmin = user?.role === 'ADMIN'
+  // Solo ADMIN puede editar numero_serie e imei en modo edición
+  const canEditSerialAndImei = isAdmin || !isEditMode
 
   // Función para calcular depreciación (igual que en backend)
   const calcularDepreciacion = (valorInicial: number, fechaIngreso: string): number => {
@@ -184,8 +189,6 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
 
       if (isEditMode && device) {
         // Modo edición
-        // NO enviar numero_serie e imei ya que son campos inmutables
-        // El backend validará contra la instancia existente
         const updateData: Partial<CreateDeviceData> = {
           tipo_equipo: formData.tipo_equipo,
           marca: formData.marca,
@@ -198,6 +201,12 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
           valor_inicial: formData.valor_inicial,
           valor_depreciado: formData.valor_depreciado,
           es_valor_manual: formData.es_valor_manual,
+        }
+
+        // Solo ADMIN puede enviar numero_serie e imei en modo edición
+        if (isAdmin) {
+          updateData.numero_serie = formData.numero_serie
+          updateData.imei = formData.imei
         }
 
         await deviceService.updateDevice(device.id, updateData)
@@ -244,7 +253,9 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
           <DialogTitle>{isEditMode ? "Editar Dispositivo" : "Crear Nuevo Dispositivo"}</DialogTitle>
           <DialogDescription>
             {isEditMode
-              ? "Actualiza la información del dispositivo. El número de serie e IMEI no pueden ser modificados."
+              ? isAdmin
+                ? "Actualiza la información del dispositivo. Como administrador, puedes modificar todos los campos."
+                : "Actualiza la información del dispositivo. El número de serie e IMEI solo pueden ser modificados por administradores."
               : "Completa la información para agregar un nuevo dispositivo al inventario."}
           </DialogDescription>
         </DialogHeader>
@@ -313,12 +324,12 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
                 onChange={handleInputChange}
                 placeholder="C02XYZ123ABC"
                 required={isNumeroSerieRequired}
-                disabled={isEditMode}
-                className={isEditMode ? "bg-muted cursor-not-allowed" : ""}
+                disabled={!canEditSerialAndImei}
+                className={!canEditSerialAndImei ? "bg-muted cursor-not-allowed" : ""}
               />
-              {isEditMode && (
+              {!canEditSerialAndImei && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  El número de serie no puede ser modificado
+                  Solo los administradores pueden modificar el número de serie
                 </p>
               )}
             </div>
@@ -333,12 +344,12 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
                   value={formData.imei}
                   onChange={handleInputChange}
                   placeholder="123456789012345"
-                  disabled={isEditMode}
-                  className={isEditMode ? "bg-muted cursor-not-allowed" : ""}
+                  disabled={!canEditSerialAndImei}
+                  className={!canEditSerialAndImei ? "bg-muted cursor-not-allowed" : ""}
                 />
-                {isEditMode && (
+                {!canEditSerialAndImei && (
                   <p className="text-xs text-muted-foreground mt-1">
-                    El IMEI no puede ser modificado
+                    Solo los administradores pueden modificar el IMEI
                   </p>
                 )}
               </div>
