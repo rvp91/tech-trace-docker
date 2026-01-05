@@ -1,5 +1,20 @@
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, UserManager as DjangoUserManager
 from django.db import models
+
+
+class UserManager(DjangoUserManager):
+    """
+    Manager personalizado para el modelo User.
+    Asegura que los superusuarios tengan rol ADMIN por defecto.
+    """
+    def create_superuser(self, username, email=None, password=None, **extra_fields):
+        """
+        Crea y guarda un superusuario con rol ADMIN.
+        """
+        # Establecer rol como ADMIN si no se especifica
+        extra_fields.setdefault('role', 'ADMIN')
+
+        return super().create_superuser(username, email, password, **extra_fields)
 
 
 class User(AbstractUser):
@@ -18,6 +33,9 @@ class User(AbstractUser):
         default='OPERADOR',
         verbose_name='Rol'
     )
+
+    # Usar el manager personalizado
+    objects = UserManager()
 
     class Meta:
         verbose_name = 'Usuario'
