@@ -68,19 +68,18 @@ export const userService = {
    * Obtiene la lista de usuarios con filtros opcionales
    */
   async getUsers(filters?: UserFilters): Promise<PaginatedResponse<User>> {
-    const params = new URLSearchParams()
+    // Construir objeto de parámetros
+    const params: Record<string, any> = {}
 
-    if (filters?.search) params.append("search", filters.search)
-    if (filters?.role) params.append("role", filters.role)
-    if (filters?.is_active !== undefined) params.append("is_active", filters.is_active.toString())
-    if (filters?.ordering) params.append("ordering", filters.ordering)
-    if (filters?.page) params.append("page", filters.page.toString())
-    if (filters?.page_size) params.append("page_size", filters.page_size.toString())
+    if (filters?.search) params.search = filters.search
+    if (filters?.role) params.role = filters.role
+    if (filters?.is_active !== undefined) params.is_active = filters.is_active
+    if (filters?.ordering) params.ordering = filters.ordering
+    if (filters?.page) params.page = filters.page
+    if (filters?.page_size) params.page_size = filters.page_size
 
-    const queryString = params.toString()
-    const url = queryString ? `/auth/users/?${queryString}` : "/auth/users/"
-
-    return apiClient.get<PaginatedResponse<User>>(url)
+    // Usar el método get de apiClient que maneja los parámetros automáticamente
+    return apiClient.get<PaginatedResponse<User>>("/auth/users/", params)
   },
 
   /**
