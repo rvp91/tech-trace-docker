@@ -54,7 +54,7 @@ export default function AssignmentsPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const [estadoFilter, setEstadoFilter] = useState("all")
+  const [estadoFilter, setEstadoFilter] = useState("ACTIVA")
   const [estadoCartaFilter, setEstadoCartaFilter] = useState("all")
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null)

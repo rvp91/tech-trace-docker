@@ -22,6 +22,7 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+pytest.ini
 
 # Django
 *.log
@@ -31,7 +32,10 @@ db.sqlite3-journal
 *.sqlite3.backup*
 *.db
 /media
+/media/
 /static
+/staticfiles
+/staticfiles/
 
 # Environment variables
 .env
@@ -45,5 +49,3 @@ db.sqlite3-journal
 *.swo
 *~
 .DS_Store
-
-/memory-bank/

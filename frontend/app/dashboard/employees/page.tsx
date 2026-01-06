@@ -32,6 +32,7 @@ import { employeeService } from "@/lib/services/employee-service"
 import { BranchSearchCombobox } from "@/components/ui/branch-search-combobox"
 import type { Employee } from "@/lib/types"
 import { CreateEmployeeModal } from "@/components/modals/create-employee-modal"
+import { formatRUT } from "@/lib/validations"
 
 export default function EmployeesPage() {
   const router = useRouter()
@@ -110,10 +111,15 @@ export default function EmployeesPage() {
       setDeleteDialogOpen(false)
       setEmployeeToDelete(null)
     } catch (error) {
+      const errorMessage = error instanceof Error
+        ? error.message
+        : "No se pudo eliminar el empleado. Puede estar siendo referenciado por otros registros."
+
       toast({
         title: "Error al eliminar",
-        description: error instanceof Error ? error.message : "No se pudo eliminar el empleado. Puede tener asignaciones activas.",
+        description: errorMessage,
         variant: "destructive",
+        duration: 6000, // Mostrar por más tiempo para errores largos
       })
     } finally {
       setIsDeleting(false)
@@ -240,7 +246,7 @@ export default function EmployeesPage() {
                 ) : (
                   employees.map((employee) => (
                     <TableRow key={employee.id}>
-                      <TableCell className="font-mono text-sm hidden lg:table-cell">{employee.rut}</TableCell>
+                      <TableCell className="font-mono text-sm hidden lg:table-cell">{formatRUT(employee.rut)}</TableCell>
                       <TableCell className="font-medium">{employee.nombre_completo}</TableCell>
                       <TableCell className="hidden md:table-cell">{employee.cargo}</TableCell>
                       <TableCell>
@@ -323,8 +329,8 @@ export default function EmployeesPage() {
               ¿Estás seguro de que deseas eliminar a <strong>{employeeToDelete?.nombre_completo}</strong>?
               Esta acción no se puede deshacer.
               {employeeToDelete && (
-                <span className="block mt-2 text-sm">
-                  Si el empleado tiene asignaciones activas, no podrá ser eliminado.
+                <span className="block mt-2 text-sm text-amber-600 dark:text-amber-500">
+                  <strong>Nota:</strong> No se podrá eliminar si el empleado tiene asignaciones, solicitudes u otros registros asociados.
                 </span>
               )}
             </AlertDialogDescription>

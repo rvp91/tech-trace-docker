@@ -55,6 +55,18 @@ class Employee(models.Model):
         limit_choices_to={'is_active': True}
     )
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='ACTIVO', verbose_name='Estado')
+    activo = models.BooleanField(
+        default=True,
+        verbose_name='Activo',
+        db_index=True,
+        help_text='Indica si el empleado está activo en el sistema'
+    )
+    fecha_inactivacion = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name='Fecha de inactivación',
+        help_text='Fecha en que el empleado fue marcado como inactivo (soft delete)'
+    )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Fecha de creación')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Última actualización')
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, verbose_name='Creado por')
@@ -65,17 +77,9 @@ class Employee(models.Model):
         ordering = ['nombre_completo']
 
     def __str__(self):
-        return f"{self.rut} - {self.nombre_completo}"
+        prefix = "[INACTIVO] " if not self.activo else ""
+        return f"{prefix}{self.rut} - {self.nombre_completo}"
 
     def has_active_assignments(self):
         """Retorna True si el empleado tiene asignaciones activas"""
         return self.assignment_set.filter(estado_asignacion='ACTIVA').exists()
-
-    def delete(self, *args, **kwargs):
-        """Previene la eliminación si tiene asignaciones activas"""
-        if self.has_active_assignments():
-            raise models.ProtectedError(
-                "No se puede eliminar el empleado porque tiene asignaciones activas",
-                self
-            )
-        super().delete(*args, **kwargs)

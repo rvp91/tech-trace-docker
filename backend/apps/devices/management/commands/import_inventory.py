@@ -60,7 +60,7 @@ class Command(BaseCommand):
         parser.add_argument(
             '--csv-path',
             type=str,
-            default='/home/rvpadmin/tech-trace/docs/Inventario_General.csv',
+            default='/home/rvpadmin/tech-trace/Inventario_General.csv',
             help='Ruta al archivo CSV de inventario'
         )
         parser.add_argument(

@@ -21,19 +21,32 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     ViewSet para gestionar los empleados.
     Proporciona operaciones CRUD completas con filtros y búsqueda.
     """
-    queryset = Employee.objects.select_related('sucursal', 'unidad_negocio', 'created_by').annotate(
-        dispositivos_asignados=Count(
-            'assignment',
-            filter=Q(assignment__estado_asignacion='ACTIVA'),
-            distinct=True
-        )
-    ).all()
     serializer_class = EmployeeSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['estado', 'sucursal', 'unidad_negocio']
     search_fields = ['nombre_completo', 'rut', 'cargo', 'correo_corporativo']
     ordering_fields = ['nombre_completo', 'rut', 'cargo', 'created_at']
     ordering = ['nombre_completo']
+
+    def get_queryset(self):
+        """
+        Filtra empleados inactivos por defecto.
+        Usa ?incluir_inactivos=true para incluirlos.
+        """
+        queryset = Employee.objects.select_related('sucursal', 'unidad_negocio', 'created_by').annotate(
+            dispositivos_asignados=Count(
+                'assignment',
+                filter=Q(assignment__estado_asignacion='ACTIVA'),
+                distinct=True
+            )
+        )
+
+        incluir_inactivos = self.request.query_params.get('incluir_inactivos', 'false').lower()
+
+        if incluir_inactivos not in ['true', '1', 'yes']:
+            queryset = queryset.filter(activo=True)
+
+        return queryset
 
     def perform_create(self, serializer):
         """
@@ -43,25 +56,14 @@ class EmployeeViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         """
-        Validar que no se puedan eliminar empleados con asignaciones activas
-        y proporcionar mensajes de error descriptivos.
+        Realiza soft delete en lugar de eliminación física.
+        Preserva todas las relaciones intactas.
         """
-        from rest_framework.exceptions import ValidationError
-        from django.db.models import ProtectedError
+        from django.utils import timezone
 
-        try:
-            instance.delete()
-        except ProtectedError:
-            if instance.has_active_assignments():
-                active_count = instance.assignment_set.filter(estado_asignacion='ACTIVA').count()
-                raise ValidationError({
-                    'detail': f'No se puede eliminar el empleado porque tiene {active_count} asignación(es) activa(s).',
-                    'active_assignments': active_count
-                })
-            else:
-                raise ValidationError({
-                    'detail': 'No se puede eliminar el empleado porque está siendo referenciado por otros registros.'
-                })
+        instance.activo = False
+        instance.fecha_inactivacion = timezone.now()
+        instance.save(update_fields=['activo', 'fecha_inactivacion'])
 
     @action(detail=True, methods=['get'], url_path='history')
     def history(self, request, pk=None):

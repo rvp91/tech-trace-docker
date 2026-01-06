@@ -40,14 +40,21 @@ class BranchSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at', 'total_dispositivos', 'total_empleados', 'dispositivos_por_tipo']
 
     def get_dispositivos_por_tipo(self, obj):
-        """Retorna la cantidad de dispositivos agrupados por tipo."""
+        """
+        Retorna la cantidad de dispositivos agrupados por tipo.
+        IMPORTANTE: Excluye dispositivos con estados finales (ROBO, BAJA).
+        """
         # Si ya está en cache (pre-calculado), usarlo
         if hasattr(obj, '_dispositivos_por_tipo_cache'):
             return obj._dispositivos_por_tipo_cache
 
         # Fallback optimizado (solo si es necesario)
         from django.db.models import Count
-        dispositivos = obj.device_set.values('tipo_equipo').annotate(
+        from apps.devices.models import Device
+
+        dispositivos = obj.device_set.exclude(
+            estado__in=Device.FINAL_STATES
+        ).values('tipo_equipo').annotate(
             cantidad=Count('id')
         )
 

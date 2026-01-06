@@ -31,9 +31,17 @@ class BranchViewSet(viewsets.ModelViewSet):
         """
         Queryset optimizado con estadísticas pre-calculadas usando annotate().
         Esto evita N+1 queries al serializar las sucursales.
+        IMPORTANTE: Excluye dispositivos con estados finales (ROBO, BAJA) del conteo.
         """
+        from django.db.models import Q
+        from apps.devices.models import Device
+
         return Branch.objects.annotate(
-            total_dispositivos=Count('device', distinct=True),
+            total_dispositivos=Count(
+                'device',
+                distinct=True,
+                filter=~Q(device__estado__in=Device.FINAL_STATES)
+            ),
             total_empleados=Count('employee', distinct=True)
         ).prefetch_related('device_set')
 

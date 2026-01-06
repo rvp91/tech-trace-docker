@@ -13,6 +13,7 @@ import { employeeService } from "@/lib/services/employee-service"
 import type { Employee, EmployeeHistory } from "@/lib/types"
 import { CreateEmployeeModal } from "@/components/modals/create-employee-modal"
 import { formatDateLocal } from "@/lib/utils/date-helpers"
+import { formatRUT } from "@/lib/validations"
 
 export default function EmployeeDetailPage() {
   const params = useParams()
@@ -129,7 +130,7 @@ export default function EmployeeDetailPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">RUT</p>
-                <p className="font-medium font-mono">{employee.rut}</p>
+                <p className="font-medium font-mono">{formatRUT(employee.rut)}</p>
               </div>
             </div>
 

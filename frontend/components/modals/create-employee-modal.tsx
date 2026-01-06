@@ -5,6 +5,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { RutInput } from "@/components/ui/rut-input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
@@ -145,11 +146,10 @@ export function CreateEmployeeModal({ employee, children, onSuccess }: CreateEmp
             {/* RUT */}
             <div>
               <Label htmlFor="rut">RUT *</Label>
-              <Input
+              <RutInput
                 id="rut"
-                name="rut"
                 value={formData.rut}
-                onChange={handleInputChange}
+                onChange={(cleanValue) => setFormData((prev) => ({ ...prev, rut: cleanValue }))}
                 placeholder="12.345.678-9"
                 required
                 disabled={isEditMode} // RUT no editable
@@ -252,21 +252,6 @@ export function CreateEmployeeModal({ employee, children, onSuccess }: CreateEmp
                 </SelectContent>
               </Select>
             </div>
-          </div>
-
-          {/* Estado */}
-          <div className="flex items-center justify-between p-4 border rounded-lg">
-            <div className="space-y-0.5">
-              <Label htmlFor="estado">Estado del Empleado</Label>
-              <div className="text-sm text-muted-foreground">
-                {formData.estado === "ACTIVO" ? "El empleado está activo" : "El empleado está inactivo"}
-              </div>
-            </div>
-            <Switch
-              id="estado"
-              checked={formData.estado === "ACTIVO"}
-              onCheckedChange={(checked) => handleSelectChange("estado", checked ? "ACTIVO" : "INACTIVO")}
-            />
           </div>
 
           <div className="flex gap-2 justify-end pt-4">

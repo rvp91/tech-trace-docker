@@ -44,6 +44,8 @@ export interface Employee {
   unidad_negocio?: number
   unidad_negocio_detail?: BusinessUnit
   estado: "ACTIVO" | "INACTIVO"
+  activo?: boolean
+  fecha_inactivacion?: string
   dispositivos_asignados: number
   created_at: string
   updated_at: string

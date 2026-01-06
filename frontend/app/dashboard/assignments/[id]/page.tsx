@@ -30,6 +30,7 @@ import { DiscountLetterModal } from "@/components/modals/discount-letter-modal"
 import { MarkSignedConfirmationModal } from "@/components/modals/mark-signed-confirmation-modal"
 import { formatDateLocal } from "@/lib/utils/date-helpers"
 import { formatDateTime } from "@/lib/utils/format"
+import { formatRUT } from "@/lib/validations"
 
 // Mapeo de estados de dispositivos en devoluciones
 const DEVICE_CONDITION_LABELS: Record<string, string> = {
@@ -204,7 +205,7 @@ export default function AssignmentDetailPage() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">RUT</p>
-                  <p className="font-medium">{assignment.empleado_detail.rut}</p>
+                  <p className="font-medium font-mono">{formatRUT(assignment.empleado_detail.rut)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Cargo</p>

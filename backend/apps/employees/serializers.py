@@ -37,13 +37,15 @@ class EmployeeSerializer(serializers.ModelSerializer):
             'unidad_negocio',
             'unidad_negocio_detail',
             'estado',
+            'activo',
+            'fecha_inactivacion',
             'dispositivos_asignados',
             'created_at',
             'updated_at',
             'created_by',
             'created_by_username',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'created_by', 'sucursal_detail', 'unidad_negocio_detail', 'created_by_username', 'dispositivos_asignados']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'created_by', 'sucursal_detail', 'unidad_negocio_detail', 'created_by_username', 'dispositivos_asignados', 'activo', 'fecha_inactivacion']
 
     def validate_rut(self, value):
         """
@@ -62,16 +64,6 @@ class EmployeeSerializer(serializers.ModelSerializer):
         """
         Validaciones a nivel de objeto.
         """
-        # VALIDACIÓN: Prevenir inactivación con asignaciones activas
-        if self.instance:  # Solo en actualización
-            old_status = self.instance.estado
-            new_status = data.get('estado')
-
-            if new_status == 'INACTIVO' and old_status == 'ACTIVO':
-                if self.instance.has_active_assignments():
-                    raise serializers.ValidationError({
-                        'estado': 'No se puede marcar como inactivo un empleado con asignaciones activas. '
-                                 'Debe registrar las devoluciones primero.'
-                    })
-
+        # Nota: Se eliminó la validación de inactivación con asignaciones activas
+        # porque ahora se usa soft delete que preserva todas las relaciones.
         return data

@@ -8,6 +8,7 @@ export interface EmployeeFilters {
   estado?: "ACTIVO" | "INACTIVO" | ""
   sucursal?: number
   unidad_negocio?: number
+  incluir_inactivos?: boolean
   page?: number
   page_size?: number
   ordering?: string

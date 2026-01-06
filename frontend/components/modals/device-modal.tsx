@@ -327,11 +327,6 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
                 disabled={!canEditSerialAndImei}
                 className={!canEditSerialAndImei ? "bg-muted cursor-not-allowed" : ""}
               />
-              {!canEditSerialAndImei && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Solo los administradores pueden modificar el número de serie
-                </p>
-              )}
             </div>
 
             {/* IMEI (solo para TELEFONO y TABLET) */}
@@ -347,11 +342,6 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
                   disabled={!canEditSerialAndImei}
                   className={!canEditSerialAndImei ? "bg-muted cursor-not-allowed" : ""}
                 />
-                {!canEditSerialAndImei && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Solo los administradores pueden modificar el IMEI
-                  </p>
-                )}
               </div>
             )}
 
@@ -409,11 +399,6 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
                   {isEditMode && <SelectItem value="ROBO">Robo/Perdida</SelectItem>}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground mt-1">
-                {isEditMode
-                  ? "Los cambios de estado se realizan a través de las acciones de estado más abajo."
-                  : "El estado inicial del dispositivo será DISPONIBLE."}
-              </p>
             </div>
 
             {/* Sucursal */}
@@ -466,7 +451,7 @@ export function DeviceModal({ open, onOpenChange, device, onSuccess }: DeviceMod
                         valor_inicial: numericValue || undefined
                       }))
                     }}
-                    placeholder="800.000"
+                    placeholder={device?.valor_inicial ? formatCurrency(device.valor_inicial) : "Ej: 800.000"}
                   />
                 </div>
 

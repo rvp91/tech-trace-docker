@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/popover"
 import { employeeService } from "@/lib/services/employee-service"
 import type { Employee } from "@/lib/types"
+import { formatRUT } from "@/lib/validations"
 
 interface EmployeeSearchComboboxProps {
   value?: string | number
@@ -121,7 +122,7 @@ export function EmployeeSearchCombobox({
         >
           {selectedEmployee ? (
             <span className="truncate">
-              {selectedEmployee.nombre_completo} - {selectedEmployee.rut}
+              {selectedEmployee.nombre_completo} - {formatRUT(selectedEmployee.rut)}
             </span>
           ) : (
             <span className="text-muted-foreground">{placeholder}</span>
@@ -158,7 +159,7 @@ export function EmployeeSearchCombobox({
                   <div className="flex flex-col">
                     <span>{employee.nombre_completo}</span>
                     <span className="text-xs text-muted-foreground">
-                      {employee.rut}
+                      {formatRUT(employee.rut)}
                     </span>
                   </div>
                 </CommandItem>

@@ -12,6 +12,8 @@ from reportlab.lib.utils import ImageReader
 from django.conf import settings
 import os
 
+from apps.employees.validators import format_rut
+
 
 # Constantes de configuración
 LOGO_PATH = os.path.join(settings.BASE_DIR.parent, 'docs', 'logo.png')
@@ -135,7 +137,7 @@ class PDFLetterGenerator:
         c.setFont("Helvetica", 11)
         intro_text = (
             f"En Santiago {self._format_date_spanish(fecha)}, entre la Empresa {self.company_name} "
-            f"RUT: {self.company_rut} Y don(a) {empleado.nombre_completo} RUT: {empleado.rut} "
+            f"RUT: {self.company_rut} Y don(a) {empleado.nombre_completo} RUT: {format_rut(empleado.rut)} "
             f'en adelante denominado "el (la) trabajador(a)", se ha convenido la siguiente carta de responsabilidad:'
         )
 
@@ -298,7 +300,7 @@ class PDFLetterGenerator:
         c.setFont("Helvetica", 11)
         intro_text = (
             f"En Santiago {self._format_date_spanish(fecha)}, entre la Empresa {self.company_name}. "
-            f"Rut {self.company_rut} y don(a) {empleado.nombre_completo} Rut {empleado.rut} "
+            f"Rut {self.company_rut} y don(a) {empleado.nombre_completo} Rut {format_rut(empleado.rut)} "
             f'en adelante denominado "el (la) trabajador(a)", se ha convenido la siguiente carta de responsabilidad:'
         )
 
@@ -347,7 +349,7 @@ class PDFLetterGenerator:
 
         # Tabla 2 columnas x 6 filas con los campos solicitados
         equipo_marca_modelo = f"{dispositivo.marca} {dispositivo.modelo}"
-        valor_depreciado = dispositivo.get_valor_depreciado() or 0
+        valor_inicial = dispositivo.valor_inicial or 0
 
         jefatura = extra_data.get('jefatura_nombre', 'N/A')
         cargo = empleado.cargo or 'N/A'
@@ -390,7 +392,7 @@ class PDFLetterGenerator:
         clauses = [
             ("SEGUNDO:", "Se deberá incorporar a la firma de correo electrónico, el número de celular asignado por la empresa. A de más está totalmente prohibido transferir teléfono a otra persona."),
             ("TERCERO:", "Se deja constancia que el trabajador, deberá responder por cualquier daño o pérdida parcial o total de la(s) especie(s) individualizadas más arriba, por lo que autoriza desde ya el descuento en su remuneración mensual, por los gastos en que incurra la empresa para el arreglo o reposición de nuevos equipos y/o accesorios."),
-            ("CUARTO:", f"En el caso de término de la relación laboral, el trabajador se compromete a realizar la devolución del equipo y accesorios, entregarlos a su jefe directo, en el caso de No ser así, se descontará del cálculo de su finiquito y este tendrá un costo de:\n\nCosto de Equipo Entregado: {self._format_currency(valor_depreciado)}"),
+            ("CUARTO:", f"En el caso de término de la relación laboral, el trabajador se compromete a realizar la devolución del equipo y accesorios, entregarlos a su jefe directo, en el caso de No ser así, se descontará del cálculo de su finiquito y este tendrá un costo de:\n\nCosto de Equipo Entregado: {self._format_currency(valor_inicial)}"),
         ]
 
         for clause_title, clause_text in clauses:
@@ -520,7 +522,7 @@ class PDFLetterGenerator:
 
         details = [
             ("NOMBRE TRABAJADOR", empleado.nombre_completo),
-            ("R.U.T.", empleado.rut),
+            ("R.U.T.", format_rut(empleado.rut)),
             ("Nº DE CUOTAS", str(discount_data['numero_cuotas'])),
             ("MES DE 1era CUOTA", discount_data['mes_primera_cuota']),
             ("MONTO DE CUOTA", self._format_currency(monto_cuota)),

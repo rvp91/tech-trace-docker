@@ -13,6 +13,7 @@ import { Download, FileSpreadsheet } from "lucide-react"
 import { BranchSearchCombobox } from "@/components/ui/branch-search-combobox"
 import { exportToCSV, exportToExcel, getDeviceSerial, formatCurrency } from "@/lib/utils"
 import { formatDateLocal, formatDateTimeToDate } from "@/lib/utils/date-helpers"
+import { formatRUT } from "@/lib/validations"
 import { reportService } from "@/lib/services/report-service"
 import { getDeviceTypeLabel } from "@/lib/services/device-service"
 import type { Assignment, DiscountReportFilters, ActiveAssignmentReportFilters, RetiredDevicesFilters, TipoEquipo, Device } from "@/lib/types"
@@ -484,7 +485,7 @@ function ActiveAssignmentsReport() {
                       <TableCell className="font-medium">
                         {assignment.empleado_detail?.nombre_completo || "N/A"}<br />
                         <span className="text-xs text-muted-foreground">
-                          {assignment.empleado_detail?.rut || "N/A"}
+                          {assignment.empleado_detail?.rut ? formatRUT(assignment.empleado_detail.rut) : "N/A"}
                         </span>
                       </TableCell>
                       <TableCell>{assignment.empleado_detail?.cargo || "N/A"}</TableCell>
@@ -815,7 +816,7 @@ function DiscountsReport() {
                       <TableCell className="font-medium">
                         {assignment.empleado_detail?.nombre_completo || "N/A"}<br />
                         <span className="text-xs text-muted-foreground">
-                          {assignment.empleado_detail?.rut || "N/A"}
+                          {assignment.empleado_detail?.rut ? formatRUT(assignment.empleado_detail.rut) : "N/A"}
                         </span>
                       </TableCell>
                       <TableCell>{assignment.empleado_detail?.sucursal_detail?.nombre || "N/A"}</TableCell>
