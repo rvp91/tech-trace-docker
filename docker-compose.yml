@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   # ==========================================
   # PostgreSQL Database
@@ -8,6 +6,8 @@ services:
     image: postgres:15-alpine
     container_name: techtrace_db
     restart: unless-stopped
+    security_opt:
+      - apparmor=unconfined
 
     environment:
       POSTGRES_DB: techtrace_db
@@ -48,6 +48,8 @@ services:
       dockerfile: Dockerfile
     container_name: techtrace_backend
     restart: unless-stopped
+    security_opt:
+      - apparmor=unconfined
 
     environment:
       # Django Core
@@ -131,6 +133,8 @@ services:
         NEXT_PUBLIC_API_URL: http://nginx/api
     container_name: techtrace_frontend
     restart: unless-stopped
+    security_opt:
+      - apparmor=unconfined
 
     environment:
       NODE_ENV: production
@@ -163,6 +167,8 @@ services:
     image: nginx:1.25-alpine
     container_name: techtrace_nginx
     restart: unless-stopped
+    security_opt:
+      - apparmor=unconfined
 
     ports:
       - "80:80"
