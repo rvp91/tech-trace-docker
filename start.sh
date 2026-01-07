@@ -20,7 +20,7 @@ if ! command -v docker &> /dev/null; then
 fi
 
 # Verificar que Docker Compose está instalado
-if ! command -v docker-compose &> /dev/null; then
+if ! command -v docker &> /dev/null || ! docker compose version &> /dev/null 2>&1; then
     echo -e "${RED}Error: Docker Compose no está instalado${NC}"
     exit 1
 fi
@@ -47,11 +47,11 @@ fi
 
 # Construir imágenes
 echo -e "${YELLOW}Construyendo imágenes Docker...${NC}"
-docker-compose build
+docker compose build
 
 # Levantar servicios
 echo -e "${YELLOW}Levantando servicios...${NC}"
-docker-compose up -d
+docker compose up -d
 
 # Esperar a que los servicios estén listos
 echo -e "${YELLOW}Esperando a que los servicios estén listos...${NC}"
@@ -61,7 +61,7 @@ sleep 10
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}Estado de los servicios:${NC}"
 echo -e "${GREEN}========================================${NC}"
-docker-compose ps
+docker compose ps
 
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}TechTrace está listo!${NC}"
