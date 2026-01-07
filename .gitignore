@@ -84,5 +84,10 @@ Thumbs.db
 # /.idea/
 # /.vscode/
 
+# Docker
+.env
+.env.production
+backup_*.sql
+
 # Memory bank
 memory-bank/
