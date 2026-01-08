@@ -53,15 +53,15 @@ if [ "$DEBUG" = "True" ] || [ "$CREATE_SUPERUSER" = "True" ]; then
     echo -e "${YELLOW}Creando superusuario de prueba (si no existe)...${NC}"
     python manage.py shell << EOF
 from apps.users.models import User
-if not User.objects.filter(email='admin@techtrace.com').exists():
+if not User.objects.filter(username='admin').exists():
     User.objects.create_superuser(
+        username='admin',
         email='admin@techtrace.com',
-        first_name='Admin',
-        last_name='TechTrace',
         password='admin123',
-        rut='11111111-1'
+        first_name='Admin',
+        last_name='TechTrace'
     )
-    print('✓ Superusuario creado: admin@techtrace.com / admin123')
+    print('✓ Superusuario creado: admin / admin123')
 else:
     print('✓ Superusuario ya existe')
 EOF

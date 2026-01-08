@@ -58,6 +58,9 @@ WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1
 
+# Instalar wget para healthcheck
+RUN apk add --no-cache wget
+
 # Crear usuario no-root (node ya existe en la imagen)
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
@@ -69,15 +72,23 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# Copiar y configurar entrypoint
+COPY --chown=nextjs:nodejs docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # Cambiar a usuario no-root
 USER nextjs
 
 # Exponer puerto
 EXPOSE 3000
 
+# Variable de entorno para que Next.js escuche en todas las interfaces
+ENV HOSTNAME="0.0.0.0"
+
 # Healthcheck
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
 
 # Comando
-CMD ["node", "server.js"]
+CMD ["docker-entrypoint.sh"]
+ENTRYPOINT ["/bin/sh", "-c"]

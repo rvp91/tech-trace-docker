@@ -107,7 +107,7 @@ services:
         condition: service_healthy
 
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/ || exit 1"]
+      test: ["CMD-SHELL", "curl -s http://localhost:8000/api/auth/ | grep -q 'credenciales' || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -130,7 +130,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: http://nginx/api
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://nginx/api}
     container_name: techtrace_frontend
     restart: unless-stopped
     security_opt:
@@ -138,7 +138,7 @@ services:
 
     environment:
       NODE_ENV: production
-      NEXT_PUBLIC_API_URL: http://nginx/api
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://nginx/api}
       NEXT_TELEMETRY_DISABLED: 1
 
     networks:
@@ -188,7 +188,7 @@ services:
         condition: service_healthy
 
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost/health || exit 1"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

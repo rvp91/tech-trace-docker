@@ -7,11 +7,61 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 TechTrace es un sistema de gestión de inventario de dispositivos móviles construido como una aplicación full-stack con:
 - **Frontend**: Next.js 16 (App Router) con React 19, TypeScript, Tailwind CSS, shadcn/ui
 - **Backend**: Django 5.2.7 con Django REST Framework
-- **Base de datos**: SQLite (desarrollo)
+- **Base de datos**: SQLite (desarrollo local), PostgreSQL (Docker/producción)
+- **Deployment**: Docker Compose con Nginx como reverse proxy
+
+## Modos de Desarrollo
+
+### Opción 1: Docker Compose (Recomendado para desarrollo rápido)
+
+```bash
+# Inicio rápido con script automático
+./start.sh  # Genera .env, construye imágenes, levanta servicios
+
+# O con Makefile
+make build  # Construir imágenes
+make up     # Levantar servicios
+make down   # Detener servicios
+make help   # Ver todos los comandos
+
+# Servicios disponibles:
+# - Frontend: http://localhost
+# - Backend API: http://localhost/api
+# - Django Admin: http://localhost/admin
+# Credenciales por defecto:
+#   Username: admin (Email: admin@techtrace.com)
+#   Password: admin123
+
+# Comandos útiles
+make logs           # Ver logs de todos los servicios
+make logs-backend   # Ver logs del backend
+make logs-frontend  # Ver logs del frontend
+make migrate        # Ejecutar migraciones
+make shell-backend  # Shell del backend
+make shell-db       # Shell de PostgreSQL
+make test           # Ejecutar tests
+make backup-db      # Backup de la base de datos
+```
+
+**Arquitectura Docker**:
+- `db`: PostgreSQL 15 con healthcheck
+- `backend`: Django con Gunicorn, espera a que DB esté lista
+- `frontend`: Next.js production build
+- `nginx`: Reverse proxy que sirve frontend, proxy a backend API, y archivos estáticos/media
+
+**Variables de entorno Docker** (`.env` en raíz):
+- `POSTGRES_PASSWORD`: Contraseña de PostgreSQL
+- `SECRET_KEY`: Clave secreta de Django (generar nueva)
+- `DEBUG`: False para Docker (producción)
+- `ALLOWED_HOSTS`: localhost,backend,nginx por defecto
+- `CORS_ALLOWED_ORIGINS`: http://localhost por defecto
+- `CREATE_SUPERUSER`: True para crear admin automáticamente
+
+### Opción 2: Desarrollo Local (Sin Docker)
 
 ## Comandos de Desarrollo
 
-### Backend (Django)
+#### Backend (Django)
 
 ```bash
 # IMPORTANTE: Todos los comandos se ejecutan desde /backend con el venv activado
@@ -37,10 +87,9 @@ python manage.py test apps.devices.tests.TestDeviceModel  # Test específico
 
 # Utilidades
 python manage.py shell  # Django shell interactiva
-python ../backend/scripts/generate_test_data.py  # Generar datos de prueba
 ```
 
-### Frontend (Next.js)
+#### Frontend (Next.js)
 
 ```bash
 # IMPORTANTE: Todos los comandos se ejecutan desde /frontend
@@ -48,7 +97,7 @@ cd frontend
 
 # Instalación inicial (usa pnpm, NO npm/yarn)
 pnpm install
-cp .env.example .env.local  # Si existe
+cp env.local .env.local  # Configurar NEXT_PUBLIC_API_URL si es necesario
 
 # Desarrollo
 pnpm dev  # http://localhost:3000
@@ -173,14 +222,57 @@ pnpm lint
    - Backend: `python manage.py test apps.{app_name}`
    - Frontend: Principalmente testing manual (no hay suite de tests configurada)
 
+## Deployment
+
+**Docker Compose** (ver detalles arriba):
+- Stack completo con PostgreSQL, Django, Next.js, y Nginx
+- Healthchecks en todos los servicios
+- Volúmenes persistentes para DB, static files, y media
+- Resource limits configurados
+- Script de inicio automático: `./start.sh`
+
+**Archivos clave**:
+- `docker-compose.yml`: Configuración de servicios
+- `Makefile`: Comandos helper para Docker
+- `.env`: Variables de entorno (copiar de `.env.example`)
+- `backend/Dockerfile` y `backend/docker-entrypoint.sh`: Build y startup del backend
+- `frontend/Dockerfile`: Build multi-stage de Next.js
+- `nginx/nginx.conf`: Configuración de reverse proxy
+
+**Deployment en cloud**: Ver `DEPLOYMENT.md` para guías de Heroku, Railway, Render, DigitalOcean, AWS, GCP
+
+## Configuración HTTPS para Producción
+
+Cuando se despliega detrás de un proxy HTTPS (nginx/traefik/caddy externo), actualizar `.env`:
+
+```env
+# Dominio público
+ALLOWED_HOSTS=localhost,backend,nginx,tudominio.com
+CORS_ALLOWED_ORIGINS=https://tudominio.com,http://localhost
+FRONTEND_URL=https://tudominio.com
+NEXT_PUBLIC_API_URL=https://tudominio.com/api
+
+# Opcional: Desactivar SSL redirect si el proxy lo maneja
+SECURE_SSL_REDIRECT=False
+```
+
+**Configuración del proxy externo**: El proxy debe pasar headers correctos:
+- `X-Forwarded-Proto`: Para que Django reconozca HTTPS
+- `X-Forwarded-For`: IP del cliente
+- `Host`: Host original
+
+Django está configurado con `SECURE_PROXY_SSL_HEADER` para confiar en `X-Forwarded-Proto` y `CSRF_TRUSTED_ORIGINS` automáticamente usa los mismos orígenes que CORS.
+
 ## Consideraciones Importantes
 
-- **Idioma**: Español (es-es) en código, comentarios, mensajes y UI
+- **Idioma**: Español (es-es/es-cl) en código, comentarios, mensajes y UI
 - **Path alias**: Usar `@/` para imports en frontend (ej: `@/components/ui/button`)
 - **Autenticación**: JWT token almacenado en localStorage, sincronizado con ApiClient
-- **CORS**: Configurado entre localhost:3000 (frontend) y localhost:8000 (backend)
+- **CORS y CSRF**: Configurados desde `.env` via `CORS_ALLOWED_ORIGINS` (se aplica a ambos)
 - **Estados de dispositivos**: Los estados finales (BAJA, ROBO) son inmutables
 - **Cambios de estado**: Los dispositivos tienen endpoints específicos para cambiar estado (ej: `/devices/{id}/marcar_disponible/`)
 - **Depreciación**: Los dispositivos calculan valor depreciado automáticamente, pero puede ser manual
 - **Soft delete**: El modelo Device tiene campo `activo` para soft deletes
-- **Scripts auxiliares**: `backend/scripts/generate_test_data.py` para generar datos de prueba (100 devices, 50 employees, 30 assignments)
+- **Docker healthchecks**: Los servicios tienen healthchecks y depends_on con condition para startup ordenado
+- **Security opts**: Los contenedores usan `apparmor=unconfined` para compatibilidad con servidores restrictivos
+- **HTTPS Proxy**: Django confía en `X-Forwarded-Proto` para detectar conexiones HTTPS detrás de proxy
